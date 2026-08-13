@@ -23,12 +23,14 @@
   //     { "name": "GAME_ROOM", "class_name": "GameRoomDO", "script_name": "jeopardy-realtime" }
   //   ]
   // },
-  // M8/phase-2: saved boards + game results. Local-first (IndexedDB) until then.
-  // "d1_databases": [
-  //   { "binding": "DB", "database_name": "jeopardy", "database_id": "TBD-created-at-first-deploy" }
-  // ],
-  // M5: clue media (images/audio), Worker-proxied uploads with limits from @jeopardy/protocol/limits.
-  // "r2_buckets": [
-  //   { "binding": "MEDIA", "bucket_name": "jeopardy-media" }
-  // ]
+  // Provisioned by owner via dashboard 2026-08-13. Server code starts using DB in M8/phase-2
+  // (library stays IndexedDB-first until then) and MEDIA in M5 (Worker-proxied uploads with
+  // limits from @jeopardy/protocol/limits) - bound now so deploys carry them from day one.
+  // NOTE: confirm database_name matches the name chosen in the dashboard (id is authoritative).
+  "d1_databases": [
+    { "binding": "DB", "database_name": "jeopardy-machine", "database_id": "c12ef3a9-1c69-4f5d-8e87-e190123a74d6" },
+  ],
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "jeopardy-machine-media" },
+  ]
 }

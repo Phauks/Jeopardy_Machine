@@ -89,8 +89,8 @@ Notes: this hands deploy power to agent sessions - the repo's `.claude/settings.
 - [ ] Plan decided (free is fine; $5 removes doubt)
 - [ ] `wrangler login` done locally
 - [ ] workers.dev subdomain claimed
-- [ ] `wrangler d1 create jeopardy-machine` -> id pasted into wrangler.jsonc
-- [ ] `wrangler r2 bucket create jeopardy-media` -> binding uncommented
+- [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name)
+- [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
 - [ ] realtime deployed, then web; echo page verified
 - [ ] (optional) scoped API token added to agent environment
 - [ ] (later) custom domain after the name lands
