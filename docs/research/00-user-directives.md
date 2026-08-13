@@ -29,7 +29,7 @@
 
 ## Decisions resolved 2026-08-13
 - SvelteKit 3 prerelease (not 2.x-then-migrate). Tailwind v4. kebab-case components. zod. partyserver evaluated M0 week 1.
-- Art direction: owner co-develops via the "Three Boards" artifact; not locked.
+- Art direction: **all three directions ship as theme presets; the game screen is highly customizable** (fonts, colors, background chosen by the host). Theme = portable document; visual customizer UI in M7 (owner priority). See docs/decisions/2026-08-13-theming-as-feature.md.
 - Name: will change from "Jeopardy" for shipping; shortlist in ROADMAP.md.
 
 ## First event target
