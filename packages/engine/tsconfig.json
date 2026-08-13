@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // TypeScript 6 does not auto-include node_modules/@types; node globals (structuredClone
+    // in transition.ts, fs/path in the fixture-replay tests) are opted in explicitly.
+    // Runtime code stays Workers/browser-compatible - node:* imports live in tests only.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

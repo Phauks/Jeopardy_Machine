@@ -90,6 +90,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@jeopardy/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@jeopardy/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -127,6 +130,25 @@ importers:
       wrangler:
         specifier: 'catalog:'
         version: 4.123.0(@cloudflare/workers-types@5.20260813.1)
+
+  packages/engine:
+    dependencies:
+      '@jeopardy/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@22.20.1)(@vitest/browser-preview@4.1.10)(vite@8.2.1(@types/node@22.20.1)(esbuild@0.28.1)(jiti@2.7.0))
 
   packages/protocol:
     dependencies:

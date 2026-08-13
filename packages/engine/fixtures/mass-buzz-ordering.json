@@ -1,0 +1,33 @@
+{
+  "name": "mass-buzz-ordering",
+  "description": "Six players race one arming: one buzzes early and eats the lockout (#12), three buzz with IDENTICAL timestamps (arrival order decides - the M3 room's guarantee), stragglers get too-late feedback. Exactly one buzz-won fires.",
+  "seed": "mass-buzz",
+  "preset": "casual-party",
+  "overrides": {},
+  "rounds": [{ "columns": 3, "rows": 3, "wagerPlacement": "manual" }],
+  "hasFinalClue": false,
+  "actions": [
+    { "type": "player-join", "at": 1000, "playerId": "p1", "name": "Ada" },
+    { "type": "player-join", "at": 1001, "playerId": "p2", "name": "Ben" },
+    { "type": "player-join", "at": 1002, "playerId": "p3", "name": "Cleo" },
+    { "type": "player-join", "at": 1003, "playerId": "p4", "name": "Dev" },
+    { "type": "player-join", "at": 1004, "playerId": "p5", "name": "Eve" },
+    { "type": "player-join", "at": 1005, "playerId": "p6", "name": "Fox" },
+    { "type": "start-game", "at": 2000 },
+    { "type": "select-cell", "at": 2100, "category": 0, "row": 0 },
+    { "type": "buzz", "at": 2900, "playerId": "p5" },
+    { "type": "arm-buzzers", "at": 3000 },
+    { "type": "buzz", "at": 3100, "playerId": "p5" },
+    { "type": "buzz", "at": 3200, "playerId": "p2" },
+    { "type": "buzz", "at": 3200, "playerId": "p1" },
+    { "type": "buzz", "at": 3200, "playerId": "p3" },
+    { "type": "buzz", "at": 3201, "playerId": "p4" },
+    { "type": "buzz", "at": 3400, "playerId": "p6" },
+    { "type": "judge", "at": 4000, "verdict": "correct" }
+  ],
+  "expect": {
+    "phase": "awaiting-selection",
+    "scores": { "p1": 0, "p2": 200, "p3": 0, "p4": 0, "p5": 0, "p6": 0 },
+    "rejectedCount": 4
+  }
+}

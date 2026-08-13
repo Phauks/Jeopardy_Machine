@@ -10,12 +10,27 @@
   import { SvelteSet } from "svelte/reactivity";
   import type { BoardData } from "#lib/board/sample-board.ts";
 
-  type Props = { board: BoardData };
-  let { board }: Props = $props();
+  type Props = {
+    board: BoardData;
+    /**
+     * Controlled mode (the /dev/hotseat driver, later the M4 display surface): the caller
+     * owns used-cell state as "categoryIndex:clueIndex" keys and receives selections instead
+     * of the internal demo overlay. Both omitted = the original self-contained demo behavior
+     * the /dev/theme gallery runs on.
+     */
+    usedKeys?: ReadonlySet<string> | null;
+    onCellSelect?: ((categoryIndex: number, clueIndex: number) => void) | null;
+  };
+  let { board, usedKeys = null, onCellSelect = null }: Props = $props();
 
   type OpenClue = { categoryIndex: number; clueIndex: number };
   let openClue = $state<OpenClue | null>(null);
   const usedCells = new SvelteSet<string>();
+
+  function isUsed(categoryIndex: number, clueIndex: number): boolean {
+    const key = cellKey(categoryIndex, clueIndex);
+    return usedKeys === null ? usedCells.has(key) : usedKeys.has(key);
+  }
 
   const rowCount = $derived(Math.max(...board.categories.map((entry) => entry.clues.length)));
   // Reduced motion: the clue reveal becomes an instant cut (research 05-ui-design.md section 7).
@@ -28,7 +43,11 @@
   }
 
   function openCell(categoryIndex: number, clueIndex: number): void {
-    if (usedCells.has(cellKey(categoryIndex, clueIndex))) return;
+    if (isUsed(categoryIndex, clueIndex)) return;
+    if (onCellSelect !== null) {
+      onCellSelect(categoryIndex, clueIndex);
+      return;
+    }
     openClue = { categoryIndex, clueIndex };
   }
 
@@ -62,7 +81,7 @@
     {#each board.categories as category, categoryIndex (category.title)}
       {@const clue = category.clues[rowIndex]}
       {#if clue}
-        {@const used = usedCells.has(cellKey(categoryIndex, rowIndex))}
+        {@const used = isUsed(categoryIndex, rowIndex)}
         <button
           type="button"
           class="value-cell"

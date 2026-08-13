@@ -1,0 +1,39 @@
+{
+  "name": "final-round-tie",
+  "description": "Two players finish the final round still tied under the sudden-death rule (#37): a stakes-free tiebreaker clue follows, the first wrong answer eliminates, a fresh clue is dealt, and a correct buzz wins the game.",
+  "seed": "final-tie",
+  "preset": "casual-party",
+  "overrides": { "end": { "tieForFirst": "sudden-death" } },
+  "rounds": [{ "columns": 3, "rows": 3, "wagerPlacement": "manual" }],
+  "hasFinalClue": true,
+  "actions": [
+    { "type": "player-join", "at": 1000, "playerId": "p1", "name": "Ada" },
+    { "type": "player-join", "at": 1001, "playerId": "p2", "name": "Ben" },
+    { "type": "start-game", "at": 2000 },
+    { "type": "score-set", "at": 2100, "entityId": "p1", "score": 500 },
+    { "type": "score-set", "at": 2200, "entityId": "p2", "score": 500 },
+    { "type": "end-round", "at": 3000 },
+    { "type": "proceed", "at": 3100 },
+    { "type": "commit-final-wager", "at": 3200, "entityId": "p1", "amount": 100 },
+    { "type": "commit-final-wager", "at": 3300, "entityId": "p2", "amount": 100 },
+    { "type": "submit-final-answer", "at": 4000, "entityId": "p1", "text": "what is tetris" },
+    { "type": "submit-final-answer", "at": 4100, "entityId": "p2", "text": "what is tetris" },
+    { "type": "judge-entity", "at": 5000, "entityId": "p1", "verdict": "correct" },
+    { "type": "judge-entity", "at": 5100, "entityId": "p2", "verdict": "correct" },
+    { "type": "arm-buzzers", "at": 6000 },
+    { "type": "buzz", "at": 6100, "playerId": "p1" },
+    { "type": "judge", "at": 6200, "verdict": "wrong" },
+    { "type": "buzz", "at": 6300, "playerId": "p2" },
+    { "type": "judge", "at": 6400, "verdict": "wrong" },
+    { "type": "tiebreaker-next-clue", "at": 7000 },
+    { "type": "arm-buzzers", "at": 7100 },
+    { "type": "buzz", "at": 7200, "playerId": "p2" },
+    { "type": "judge", "at": 7300, "verdict": "correct" }
+  ],
+  "expect": {
+    "phase": "game-over",
+    "scores": { "p1": 600, "p2": 600 },
+    "winners": ["p2"],
+    "rejectedCount": 0
+  }
+}

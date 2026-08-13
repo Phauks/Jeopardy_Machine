@@ -1,0 +1,32 @@
+{
+  "name": "@jeopardy/engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The M2 rules engine: the game state machine as pure functions. No network, no DOM, no timers - time arrives as data on actions, randomness comes from a seeded generator in the state, and the append-only action log makes every game a replayable document.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./setup": "./src/setup.ts",
+    "./state": "./src/state.ts",
+    "./actions": "./src/actions.ts",
+    "./events": "./src/events.ts",
+    "./transition": "./src/transition.ts",
+    "./simulate": "./src/simulate.ts",
+    "./fixture": "./src/fixture.ts",
+    "./rng": "./src/rng.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@jeopardy/protocol": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

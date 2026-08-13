@@ -1,0 +1,33 @@
+{
+  "name": "rebound-chain",
+  "description": "Four players chain wrong answers on one clue until the field is exhausted and the clue dies. Locked-out players who try to rebuzz are refused. Exercises matrix rows #15/#16/#17.",
+  "seed": "rebound-chain",
+  "preset": "casual-party",
+  "overrides": {},
+  "rounds": [{ "columns": 3, "rows": 3, "wagerPlacement": "manual" }],
+  "hasFinalClue": false,
+  "actions": [
+    { "type": "player-join", "at": 1000, "playerId": "p1", "name": "Ada" },
+    { "type": "player-join", "at": 1001, "playerId": "p2", "name": "Ben" },
+    { "type": "player-join", "at": 1002, "playerId": "p3", "name": "Cleo" },
+    { "type": "player-join", "at": 1003, "playerId": "p4", "name": "Dev" },
+    { "type": "start-game", "at": 2000 },
+    { "type": "select-cell", "at": 2100, "category": 2, "row": 2 },
+    { "type": "arm-buzzers", "at": 2200 },
+    { "type": "buzz", "at": 2300, "playerId": "p1" },
+    { "type": "judge", "at": 2400, "verdict": "wrong" },
+    { "type": "buzz", "at": 2500, "playerId": "p1" },
+    { "type": "buzz", "at": 2600, "playerId": "p2" },
+    { "type": "judge", "at": 2700, "verdict": "wrong" },
+    { "type": "buzz", "at": 2800, "playerId": "p3" },
+    { "type": "judge", "at": 2900, "verdict": "wrong" },
+    { "type": "buzz", "at": 3000, "playerId": "p2" },
+    { "type": "buzz", "at": 3100, "playerId": "p4" },
+    { "type": "judge", "at": 3200, "verdict": "wrong" }
+  ],
+  "expect": {
+    "phase": "awaiting-selection",
+    "scores": { "p1": -600, "p2": -600, "p3": -600, "p4": -600 },
+    "rejectedCount": 2
+  }
+}

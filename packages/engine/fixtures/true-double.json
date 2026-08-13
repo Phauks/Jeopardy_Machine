@@ -1,0 +1,27 @@
+{
+  "name": "true-double",
+  "description": "The selector wins a clue for control, hits the hand-placed hidden wager cell, bets their entire score (a true double), and doubles up. Exercises matrix rows #23-#26 and the TV keep-control rule.",
+  "seed": "true-double",
+  "preset": "casual-party",
+  "overrides": {},
+  "rounds": [{ "columns": 3, "rows": 3, "wagerPlacement": "manual", "authoredWagers": [[1, 1]] }],
+  "hasFinalClue": false,
+  "actions": [
+    { "type": "player-join", "at": 1000, "playerId": "p1", "name": "Ada" },
+    { "type": "player-join", "at": 1001, "playerId": "p2", "name": "Ben" },
+    { "type": "start-game", "at": 2000 },
+    { "type": "select-cell", "at": 2100, "category": 0, "row": 0 },
+    { "type": "arm-buzzers", "at": 2200 },
+    { "type": "buzz", "at": 2300, "playerId": "p1" },
+    { "type": "judge", "at": 2400, "verdict": "correct" },
+    { "type": "select-cell", "at": 2500, "category": 1, "row": 1, "entityId": "p1" },
+    { "type": "commit-wager", "at": 2600, "amount": 200 },
+    { "type": "judge", "at": 2700, "verdict": "correct" },
+    { "type": "select-cell", "at": 2800, "category": 0, "row": 1, "entityId": "p1" }
+  ],
+  "expect": {
+    "phase": "reading",
+    "scores": { "p1": 400, "p2": 0 },
+    "rejectedCount": 0
+  }
+}
