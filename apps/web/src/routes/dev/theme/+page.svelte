@@ -214,27 +214,30 @@
     letter-spacing: 0.06em;
   }
 
+  /* The picker controls are deliberately NOT themed: they switch the theme under preview,
+     so they must stay visible on every preset (the light event-poster paper washed out
+     theme-derived chips - dev-gallery bug, 2026-08-13). Fixed dev-chrome palette. */
   .picker-chip {
     font-family: var(--font-chrome);
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.35rem 0.9rem;
-    border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-raised);
-    color: var(--surface-text);
+    border-radius: 4px;
+    border: 1px solid #3a3a48;
+    background: #1b1b23;
+    color: #ecebf2;
     cursor: pointer;
   }
 
   .picker-chip.active {
-    background: var(--accent);
-    color: var(--surface-page);
-    border-color: var(--accent);
+    background: #cfa146;
+    color: #131318;
+    border-color: #cfa146;
   }
 
   .picker-chip:focus-visible {
-    outline: 3px solid var(--accent);
+    outline: 3px solid #cfa146;
     outline-offset: 2px;
   }
 

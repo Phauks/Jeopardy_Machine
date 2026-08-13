@@ -55,6 +55,7 @@
 
 - **Kick / make-leader go behind a per-member "..." overflow menu** - not exposed buttons. (Answers the gallery's kick-exposure question.)
 - **Emoji skepticism**: owner is unsure about raw emoji as player identity markers. Next UI iteration explores a curated emblem set (consistent, designed marks - could be a custom SVG icon set or a tightly curated emoji subset rendered uniformly) instead of free emoji.
+- **UPDATE 2026-08-13: single-color emblems rejected too.** Owner wants **full-color icon packs** for player identity, preferably with animals. Requirements: bundle-clean license (CC0/MIT/Apache preferred; CC-BY acceptable with credits screen), consistent style across the set, reads at chip size on phones AND on the big-screen roster, animals well represented. Candidates under evaluation (see comparison artifact): Kenney game-asset packs (CC0), Microsoft Fluent Emoji (MIT), Google Noto Color Emoji (OFL/Apache), OpenMoji (CC BY-SA - flag the SA). The 16 single-color SVG emblems in apps/web/src/lib/emblems/ get replaced once a pack is chosen; tint-via-currentColor machinery goes away.
 - **Post-join customization required**: players can change appearance after joining a team (see user-flows "Post-join customization").
 - **Host mirror view required**: host's screen is sometimes literally mirrored to the projector; console needs a mirror mode whose private layer (answers, DD locations) moves to a host-phone companion view or the print pack (see user-flows C1b).
 - **Interactive token swap**: gallery presets were static; owner wanted to actually flip themes. Next gallery revision gets a working preset switcher (also a proof-drill for the token contract). Owner endorses the constraint: "having theming this way forces our theming to be very well designed."
@@ -80,3 +81,24 @@
 
 - Joint Board Game Club × Environmental Law Society night.
 - Questions: environmental + gaming topics ONLY — explicitly nothing law-related.
+
+## Full-color avatar pack candidates (2026-08-13)
+
+Research round for the full-color player-identity icons that replace the rejected single-color emblems (`apps/web/src/lib/emblems/`). Real samples were downloaded from each pack and licenses verified on the actual license files (not marketing pages). Visual comparison page with all samples at 96/48/24 px: scratchpad `avatar-packs.html` (published as the "Avatar Packs" artifact).
+
+| Pack | License (verified) | Animals | Style | Verdict |
+|---|---|---|---|---|
+| **Kenney Animal Pack Remastered** ([kenney.nl](https://kenney.nl/assets/animal-pack-remastered)) | **CC0 1.0** — confirmed in the zip's `License.txt` ("credit would be nice but is not mandatory") | 30 animals × 8 variants (round/square, ±details, ±outline) = 240 assets; animals only | Chunky round game-art heads, flat cel shading, identical framing; outlined variant stays crisp on any chip color | **Front-runner.** Purpose-built for games, zero license overhead, best 24 px legibility. Limits: 30 animals, no fox/lion/tiger, no objects |
+| **Microsoft Fluent Emoji** ([github.com/microsoft/fluentui-emoji](https://github.com/microsoft/fluentui-emoji)) | **MIT** — plain MIT LICENSE, © Microsoft; keep notice in bundle | Full Unicode: 131 animal glyphs (66 mammal / 22 bird / 18 marine / 16 bug / 8 reptile / 1 amphibian; ~19 big-face heads) + all objects | Soft-gradient modern flat (Color SVG) plus glossy 3D PNG style; consistent but more "app" than "game" | **Strong runner-up.** Huge roster incl. fox/lion/tiger + objects in one style; MIT is bundle-clean |
+| **Twemoji** (maintained fork: [github.com/jdecked/twemoji](https://github.com/jdecked/twemoji)) | **CC-BY 4.0** graphics (`LICENSE-GRAPHICS`), MIT code; README accepts footer/about-screen attribution | Full Unicode: 131 animal glyphs (~19 faces) + objects; tiny SVGs (<3 KB) | Flat, bold, geometric; crispest emoji set at 24 px (no gradients to mush) | Workable with a credits screen, but Fluent offers a comparable roster without the attribution requirement |
+| **Google Noto Color Emoji** ([github.com/googlefonts/noto-emoji](https://github.com/googlefonts/noto-emoji)) | **Ambiguous**: root LICENSE is now OFL 1.1, but README still claims images are Apache-2.0 and links to that same file. Both free, but contradictory paperwork; OFL is awkward for standalone SVGs | Full Unicode: 131 animal glyphs (~19 faces) + objects | Stock Android emoji look — soft, rounded, least distinctive | Fallback only; license contradiction upstream and no styling advantage over Fluent/Twemoji |
+| **OpenMoji** ([openmoji.org](https://openmoji.org)) | **CC BY-SA 4.0** — confirmed in repo `LICENSE.txt` and site FAQ. **Flagged: ShareAlike** — adaptations (recolor/composite into chips) arguably must be BY-SA too | Full Unicode + ~800 extras | Hand-drawn line art with signature black outline; charming, very consistent; outlines thin at 24 px | **Do not pick.** SA is legal overhead we don't need when CC0/MIT peers exist |
+| Kenney Fish Pack 2.0 / Cube Pets ([kenney.nl](https://kenney.nl/assets/fish-pack)) | CC0 1.0 — confirmed in zip `License.txt` | ~8 distinct fish (color variants, 64 px sprites); Cube Pets = 24 3D models, not icons | Same lovable Kenney game style | Not a fit: too few shapes, and color is the distinguisher — collides with per-player accent colors |
+
+**Ranked recommendation:**
+
+1. **Kenney Animal Pack Remastered** — CC0 (literally zero obligations), the only set actually designed as game art, the strongest small-size legibility (thick outlines, no gradients), and the white-outline variant solves icon-on-colored-chip contrast for free. 30 animals covers 2–100 players if avatars may repeat across teams (they're per-player identity *within* a team display, so repeats are tolerable) — or cap unique-avatar count at 30.
+2. **Fluent Emoji (Color style)** — if we want 100+ unique animals or non-animal avatars (robot/alien/ghost) in the same style, MIT-clean. Also the designated *extension* pack: if Kenney's 30 ever feels tight, mixing Kenney animals + Fluent objects is licence-clean but visibly style-inconsistent — treat mixing as a deliberate later decision, not the default.
+3. **Twemoji (jdecked)** — only if the flat style wins on looks; costs a credits screen (CC-BY).
+4. **Noto** — fallback; upstream license paperwork contradictory (OFL vs Apache).
+5. **OpenMoji** — rejected on CC BY-SA despite the nicest illustration style.
