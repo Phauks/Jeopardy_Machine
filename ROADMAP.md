@@ -80,6 +80,8 @@ Buzz latency compensation (arm-window + client-elapsed with RTT clamps), early-b
 
 **Theme customizer** (owner priority - pull earlier if appetite allows): a visual editor over the theme document - pick fonts per slot from the curated self-hosted set, full color control, background (solid/gradient/pattern/uploaded image via R2 with auto-dim overlay), effects level (flat vs bevel-and-glow), live board preview, WCAG-contrast warnings; themes export/import and share like content packs. Also: CSV/spreadsheet import (+ J-Archive-shaped and Quizlet/Anki TSV), zip bundle export with media, print stylesheet, board sizes beyond 6x5, everyone-answers mode for large crowds, cosmetics module (player colors/avatars; buzzer sounds stay curated-pack-only - owner cut uploads 2026-08-13, boundary 2.10), single-file offline HTML export.
 
+**3D lobby environments** (owner direction 2026-08-13, see directives log): Kenney world kits (CC0) + Cube Pets avatars as display-only three.js dioramas the players "live in" - lobby first (pets appear/dance in a forest/pirate/dungeon scene as players join), environment as a curated theme-document slot, phones and in-game surfaces stay 2D. The event may get a v0 forest lobby only if M4/M5 land early; otherwise this is the first post-event milestone.
+
 ### M8 - Multi-user (only if wanted)
 
 Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by Access email. Phase 3 (only if it goes multi-tenant): better-auth on D1. The `BoardRepository` seam from M1 makes this additive.
