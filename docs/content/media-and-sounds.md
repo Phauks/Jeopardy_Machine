@@ -262,3 +262,19 @@ Judged against the §7 requirements: one track forever, upbeat, playful tension,
 Bench (not auditioned, link-only): Kevin MacLeod "Monkeys Spinning Monkeys" (CC-BY, ~2:06, famous playful earworm — big file, left out of the review page for size) and "Bit Quest" (CC-BY, upbeat chiptune adventure); Pixabay "Retro Arcade Game Music" (HitsLab, 1:00) and "8Bit theme Loop - Chiptune Symphony" (MusicInMedia, 1:13) from the verified search page https://pixabay.com/music/search/game%20show%20upbeat%20loop/.
 
 Sourcing note for the record: Pixabay pages return HTTP 403 to plain fetches (Cloudflare); the search page and the L7 track page were read via the reader pipeline instead, and the license wording above is quoted from the track page. Re-verify all of §8 per checklist §5 before bundling; CC-BY candidates additionally trigger checklist §8 (attribution audit).
+
+---
+
+## 9. Owner decisions — Listening Room 2 (2026-08-13)
+
+### Buzzer pack: FINALIZED at 14 sounds (rounds 1+2). No further sourcing needed.
+
+Round-2 approvals (8): kookaburra (trim to laugh burst) · loon · owl Hoot_2 · Airhorn · Gong_Center_Clear · Game Powerup · Elephant Trumpets Growls (alternate won over the plain trumpet) · FX swanee whistle up (alternate won over Slide Whistle).
+Round-2 rejects: wolf howl, elephant trumpet (primary), frog croak, Slide Whistle (primary), distant owl.
+
+**Final pack (14):** Correct Bell · ding · Clown Horn · Squeaky Toy #4 · LASRGun zap (trimmed) · Klaxon · kookaburra · loon · owl hoot · airhorn · gong · game powerup · elephant growl-trumpet · swanee whistle up.
+All proceed through the pipeline: original downloads, license re-verify + screenshots, trim to 0.5-1.5 s, uniform ~10 ms onset, -16 LUFS, one format.
+
+### Lobby track: round 3 with a locked vibe
+
+All seven round-2 candidates rejected except **Quirky Rock Funky Loop** (Sonican, Pixabay) - vibe approved ("I like the vibe but I want more options"). Round-3 brief: **quirky rock / funky loops** in that lane - upbeat, guitar/bass-forward, playful, loop-ready. Sources: Pixabay music search (that vibe's home turf; Pixabay Content License = free, no attribution, usable in the app, but individual track pages must be verified and tracks cannot be redistributed standalone - flag this in the final license review), plus Freesound CC0 funk/rock loops. Keep Sonican's track in the running as the benchmark row.
