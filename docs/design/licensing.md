@@ -4,12 +4,12 @@
 
 ## The project has four licensing surfaces
 
-| Surface | What applies | Status |
-|---|---|---|
-| **The code** (this repo) | One SPDX license in /LICENSE | **Owner decision needed - recommendation below** |
-| **Bundled fonts** | SIL OFL 1.1, per face | Handled: OFL permits app bundling; each face's license text ships in the fonts directory (M4 foundations includes LICENSES.md) |
-| **Bundled sounds** | CC0 only (by policy - boundary 2.10) | Handled: CC0 requires nothing; we keep a credits/audit row per file anyway (media checklist §5) |
-| **User-created content** (boards, packs, themes made in the tool) | The creator's, full stop | Handled by design: exports carry an optional `license` metadata field the creator controls; the app claims nothing. Event media follows the per-file rules in docs/content/media-and-sounds.md (PD preferred, CC BY-SA = credits slide) |
+| Surface                                                           | What applies                         | Status                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **The code** (this repo)                                          | One SPDX license in /LICENSE         | **Owner decision needed - recommendation below**                                                                                                                                                                                        |
+| **Bundled fonts**                                                 | SIL OFL 1.1, per face                | Handled: OFL permits app bundling; each face's license text ships in the fonts directory (M4 foundations includes LICENSES.md)                                                                                                          |
+| **Bundled sounds**                                                | CC0 only (by policy - boundary 2.10) | Handled: CC0 requires nothing; we keep a credits/audit row per file anyway (media checklist §5)                                                                                                                                         |
+| **User-created content** (boards, packs, themes made in the tool) | The creator's, full stop             | Handled by design: exports carry an optional `license` metadata field the creator controls; the app claims nothing. Event media follows the per-file rules in docs/content/media-and-sounds.md (PD preferred, CC BY-SA = credits slide) |
 
 ## Code license recommendation: AGPL-3.0-only
 

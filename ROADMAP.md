@@ -99,9 +99,9 @@ Resolved 2026-08-13 (see docs/decisions/2026-08-13-stack-choices.md): SvelteKit 
 
 Resolved 2026-08-13 (see docs/decisions/2026-08-13-theming-as-feature.md): art direction - no single winner; all three directions ship as theme presets and the game screen becomes highly customizable (fonts, colors, background) via the theme document + M7 customizer.
 
-| #   | Decision     | Status                                                                                                                                                                  |
-| --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 5   | Product name | Shortlist under review: Buzzboard · Big Board · What Is · Podium · Answers First · Clueboard · Double Down. Will not ship as "Jeopardy"; repo may stay Jeopardy_Machine |
+| #   | Decision     | Status                                                                                                                                                                                                                       |
+| --- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5   | Product name | Shortlist under review: Buzzboard · Big Board · What Is · Podium · Answers First · Clueboard · Double Down. Will not ship as "Jeopardy"; repo may stay Jeopardy_Machine                                                      |
 | 6   | Code license | **AGPL-3.0 recommended** (protects the free-forever promise against closed SaaS forks; MIT is the max-adoption alternative). No LICENSE file exists yet = all-rights-reserved by default. Analysis: docs/design/licensing.md |
 
 ## Update protocol
