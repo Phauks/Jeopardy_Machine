@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-13 (M0 scaffold landed: monorepo, protocol package, realtime DO stub, web shell + PWA skeleton, dev loop proven, CI gate; awaiting owner's first manual deploy to close M0)
+> Last updated: 2026-08-13 (M1 protocol phase landed: document envelope + migrations, content layer, settings registry + rule sets, theme + game-definition schemas; M1 editor phase open. M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -43,6 +43,18 @@ Progress 2026-08-13 - everything agent-verifiable is done; what remains is owner
 ### M1 - Content model + board format + editor core
 
 Two-layer data model in `packages/protocol` (zod schemas + migration functions): the **content layer** (question items: prompt, answer, media refs, tags, difficulty, source note - game-mode-agnostic) and the **jeopardy mode layer** (board layout: rounds, categories, cells referencing content items, values, wager cells). The visual editor: create/edit content items and compose boards from them (with a fast "type straight into the grid" path that creates content items implicitly), local-first persistence behind repository interfaces - IndexedDB-backed per the PWA decision (docs/decisions/2026-08-13-pwa.md; localStorage only for tiny prefs/tokens); export/import of content packs and game definitions. **Exit criteria:** a full 6x5 two-round board can be authored, exported, re-imported, survives a format-version bump - and its questions can be listed/reused independently of the board. The protocol also defines the **theme document** schema (token values, font-slot choices, background spec, effects level) so themes are a portable, shareable artifact from day one.
+
+Progress 2026-08-13 - the protocol phase landed (docs/proposals/m1-protocol.md with owner resolutions R1-R4); the editor phase is open:
+
+- [x] Document envelope + semver migration machinery: `parsePortableDocument` single entry point, migration chains validated at registry construction, committed fixture pair per migration enforced by a gate test (proven by a synthetic example migration)
+- [x] UUIDv7 ids everywhere (R3), `ids.ts` owns generation + validation
+- [x] Content layer: content-item with media attachable to prompt AND answer (owner directive 2026-08-13), content-pack, media identity/bytes indirection with sha256 dedupe-and-relink
+- [x] Settings registry (R2): all 43 matrix rows defined once, deriving the composed schema + TS types + a UI-renderable description + the generated docs table (docs/reference/settings.md, regenerate-and-diff gate); presets as sparse diffs (tv, casual-party); group-level cross-field refinements
+- [x] Rule-set document (R4): the fifth portable document (`.rules.json`); design-law table updated in docs/design/expansion-and-boundaries.md
+- [x] Theme document: tokens, curated font slots, background variants with auto-dim, effects level, reserved sound-set slot
+- [x] Jeopardy mode layer: game-definition with embedded-or-external content, embed-or-preset rules and theme, authored-wins wager cells, value schemes
+- [ ] Visual editor + IndexedDB repositories + export/import UI (M1 phase 2)
+- [ ] Exit-criteria run (author, export, re-import, survive a version bump via the editor) - blocked on phase 2
 
 ### M2 - Game engine (pure logic, no network)
 
@@ -85,7 +97,7 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 
 **Next**
 
-- [ ] M1 board format + editor core
+- [ ] M1 board format + editor core (protocol schemas landed 2026-08-13 - see the M1 progress list; visual editor remains)
 - [ ] M2 game engine
 
 **Later**

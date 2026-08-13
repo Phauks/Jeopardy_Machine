@@ -6,6 +6,7 @@
   "type": "module",
   "sideEffects": false,
   "exports": {
+    ".": "./src/index.ts",
     "./envelope": "./src/envelope/wire.ts",
     "./ext": "./src/ext.ts",
     "./limits": "./src/limits.ts"

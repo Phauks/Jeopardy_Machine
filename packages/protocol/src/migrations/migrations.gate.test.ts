@@ -8,11 +8,12 @@ import { describe, expect, it } from "vitest";
 import { parseDocument } from "../envelope/migration.ts";
 import type { DocumentFormatDefinition, DocumentRegistry } from "../envelope/migration.ts";
 import { exampleRegistry } from "./example/example-format.ts";
+import { documentRegistry } from "./registry.ts";
 import { missingFixtureProblems, orphanFixtureProblems, readFixturePair } from "./fixture-gate.ts";
 
-// The real document registry joins this list in the same commit it is born (M1 jeopardy-mode
-// commit); the example registry keeps the gate honest from the first migration ever written.
-const registriesUnderGate: DocumentRegistry[] = [exampleRegistry];
+// The example registry keeps the gate honest from the first migration ever written (the real
+// formats have no migrations yet - their chains are genesis-only until a version bumps).
+const registriesUnderGate: DocumentRegistry[] = [documentRegistry, exampleRegistry];
 
 const allDefinitions: DocumentFormatDefinition[] = registriesUnderGate.flatMap((registry) => [
   ...registry.values(),
