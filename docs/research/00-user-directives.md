@@ -122,3 +122,8 @@ Research round for the full-color player-identity icons that replace the rejecte
 3. **Twemoji (jdecked)** — only if the flat style wins on looks; costs a credits screen (CC-BY).
 4. **Noto** — fallback; upstream license paperwork contradictory (OFL vs Apache).
 5. **OpenMoji** — rejected on CC BY-SA despite the nicest illustration style.
+
+## Avatar set FINAL + autonomy scope (owner, 2026-08-13, before leaving)
+
+- **Avatar set: Cube Pets + Mini Characters** (proof-verified single universe, shared recolor mechanism). Sprite pipeline builds against both; Blocky is out.
+- **Autonomy scope granted: build as far as possible** - M3 (realtime rooms) -> M4 (play surfaces) -> M5 prep, each milestone gate-verified. PRs are opened with green CI; owner merges on return (nothing deploys unattended).
