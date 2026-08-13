@@ -22,7 +22,7 @@
   // Local dev status for this binding is tracked in docs/DEVELOPMENT.md.
   // "durable_objects": {
   //   "bindings": [
-  //     { "name": "GAME_ROOM", "class_name": "GameRoomDO", "script_name": "jeopardy-realtime" }
+  //     { "name": "GAME_ROOM", "class_name": "GameRoomDO", "script_name": "jeopardy-machine-realtime" }
   //   ]
   // },
   // Provisioned by owner via dashboard 2026-08-13. Server code starts using DB in M8/phase-2

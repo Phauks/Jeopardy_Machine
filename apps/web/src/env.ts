@@ -10,7 +10,10 @@ export const variables = defineEnvVars({
     // rt host in a production build (set in .env or the build environment).
     public: true,
     static: true,
-    schema: (value) => value ?? "http://localhost:8787",
+    // Dev falls back to local wrangler; a production build with the var unset gets "" so
+    // the UI can refuse to connect instead of dialing localhost from a public origin -
+    // that misdial is what triggers Chrome's Local Network Access permission popup.
+    schema: (value) => value ?? (import.meta.env.DEV ? "http://localhost:8787" : ""),
     description:
       "http(s) origin of the realtime Worker (WebSockets ride the matching ws(s) scheme)",
   },

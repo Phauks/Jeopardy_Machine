@@ -21,6 +21,15 @@
 
   function connect(): void {
     disconnect();
+    // Empty origin = production build without REALTIME_ORIGIN configured. Refuse loudly
+    // rather than dialing localhost from a public origin (which trips Chrome's Local
+    // Network Access permission popup on visitors' machines).
+    if (!REALTIME_ORIGIN) {
+      append(
+        "REALTIME_ORIGIN is not configured for this deployment - set it as a build variable to the realtime Worker's https origin",
+      );
+      return;
+    }
     try {
       const url = roomWebSocketUrl(REALTIME_ORIGIN, roomCode);
       append(`connecting to ${url}`);

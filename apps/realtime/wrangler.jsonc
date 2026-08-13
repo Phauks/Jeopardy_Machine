@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "jeopardy-realtime",
+  "name": "jeopardy-machine-realtime",
   "main": "src/index.ts",
   // Bump deliberately, in its own commit, after reading the compat-date changelog.
   "compatibility_date": "2026-08-01",
