@@ -1,4 +1,19 @@
-/* Tailwind v4 entry point. The design-token contract (tokens as SSOT, consumed by Tailwind
- * via @theme) is built in M4 with the theme system - docs/decisions/2026-08-13-theming-as-feature.md.
- * Until then this file stays deliberately empty of design decisions. */
+/* Tailwind v4 entry point. Design decisions live in the token contract
+ * (lib/theme/tokens.css - the SSOT, see docs/design/theming.md), never in Tailwind config.
+ * The @theme inline block below only REFLECTS semantic tokens into utility names so chrome
+ * layout code can say bg-surface-raised / text-accent; board and buzzer surfaces use the
+ * custom properties directly in bespoke CSS. `inline` matters: utilities carry the var()
+ * reference itself, so they resolve against whatever theme scope (preset style attribute)
+ * the element sits inside, not against a build-time snapshot. */
 @import "tailwindcss";
+@import "./lib/theme/fonts.css";
+@import "./lib/theme/tokens.css";
+
+@theme inline {
+  --color-accent: var(--accent);
+  --color-surface-page: var(--surface-page);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-text: var(--surface-text);
+  --color-surface-text-muted: var(--surface-text-muted);
+  --color-surface-border: var(--surface-border);
+}
