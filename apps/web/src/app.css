@@ -1,0 +1,4 @@
+/* Tailwind v4 entry point. The design-token contract (tokens as SSOT, consumed by Tailwind
+ * via @theme) is built in M4 with the theme system - docs/decisions/2026-08-13-theming-as-feature.md.
+ * Until then this file stays deliberately empty of design decisions. */
+@import "tailwindcss";

@@ -1,0 +1,34 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jeopardy-web",
+  // The adapter emits the Worker entry + static assets here on `vite build`.
+  "main": ".svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2026-08-01",
+  // nodejs_als: AsyncLocalStorage, required by SvelteKit's Cloudflare adapter runtime.
+  "compatibility_flags": ["nodejs_als"],
+  "assets": {
+    "directory": ".svelte-kit/cloudflare",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+  "upload_source_maps": true,
+  // --- Bindings that arrive with later milestones, declared here so the shape is agreed ---
+  // M3: reach the SAME GameRoomDO instances the realtime Worker owns, via cross-script
+  // binding (script_name points at the sibling Worker) - used for room creation/game start.
+  // Local dev status for this binding is tracked in docs/DEVELOPMENT.md.
+  // "durable_objects": {
+  //   "bindings": [
+  //     { "name": "GAME_ROOM", "class_name": "GameRoomDO", "script_name": "jeopardy-realtime" }
+  //   ]
+  // },
+  // M8/phase-2: saved boards + game results. Local-first (IndexedDB) until then.
+  // "d1_databases": [
+  //   { "binding": "DB", "database_name": "jeopardy", "database_id": "TBD-created-at-first-deploy" }
+  // ],
+  // M5: clue media (images/audio), Worker-proxied uploads with limits from @jeopardy/protocol/limits.
+  // "r2_buckets": [
+  //   { "binding": "MEDIA", "bucket_name": "jeopardy-media" }
+  // ]
+}

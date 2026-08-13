@@ -1,0 +1,14 @@
+{
+  // Service workers compile against WebWorker libs, not DOM; SvelteKit generates this
+  // parent config (node_modules/$app/tsconfig/service-worker.json) for exactly this split.
+  "extends": "$app/tsconfig/service-worker",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["./**/*.ts"]
+}
