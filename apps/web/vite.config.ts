@@ -8,7 +8,21 @@ import tailwindcss from "@tailwindcss/vite";
 // vitest/config, not vite: it widens the config type with the `test` block.
 import { defineConfig } from "vitest/config";
 
+// Build metadata baked into the bundle so any deployment can state what it is (badge on
+// /dev pages + /api/version). Workers Builds injects WORKERS_CI_COMMIT_SHA during CI
+// builds; local builds fall back to "local". Accessed via globalThis because this app's
+// tsconfig deliberately has no Node types (it targets workerd).
+const ciEnv =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env ?? {};
+const buildMeta = {
+  sha: (ciEnv.WORKERS_CI_COMMIT_SHA ?? ciEnv.GIT_SHA ?? "local").slice(0, 12),
+  builtAt: new Date().toISOString(),
+};
+
 export default defineConfig({
+  define: {
+    __BUILD_META__: JSON.stringify(buildMeta),
+  },
   // Explicit root: tools other than vite itself (oxlint via `vp lint` at the workspace root)
   // evaluate this config from their own cwd, and SvelteKit's sync step resolves src/app.html
   // against root - without this line, root-level `vp lint` explodes. URL form rather than

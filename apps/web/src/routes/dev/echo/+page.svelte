@@ -19,6 +19,20 @@
     log = [...log, `${new Date().toISOString().slice(11, 19)} ${line}`];
   }
 
+  let copyState = $state("Copy log");
+
+  async function copyLog(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(log.join("\n"));
+      copyState = "Copied!";
+    } catch {
+      copyState = "Copy failed";
+    }
+    setTimeout(() => {
+      copyState = "Copy log";
+    }, 1500);
+  }
+
   function connect(): void {
     disconnect();
     // Empty origin = production build without REALTIME_ORIGIN configured. Refuse loudly
@@ -86,6 +100,16 @@
     <button class="border px-3 py-1" disabled={!connected} onclick={sendHello}>Send hello</button>
     <button class="border px-3 py-1" disabled={!connected} onclick={sendStaleVersion}>Send stale version</button>
     <button class="border px-3 py-1" disabled={!connected} onclick={disconnect}>Disconnect</button>
+    <button
+      class="border px-3 py-1"
+      disabled={log.length === 0}
+      onclick={() => {
+        log = [];
+      }}>Clear log</button
+    >
+    <button class="border px-3 py-1" disabled={log.length === 0} onclick={copyLog}
+      >{copyState}</button
+    >
   </div>
   <pre class="min-h-40 overflow-x-auto border p-3 text-sm">{log.join("\n")}</pre>
 </main>
