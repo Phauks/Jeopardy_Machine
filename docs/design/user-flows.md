@@ -21,7 +21,7 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 ### A2. Join (one screen, <15 seconds)
 Single screen: nickname field + (if enabled) pick-your-buzzer-sound (tap to preview locally) + color/emoji pick + **Join**.
 - Team mode, host-premade teams: tap your team's card.
-- Team mode, self-organize: join an existing team card or "+ new team".
+- Team mode, self-organize: join an existing team card or "+ new team" (creating a team makes you its **leader** - see "Teams & leadership" below).
 - Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix.
 - On join: session token minted and kept in `sessionStorage`; wake-lock requested; phone registered in lobby.
 
@@ -123,6 +123,23 @@ Always available: undo stack, score override, reopen clue, skip, pause (freezes 
 Winner screen (podium + per-team totals). Console: export results (JSON/CSV: final scores, per-clue log). Room expires via DO alarm (default 2h idle); code becomes reusable.
 
 ---
+
+## Teams & leadership (owner-specified 2026-08-13)
+
+Two customization tiers that never collide:
+
+| Tier | Who controls | What it covers |
+|---|---|---|
+| **Team** | Team leader | Team name, team color/emblem (picked from a theme-safe palette), team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation) |
+| **Personal** | Each player | Own nickname, personal avatar/accent, personal buzzer sound - always visible *within* the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal emblem) |
+
+**Leadership mechanics:**
+- Creating a team makes you its leader (crown affordance on your card). Host-premade teams: leader = first joiner, until changed.
+- Leader powers, all from the phone lobby screen: rename team, pick team color/emblem, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly).
+- Kicked players return to team selection (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list).
+- **Leader disconnect**: after a grace period (missed heartbeats), leadership auto-passes to the longest-tenured connected member; if the original leader returns they rejoin as a regular member.
+- **Host supremacy is unchanged** (guiding principle 4): the host console can rename/kick/merge/reassign leaders over any team decision, and sees a feed entry for kicks (abuse visibility). Team self-governance reduces host workload; it never gates the host.
+- Personal customization is never leader-editable; team customization is never member-editable. The tiers are separate protocol fields (team doc vs player doc in room state, modeled in M3, surfaced in M5 team mode).
 
 ## Cross-flow notes
 

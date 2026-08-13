@@ -24,6 +24,11 @@
   - Custom category header styling, custom win screens, custom "Daily Double"-equivalent branding per game.
   - Treat personalization as a module ("cosmetics") so it can grow without touching game logic.
 
+## Team leadership (owner, 2026-08-13)
+- Team creator = **team leader**: names the team, kicks members who don't belong, controls team-level customization (e.g. team color), and can **hand off the leader role** to another player.
+- Personal customization stays personal: players keep their own identity assets (avatar/accent/buzzer sound) visible within the team display, independent of team-level choices.
+- Specced in docs/design/user-flows.md ("Teams & leadership"); protocol modeling in M3, ships with team mode in M5.
+
 ## Architecture directive (owner, 2026-08-13)
 - **Quiz content must be reusable across game modes.** Question files should be usable in other types of games, which delineates how we deal with files, questions, assets, game data, and user data as separate layers. See docs/decisions/2026-08-13-stack-choices.md for the resulting model (content packs vs game definitions vs live game data vs user data).
 
