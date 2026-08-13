@@ -12,6 +12,9 @@
 - **Open question (research to recommend)**: multi-user login vs local-only storage.
 - **UI**: must look genuinely good — deliberately designed, not "AI-made" — and be easy to develop against.
 
+## Design philosophy (owner directive, 2026-08-13)
+- **Jeopardy is the inspiration, not the specification.** Do not arbitrarily match the TV show. Every show-derived setting or mechanic must be justified by fun; if it is not, relax it or explore a better variant. Ship TV rules as one preset, not as the definition of the game. Examples of things explicitly open to rethinking: dollar values vs points, question-format requirement, negative scoring, round structure, buzzer conventions, board dimensions.
+
 ## Feature ideas from the user
 - **Customizable buzzer sounds**: each player/team can pick (or upload?) the sound that plays when they buzz in. Fun + helps the host identify who buzzed without looking.
   - Design implications: sound picker in the player join/lobby flow; a curated royalty-free sound pack (short, distinct, room-friendly); optional per-player upload (needs R2 + moderation/size limits + host veto); host master-volume/mute; preview button; sounds play on the host/board device (not the phone) so the room hears one canonical audio source.
