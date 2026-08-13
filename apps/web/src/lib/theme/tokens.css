@@ -1,0 +1,136 @@
+/* ============================================================================================
+ * Design token contract - the SSOT for every themed surface.
+ * Reference doc: docs/design/theming.md. Presets: src/lib/theme/theme-presets.ts, rendered to
+ * these custom properties by src/lib/theme/theme-to-css.ts. Components consume ONLY the
+ * semantic tokens below - never raw colors, never preset-specific selectors. That rule is what
+ * makes a theme a document instead of a code path (docs/design/expansion-and-boundaries.md).
+ *
+ * SYNC BLOCK - theme document mapping (docs/proposals/m1-protocol.md section 5).
+ * CSS token                <- theme document field
+ * --page-bg                <- body.background            (solid | gradient implemented;
+ *                                                         pattern | image land with the M7
+ *                                                         customizer + media pipeline)
+ * --board-bg               <- body.tokens.boardBackground (also the gutter color: gutters are
+ *                                                          the board background showing
+ *                                                          through the cell grid's gaps)
+ * --board-cell-bg          <- body.tokens.cellBackground
+ * --board-category-bg      <- body.tokens.categoryBackground
+ * --board-value-color      <- body.tokens.valueColor
+ * --clue-text-color        <- body.tokens.clueTextColor
+ * --accent                 <- body.tokens.accentColor
+ * --board-cell-used-bg     \
+ * --board-cell-used-outline > derived from body.tokens.usedCellTreatment (enum -> 3 tokens,
+ * --board-cell-used-opacity/  mapping lives in theme-to-css.ts)
+ * --font-display           <- body.fontSlots.display   (face id -> family stack,
+ * --font-values            <- body.fontSlots.values     map in theme-to-css.ts;
+ * --font-clue              <- body.fontSlots.clue       faces in fonts.css)
+ * --font-chrome            <- body.fontSlots.chrome
+ * data-effects attribute   <- body.effectsLevel        (flat | dimensional - drives the
+ *                                                       --effect-* tokens below, NOT per-preset
+ *                                                       CSS forks)
+ * --surface-*              <- app-DERIVED from document fields (background + clueTextColor +
+ *                             accentColor via color-mix in theme-to-css.ts) - deliberately NOT
+ *                             document fields, so chrome restyles itself from any valid theme
+ *                             and the M7 customizer has nothing extra to expose.
+ * --board-gutter, --board-radius, type-scale tokens: app layout constants, not themeable.
+ * body.soundSet: audio, no CSS mapping. Divergences beyond these notes are bugs.
+ * ============================================================================================ */
+
+:root {
+  /* --- Theme document tokens: defaults = the retro-tv preset (the recommended default look,
+   * docs/research/05-ui-design.md section 2). A themed surface normally has all of these
+   * overridden by a preset via inline custom properties; the defaults exist so an unthemed
+   * fragment fails soft into the house look instead of into browser defaults. */
+  --page-bg: linear-gradient(180deg, #0a0b33, #04041a);
+  --board-bg: #06071a;
+  --board-cell-bg: #060ce9;
+  --board-category-bg: #0509c0;
+  --board-value-color: #ffcc00;
+  --clue-text-color: #ffffff;
+  --accent: #ffcc00;
+  --board-cell-used-bg: #04051c;
+  --board-cell-used-outline: none;
+  --board-cell-used-opacity: 1;
+
+  /* --- Font slots: family stacks, not face ids. Fallbacks are metric-adjacent system faces
+   * so font-display: swap flashes small, not jarring. */
+  --font-display: "Anton", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-values: "Six Caps", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --font-clue: "Bitter", Georgia, serif;
+  --font-chrome: "Oswald", "Arial Narrow", "Helvetica Neue", sans-serif;
+
+  /* --- Derived chrome surfaces (see SYNC BLOCK: computed from document fields per preset;
+   * these defaults match retro-tv). --surface-page is always a plain color (the background
+   * fill's base) because Tailwind reflects it into background-color; full-bleed screens that
+   * want the gradient/pattern fill use --page-bg directly. */
+  --surface-page: #0a0b33;
+  --surface-raised: color-mix(in srgb, #0a0b33 90%, #ffffff);
+  --surface-text: #ffffff;
+  --surface-text-muted: color-mix(in srgb, #ffffff 62%, transparent);
+  --surface-border: color-mix(in srgb, #ffffff 20%, transparent);
+  --surface-scrim: rgb(0 0 0 / 0.55);
+
+  /* --- Board layout constants. Thick gutters are trade dress (research section 2: the grid
+   * lines are part of the look) - a layout decision, not a theme decision. */
+  --board-gutter: clamp(3px, 0.8vw, 10px);
+  --board-radius: 2px;
+
+  /* --- Board type scale: clamp() against viewport so one component serves a 720p projector
+   * and a 4K TV (research section 3 distance-legibility rules: values >= ~8% of screen
+   * height, clue text >= ~5vh). */
+  --board-category-size: clamp(0.8rem, 2.4vh, 2rem);
+  --board-value-size: clamp(1.7rem, 8vh, 6.5rem);
+  --clue-text-size: clamp(1.3rem, 5vh, 4rem);
+
+  /* --- Effects tokens: FLAT defaults. The effects level is a token-driven switch - the
+   * [data-effects] blocks below re-derive these from the active theme's color tokens, so
+   * every preset (and every future custom theme) gets both levels for free. Components use
+   * --effect-* and never know which level is active. */
+  --effect-cell-overlay: none;
+  --effect-cell-shadow: none;
+  --effect-value-glow: none;
+  --effect-category-text-shadow: none;
+  --effect-clue-card-shadow: none;
+}
+
+/* Explicit flat (same as the :root defaults; exists so markup can always set the attribute). */
+[data-effects="flat"] {
+  --effect-cell-overlay: none;
+  --effect-cell-shadow: none;
+  --effect-value-glow: none;
+  --effect-category-text-shadow: none;
+  --effect-clue-card-shadow: none;
+}
+
+/* Dimensional: bevel + vignette + glow, all derived from the surrounding theme's tokens
+ * (var() inside these values resolves against whatever theme scope the consuming element
+ * sits in - that is the mechanism that keeps effects theme-agnostic). */
+[data-effects="dimensional"] {
+  /* Cell lighting: a soft top-center hotspot plus a vertical falloff = the TV-era vignette. */
+  --effect-cell-overlay:
+    radial-gradient(ellipse 120% 90% at 50% 30%, rgb(255 255 255 / 0.1), transparent 65%),
+    linear-gradient(rgb(255 255 255 / 0.04), rgb(0 0 0 / 0.22));
+  /* Bevel: light top edge, dark lower inset, wide inner shade. */
+  --effect-cell-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.16), inset 0 -2px 6px rgb(0 0 0 / 0.35),
+    inset 0 0 2.4em rgb(0 0 0 / 0.22);
+  /* Gold-numeral glow, tinted by the active theme's value color. */
+  --effect-value-glow:
+    0 0 0.14em color-mix(in srgb, var(--board-value-color) 40%, transparent),
+    0.03em 0.045em 0.06em rgb(0 0 0 / 0.6);
+  --effect-category-text-shadow: 0.03em 0.04em 0.05em rgb(0 0 0 / 0.65);
+  --effect-clue-card-shadow: 0 24px 90px rgb(0 0 0 / 0.55), inset 0 0 8em rgb(0 0 0 / 0.25);
+}
+
+/* Reduced motion is a floor, not a theme option (boundary 2.9): kill every animation and
+ * transition on themed surfaces when the OS asks. Signature motion (board fill-in, clue zoom)
+ * must additionally provide non-animated equivalents at the component level. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
