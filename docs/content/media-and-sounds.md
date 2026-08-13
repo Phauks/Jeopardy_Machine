@@ -196,6 +196,16 @@ For **every** image/sound that makes the final cut:
 ### Think music: 3 approved
 Short Elevator Music Loop · Bossa Nova "Thank You for Shopping!" · Lounging Smooth Keys. (2.2 s bossa bar and Blues Impro rejected.) Three tracks = enough variety for a night; rotate per Final round or let the theme sound-set pick.
 
+### Lobby music - the signature track (owner directive 2026-08-13)
+
+Kahoot's lobby theme proves the pattern: one upbeat, anticipation-building track that plays in EVERY lobby, always the same - identity through repetition. Requirements for ours:
+
+- **One track, never rotated** (unlike think music). It becomes the product's sound. Theme sound-sets may eventually offer variants, but the default is sacred.
+- **Character**: upbeat, playful tension, builds without wearing out; survives 5+ minutes of looping while a room fills up.
+- **Seamless loop** - engineered loop points, no audible seam.
+- **License**: CC0 strongly preferred (bundle policy); CC-BY acceptable ONLY if the attribution story is clean (in-app credits screen), since this ships in every deploy.
+- Round-2 sourcing hunts candidates; a genuinely iconic option may also come from commissioning/generating an original 8-16 bar loop later - candidates first, then judge.
+
 ### Bundling next steps
 1. Download originals of all approved (free Freesound account), verify license on each page same-day (checklist §5), screenshot to docs/content/licenses/.
 2. Process per pipeline: trim to best hit, enforce 0.5-1.5 s buzzer window, uniform ~10 ms onset (§7b), -16 LUFS, single format/sample rate.
