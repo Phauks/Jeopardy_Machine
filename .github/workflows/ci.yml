@@ -1,0 +1,51 @@
+# PR-only gate, on purpose: everything lands via PR, so re-running the same suite on the
+# push to main is pure duplication. No deploy jobs here ever - deploys are deliberate,
+# local, owner-run (`pnpm deploy` per app), and this repo's agent settings deny them too.
+name: ci
+
+on:
+  pull_request:
+
+concurrency:
+  # New pushes to a PR cancel the previous run; CI minutes are for the latest commit.
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # No version input: pnpm/action-setup reads the pinned "packageManager" field from
+        # package.json - one home for the pnpm version.
+
+      - uses: actions/setup-node@v4
+        with:
+          # Same idea: the Node major comes from the repo pin, not a workflow constant.
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: install
+        run: pnpm install --frozen-lockfile
+
+      - name: format gate
+        run: pnpm exec vp fmt --check
+
+      - name: lint
+        run: pnpm exec vp lint
+
+      - name: typecheck
+        # svelte-check + per-package tsc; also regenerates wrangler/svelte-kit artifacts,
+        # so drift between configs and generated types fails here, not at dev time.
+        run: pnpm -r check
+
+      - name: test
+        run: pnpm -r test
+
+      - name: build
+        # Web: real `vite build` through adapter-cloudflare. Realtime: `wrangler deploy
+        # --dry-run` - full bundle + config validation without credentials.
+        run: pnpm -r build

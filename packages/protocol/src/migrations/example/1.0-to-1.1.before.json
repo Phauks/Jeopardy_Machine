@@ -1,0 +1,16 @@
+{
+  "format": "example",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Example fixture",
+    "author": "Fixture Author",
+    "created": "2026-08-13T12:00:00.000Z",
+    "modified": "2026-08-13T12:30:00.000Z"
+  },
+  "ext": {
+    "com.example.fixture-marker": { "survives": ["migration", "round-trip"] }
+  },
+  "body": {
+    "message": "hello from schema 1.0"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "deny": [
+      "Bash(wrangler deploy:*)",
+      "Bash(wrangler deploy)",
+      "Bash(npx wrangler deploy:*)",
+      "Bash(pnpm exec wrangler deploy:*)",
+      "Bash(pnpm deploy:*)",
+      "Bash(pnpm run deploy:*)",
+      "Bash(wrangler versions upload:*)",
+      "Bash(wrangler versions deploy:*)",
+      "Bash(wrangler secret:*)",
+      "Bash(wrangler d1 execute:*)",
+      "Bash(wrangler r2:*)"
+    ]
+  }
+}

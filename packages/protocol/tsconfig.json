@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // TypeScript 6 does not auto-include node_modules/@types; node globals (fs/path in the
+    // migrations fixture gate, crypto in ids.ts) are opted in explicitly. Runtime code stays
+    // Workers-compatible - node:* imports are allowed in test-support modules only.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
+}

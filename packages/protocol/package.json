@@ -1,0 +1,28 @@
+{
+  "name": "@jeopardy/protocol",
+  "version": "0.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "description": "Shared wire/document contracts: versioned envelope, ext extension-bag convention, operational limits. The modularity keystone - client, SvelteKit server, and GameRoomDO all import identical types and validators.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": "./src/index.ts",
+    "./envelope": "./src/envelope/wire.ts",
+    "./ext": "./src/ext.ts",
+    "./limits": "./src/limits.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "generate:settings-docs": "node --experimental-strip-types scripts/generate-settings-docs.ts",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

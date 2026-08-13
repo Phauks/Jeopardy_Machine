@@ -1,0 +1,17 @@
+{
+  // SvelteKit 3 generates the parent config into node_modules/$app/tsconfig.json on
+  // `svelte-kit sync` (the old ./.svelte-kit/tsconfig.json is gone). The strictness flags
+  // below mirror tsconfig.base.json - restated because the generated config must be the base.
+  "extends": "$app/tsconfig",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  // The service worker compiles against WebWorker libs, not DOM - it has its own tsconfig
+  // (src/service-worker/tsconfig.json) and its own `tsc -p` run in the check script.
+  "exclude": ["src/service-worker"]
+}

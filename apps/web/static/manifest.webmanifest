@@ -1,0 +1,18 @@
+{
+  "name": "Jeopardy Machine",
+  "short_name": "Jeopardy Machine",
+  "description": "Free, self-hosted quiz-show game suite: board editor, big-screen board, host console, phone buzzers.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#0b1120",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

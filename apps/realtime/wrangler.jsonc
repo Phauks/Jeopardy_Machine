@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jeopardy-realtime",
+  "main": "src/index.ts",
+  // Bump deliberately, in its own commit, after reading the compat-date changelog.
+  "compatibility_date": "2026-08-01",
+  "observability": {
+    // Workers Logs (persisted + queryable, includes DO logs). Free tier is generous; head
+    // sampling can be added here if volume ever matters.
+    "enabled": true,
+  },
+  // Readable stack traces in the dashboard; source maps are not served to clients.
+  "upload_source_maps": true,
+  "durable_objects": {
+    "bindings": [
+      // One DO instance per game room, addressed by idFromName(roomCode) - no lookup table.
+      { "name": "GAME_ROOM", "class_name": "GameRoomDO" },
+    ],
+  },
+  "migrations": [
+    // SQLite-backed from birth: live game state (roster, scores, buzz log) must survive
+    // hibernation/eviction, and SQLite classes are also what the free plan includes.
+    { "tag": "v1", "new_sqlite_classes": ["GameRoomDO"] },
+  ],
+  // --- Bindings that arrive with later milestones, declared here so the shape is agreed ---
+  // M3+: flush final game results to the same D1 the web Worker reads (architecture doc §4).
+  // "d1_databases": [
+  //   { "binding": "DB", "database_name": "jeopardy", "database_id": "TBD-created-at-first-deploy" }
+  // ]
+}
