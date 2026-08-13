@@ -90,6 +90,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@jeopardy/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@jeopardy/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol

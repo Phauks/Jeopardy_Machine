@@ -25,6 +25,8 @@ The realtime origin the web app uses comes from `REALTIME_ORIGIN` (declared in `
 
 **Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and emblem set with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change.
 
+**Engine smoke check (M2 exit criteria):** <http://localhost:5173/dev/hotseat> plays a complete game against `@jeopardy/engine` with no server - one keyboard drives host and players (S start, click cells, A arms, 1-8 buzz, C/W/N judge, E expires whichever timer the phase waits on, U undoes anything). Wager cells, the final round, and sudden-death ties are all reachable; the key legend is on the page.
+
 ### Cross-worker DO access (architecture risk 6 - validated)
 
 The web Worker will reach the same `GameRoomDO` instances via a cross-script binding (`script_name: "jeopardy-realtime"` - present but commented in `apps/web/wrangler.jsonc` until M3 uses it). The local story was proven during M0:
@@ -43,6 +45,7 @@ pnpm -F @jeopardy/realtime test   # one package (same for web/protocol)
 ```
 
 - `packages/protocol` - plain vitest, co-located `*.test.ts` next to sources; `limits.gate.test.ts` is an invariant gate (cross-field sanity of the caps).
+- `packages/engine` - plain vitest, one test file per rules area (buzzing, judging, wagers, final, ...) with settings-matrix row numbers cited in describe/it names; `fixture.test.ts` replays every scenario JSON under `fixtures/` twice and diffs the runs (determinism gate); `undo-replay.test.ts` holds the undo-returns-exact-prior-state and log-replay invariants.
 - `apps/realtime` - vitest **inside workerd** via `@cloudflare/vitest-pool-workers` (the `cloudflareTest` plugin in vitest.config.ts reads wrangler.jsonc, so tests exercise the real DO with real hibernation APIs). `wrangler types` runs automatically first (pretest is part of the script).
 - `apps/web` - plain vitest for pure logic plus server-render component tests (`svelte/server` `render()` inside node vitest - see `src/lib/board/board-display.test.ts`); browser-mode interaction tests arrive with the M4 phase 2 surfaces. Invariant gates: `theme-contract.gate.test.ts` (every preset emits the full token contract), `emblem-set.gate.test.ts` (curated-set design rules).
 

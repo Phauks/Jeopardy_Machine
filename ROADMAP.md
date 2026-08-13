@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-13 (M1 protocol phase landed: document envelope + migrations, content layer, settings registry + rule sets, theme + game-definition schemas; M1 editor phase open. M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-13 (M2 engine landed: pure state machine + seeded rng + fixtures + /dev/hotseat exit-criteria page. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -70,7 +70,7 @@ Progress 2026-08-13 - `packages/engine` (@jeopardy/engine) landed:
 - [x] Round flow (#1-#9), shot clock (#10), round time limit (#6, latching), control passing (last-correct / rotate / host-picks / auto-sweep), tiebreakers (#37) + degenerate finishes (#38), teams (#34-#36), late join (#43), everyone-answers (#21/#22)
 - [x] Undo = replay of the append-only action log; seeded rng in state (same seed = identical game)
 - [x] Scenario fixtures (`packages/engine/fixtures/`) as replayable JSON games + `simulate()` as the public simulation API (M3 bots / M4 sim panel build on it)
-- [ ] `/dev/hotseat` keyboard-driven full-game page (exit criteria: a full game with no server)
+- [x] `/dev/hotseat` keyboard-driven full-game page against the engine, no server (exit criteria; plus a headless full-game drive in `apps/web/src/lib/hotseat/sample-game.test.ts`)
 
 ### M3 - Realtime rooms (DO + WebSockets)
 
@@ -110,7 +110,7 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 **Next**
 
 - [ ] M1 board format + editor core (protocol schemas landed 2026-08-13 - see the M1 progress list; visual editor remains)
-- [ ] M2 game engine
+- [x] M2 game engine (landed 2026-08-13 - see the M2 progress list; everyone-answers is engine-complete but not yet driven by the hotseat page)
 
 **Later**
 
