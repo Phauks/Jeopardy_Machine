@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-13 (research round 1 complete; no code yet)
+> Last updated: 2026-08-13 (research round 1 complete; stack decisions resolved; no code yet)
 
 ## What we are building
 
@@ -20,6 +20,7 @@ The competitive research (docs/research/02-landscape.md) confirmed the gap: nobo
 3. **Players never log in** - room code is the entire join flow, forever.
 4. **The host is always in control** - every automated step (arm, timers, judging) has a manual override and an undo.
 5. **Own your data** - versioned JSON export/import from day one; no walled garden.
+6. **Content is portable across game modes.** Questions and assets live in a game-mode-agnostic content layer; a Jeopardy board is a presentation of content items, not their owner. Content packs (questions + assets), game definitions (mode + layout + settings), live game data, and user data are four distinct layers with their own file/storage stories. Future modes reuse the same content packs.
 
 ---
 
@@ -28,8 +29,8 @@ The competitive research (docs/research/02-landscape.md) confirmed the gap: nobo
 ### M0 - Foundations (repo, tooling, docs skeleton)
 Scaffold the pnpm monorepo (`apps/web`, `apps/realtime`, `packages/protocol`) with the owner's conventions from docs/research/04-style-guide.md: Vite+ (`vp`) with Oxlint/Oxfmt, TypeScript strict, Svelte 5 runes, `wrangler.jsonc` with commented bindings, CI gate (PR-only), `.claude/settings.json` deploy denies, CLAUDE.md + docs skeleton (STATUS.md, decisions/, proposals/). **Exit criteria:** `pnpm test` green in CI; hello-world deploys of both Workers verified manually; local dev loop for the two-Worker + DO setup proven (architecture risk 6).
 
-### M1 - Board format + editor core
-The versioned `jeopardy-board` JSON format (zod schema in `packages/protocol`) with migration functions; the visual editor: create/edit boards (categories, clues, values, Daily Double placement, Final round), localStorage persistence behind a `BoardRepository` interface; JSON export/import. **Exit criteria:** a full 6x5 two-round board can be authored, exported, re-imported, and survives a format-version bump.
+### M1 - Content model + board format + editor core
+Two-layer data model in `packages/protocol` (zod schemas + migration functions): the **content layer** (question items: prompt, answer, media refs, tags, difficulty, source note - game-mode-agnostic) and the **jeopardy mode layer** (board layout: rounds, categories, cells referencing content items, values, wager cells). The visual editor: create/edit content items and compose boards from them (with a fast "type straight into the grid" path that creates content items implicitly), localStorage persistence behind repository interfaces; export/import of content packs and game definitions. **Exit criteria:** a full 6x5 two-round board can be authored, exported, re-imported, survives a format-version bump - and its questions can be listed/reused independently of the board.
 
 ### M2 - Game engine (pure logic, no network)
 The rules state machine as pure, heavily-tested functions: round flow, clue lifecycle (reading -> armed -> buzzed -> judged -> rebound), scoring incl. negatives and overrides, Daily Double wagering math, Final round flow, tiebreakers - all 42 settings from the configurable rules matrix (docs/research/01-game-anatomy.md) as a typed config object with defaults. **Exit criteria:** engine passes a test suite covering the rules matrix; a keyboard-driven "hotseat" debug page can play a full game locally with no server.
@@ -71,15 +72,12 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 
 ## Open decisions (owner input needed)
 
-| # | Decision | Options | Research lean |
-|---|---|---|---|
-| 1 | SvelteKit version | SK3 is still prerelease (`3.0.0-next.13`, Aug 2026), not GA | Start SvelteKit 2.x deprecation-clean, flip at GA; or accept prerelease risk to scratch the SK3 itch |
-| 2 | CSS philosophy | sagebrush: plain scoped CSS + tokens.css, no Tailwind · magna-carta: Tailwind v4 + tokens + Bits UI | Either works with the per-surface split (custom board/buzzer regardless); UI research leans Tailwind v4 + shadcn-svelte for editor only |
-| 3 | Component naming | PascalCase (sagebrush) vs kebab-case (magna-carta) | kebab-case (newer repo) |
-| 4 | Art direction | A faithful-retro TV · B modern flat · C event-poster | A as default theme, B/C as token overrides |
-| 5 | Product name | Cannot ship as "Jeopardy" (trademark) | Pick a generic name; repo can stay Jeopardy_Machine |
-| 6 | Validation library | hand-rolled (sagebrush) vs zod (magna-carta) | zod - the shared protocol package is a large schema surface |
-| 7 | Workflow accelerator | hand-rolled DO code vs Cloudflare `partyserver` | Evaluate in M0 week 1 |
+Resolved 2026-08-13 (see docs/decisions/2026-08-13-stack-choices.md): SvelteKit 3 prerelease · Tailwind v4 · kebab-case · zod · partyserver evaluated in M0 week 1.
+
+| # | Decision | Status |
+|---|---|---|
+| 4 | Art direction | Iterating with owner via the "Three Boards" artifact (A faithful-retro TV · B modern flat · C event-poster); no base locked yet |
+| 5 | Product name | Shortlist under review: Buzzboard · Big Board · What Is · Podium · Answers First · Clueboard · Double Down. Will not ship as "Jeopardy"; repo may stay Jeopardy_Machine |
 
 ## Update protocol
 

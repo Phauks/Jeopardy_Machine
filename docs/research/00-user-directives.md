@@ -24,6 +24,14 @@
   - Custom category header styling, custom win screens, custom "Daily Double"-equivalent branding per game.
   - Treat personalization as a module ("cosmetics") so it can grow without touching game logic.
 
+## Architecture directive (owner, 2026-08-13)
+- **Quiz content must be reusable across game modes.** Question files should be usable in other types of games, which delineates how we deal with files, questions, assets, game data, and user data as separate layers. See docs/decisions/2026-08-13-stack-choices.md for the resulting model (content packs vs game definitions vs live game data vs user data).
+
+## Decisions resolved 2026-08-13
+- SvelteKit 3 prerelease (not 2.x-then-migrate). Tailwind v4. kebab-case components. zod. partyserver evaluated M0 week 1.
+- Art direction: owner co-develops via the "Three Boards" artifact; not locked.
+- Name: will change from "Jeopardy" for shipping; shortlist in ROADMAP.md.
+
 ## First event target
 - Joint Board Game Club × Environmental Law Society night.
 - Questions: environmental + gaming topics ONLY — explicitly nothing law-related.
