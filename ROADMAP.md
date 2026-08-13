@@ -60,6 +60,18 @@ Progress 2026-08-13 - the protocol phase landed (docs/proposals/m1-protocol.md w
 
 The rules state machine as pure, heavily-tested functions: round flow, clue lifecycle (reading -> armed -> buzzed -> judged -> rebound), scoring incl. negatives and overrides, Daily Double wagering math, Final round flow, tiebreakers - all 42 settings from the configurable rules matrix (docs/research/01-game-anatomy.md) as a typed config object with defaults. **Exit criteria:** engine passes a test suite covering the rules matrix; a keyboard-driven "hotseat" debug page can play a full game locally with no server.
 
+Progress 2026-08-13 - `packages/engine` (@jeopardy/engine) landed:
+
+- [x] Pure transition core: `(state, action, setup) -> {state, events}`; time is action data, timers are hint events, total (invalid actions reject, never throw)
+- [x] Clue lifecycle incl. early-buzz lockout (#12), first-valid-buzz-wins with ONE buzz-won per arming (owner audio directive), rebound chains (#15/#16), manual-mode host awards, cancel/reopen
+- [x] Scoring rows #17/#18 (deduct / floor-at-zero / none), host score override + undo as first-class actions (row 20)
+- [x] Wager cells (#23-#28): seeded weighted/uniform auto-placement (aired row distribution), authored-wins manual placement, TV/score-only/unlimited maxima, entry timer, true doubles
+- [x] Final round (#29-#33): eligibility, simultaneous secret wagers + answers, lowest-first / top-contenders (batch threshold) / leaderboard reveal plans with enforced drama order
+- [x] Round flow (#1-#9), shot clock (#10), round time limit (#6, latching), control passing (last-correct / rotate / host-picks / auto-sweep), tiebreakers (#37) + degenerate finishes (#38), teams (#34-#36), late join (#43), everyone-answers (#21/#22)
+- [x] Undo = replay of the append-only action log; seeded rng in state (same seed = identical game)
+- [x] Scenario fixtures (`packages/engine/fixtures/`) as replayable JSON games + `simulate()` as the public simulation API (M3 bots / M4 sim panel build on it)
+- [ ] `/dev/hotseat` keyboard-driven full-game page (exit criteria: a full game with no server)
+
 ### M3 - Realtime rooms (DO + WebSockets)
 
 `GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, server-arrival buzz ordering (fairness compensation deferred to M6), alarms for room cleanup. **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones.
