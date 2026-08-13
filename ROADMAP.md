@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-13 (research round 1 complete; stack decisions resolved; no code yet)
+> Last updated: 2026-08-13 (M0 scaffold landed: monorepo, protocol package, realtime DO stub, web shell + PWA skeleton, dev loop proven, CI gate; awaiting owner's first manual deploy to close M0)
 
 ## What we are building
 
@@ -27,30 +27,49 @@ The competitive research (docs/research/02-landscape.md) confirmed the gap: nobo
 ## Milestones
 
 ### M0 - Foundations (repo, tooling, docs skeleton)
-Scaffold the pnpm monorepo (`apps/web`, `apps/realtime`, `packages/protocol`) with the owner's conventions from docs/research/04-style-guide.md: Vite+ (`vp`) with Oxlint/Oxfmt, TypeScript strict, Svelte 5 runes, `wrangler.jsonc` with commented bindings, CI gate (PR-only), `.claude/settings.json` deploy denies, CLAUDE.md + docs skeleton (STATUS.md, decisions/, proposals/). **Exit criteria:** `pnpm test` green in CI; hello-world deploys of both Workers verified manually; local dev loop for the two-Worker + DO setup proven (architecture risk 6).
+
+Scaffold the pnpm monorepo (`apps/web`, `apps/realtime`, `packages/protocol`) with the owner's conventions from docs/research/04-style-guide.md: Vite+ (`vp`) with Oxlint/Oxfmt, TypeScript strict, Svelte 5 runes, `wrangler.jsonc` with commented bindings, CI gate (PR-only), `.claude/settings.json` deploy denies, CLAUDE.md + docs skeleton (STATUS.md, decisions/, proposals/). PWA skeleton (added to scope 2026-08-13, docs/decisions/2026-08-13-pwa.md): web manifest + service worker with the caching policy (precache immutable assets, network-first navigations), documented in DEVELOPMENT.md. **Exit criteria:** `pnpm test` green in CI; hello-world deploys of both Workers verified manually; local dev loop for the two-Worker + DO setup proven (architecture risk 6).
+
+Progress 2026-08-13 - everything agent-verifiable is done; what remains is owner-manual:
+
+- [x] Monorepo + catalog-pinned toolchain (versions verified live; docs/decisions/2026-08-13-m0-version-pins.md)
+- [x] `packages/protocol`: versioned envelope + `ext` bag + limits module, tested
+- [x] `apps/realtime`: `GameRoomDO` stub on partyserver (verdict: use, transport-only - docs/decisions/2026-08-13-partyserver.md), tested inside workerd
+- [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + `/dev/echo` proof page
+- [x] Local dev loop proven end to end (`pnpm dev`; cross-script DO binding `[connected]` under multi-config `wrangler dev`) - docs/DEVELOPMENT.md
+- [x] CI gate (PR-only: fmt, lint, typecheck, test, build), deploy denies, CLAUDE.md, STATUS.md, per-package READMEs
+- [ ] Owner: first manual hello-world deploy of both Workers (docs/cloudflare-setup.md) - closes M0
 
 ### M1 - Content model + board format + editor core
-Two-layer data model in `packages/protocol` (zod schemas + migration functions): the **content layer** (question items: prompt, answer, media refs, tags, difficulty, source note - game-mode-agnostic) and the **jeopardy mode layer** (board layout: rounds, categories, cells referencing content items, values, wager cells). The visual editor: create/edit content items and compose boards from them (with a fast "type straight into the grid" path that creates content items implicitly), localStorage persistence behind repository interfaces; export/import of content packs and game definitions. **Exit criteria:** a full 6x5 two-round board can be authored, exported, re-imported, survives a format-version bump - and its questions can be listed/reused independently of the board. The protocol also defines the **theme document** schema (token values, font-slot choices, background spec, effects level) so themes are a portable, shareable artifact from day one.
+
+Two-layer data model in `packages/protocol` (zod schemas + migration functions): the **content layer** (question items: prompt, answer, media refs, tags, difficulty, source note - game-mode-agnostic) and the **jeopardy mode layer** (board layout: rounds, categories, cells referencing content items, values, wager cells). The visual editor: create/edit content items and compose boards from them (with a fast "type straight into the grid" path that creates content items implicitly), local-first persistence behind repository interfaces - IndexedDB-backed per the PWA decision (docs/decisions/2026-08-13-pwa.md; localStorage only for tiny prefs/tokens); export/import of content packs and game definitions. **Exit criteria:** a full 6x5 two-round board can be authored, exported, re-imported, survives a format-version bump - and its questions can be listed/reused independently of the board. The protocol also defines the **theme document** schema (token values, font-slot choices, background spec, effects level) so themes are a portable, shareable artifact from day one.
 
 ### M2 - Game engine (pure logic, no network)
+
 The rules state machine as pure, heavily-tested functions: round flow, clue lifecycle (reading -> armed -> buzzed -> judged -> rebound), scoring incl. negatives and overrides, Daily Double wagering math, Final round flow, tiebreakers - all 42 settings from the configurable rules matrix (docs/research/01-game-anatomy.md) as a typed config object with defaults. **Exit criteria:** engine passes a test suite covering the rules matrix; a keyboard-driven "hotseat" debug page can play a full game locally with no server.
 
 ### M3 - Realtime rooms (DO + WebSockets)
+
 `GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, server-arrival buzz ordering (fairness compensation deferred to M6), alarms for room cleanup. **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones.
 
 ### M4 - Play surfaces (board, buzzer, host)
-The three UIs on the design-token foundation (docs/research/05-ui-design.md): tokens.css + fonts + theme mechanism first - the three "Three Boards" art directions all ship as built-in **theme presets** (retro-tv, modern-flat, event-poster) plus the Terra Verde event variant, proving the token contract covers real visual range - then primitives in a `/dev` gallery, then the board screen (fill-in stagger, FLIP clue zoom, DD splash, timer bars), the phone buzzer (fixed layout, wake lock, pointerdown + optimistic feedback, per-player buzz sounds from a curated pack), and the host console (arm button, correct/wrong/no-penalty, score override, undo, Final round wizard). Join flow: QR + room code + nickname + lobby. **Exit criteria: a complete real game is playable end-to-end by phones in a room.** This is the "usable at an event" line.
+
+The three UIs on the design-token foundation (docs/research/05-ui-design.md): tokens.css + fonts + theme mechanism first - the three "Three Boards" art directions all ship as built-in **theme presets** (retro-tv, modern-flat, event-poster) plus the Terra Verde event variant, proving the token contract covers real visual range - then primitives in a `/dev` gallery, then the board screen (fill-in stagger, FLIP clue zoom, DD splash, timer bars), the phone buzzer (fixed layout, wake lock, pointerdown + optimistic feedback, per-player buzz sounds from a curated pack), and the host console (arm button, correct/wrong/no-penalty, score override, undo, Final round wizard). Join flow: QR + room code + nickname + lobby. PWA: the precache manifest grows to fonts + sound pack, and the install affordance appears in editor chrome (only there - players are never prompted). **Exit criteria: a complete real game is playable end-to-end by phones in a room.** This is the "usable at an event" line.
 
 ### M5 - Event readiness (the club night)
-Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal. **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
+
+Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal - whose checklist includes the PWA drills: airplane-mode editor test and a service-worker-update-during-game drill (docs/decisions/2026-08-13-pwa.md). **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
 
 ### M6 - Fairness + resilience polish
+
 Buzz latency compensation (arm-window + client-elapsed with RTT clamps), early-buzz lockout penalty, reconnection hardening under real phone conditions, host "resume crashed game" from DO state.
 
 ### M7 - Suite features
+
 **Theme customizer** (owner priority - pull earlier if appetite allows): a visual editor over the theme document - pick fonts per slot from the curated self-hosted set, full color control, background (solid/gradient/pattern/uploaded image via R2 with auto-dim overlay), effects level (flat vs bevel-and-glow), live board preview, WCAG-contrast warnings; themes export/import and share like content packs. Also: CSV/spreadsheet import (+ J-Archive-shaped and Quizlet/Anki TSV), zip bundle export with media, print stylesheet, board sizes beyond 6x5, everyone-answers mode for large crowds, cosmetics module (player colors/avatars, custom buzzer sound upload with host veto), single-file offline HTML export.
 
 ### M8 - Multi-user (only if wanted)
+
 Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by Access email. Phase 3 (only if it goes multi-tenant): better-auth on D1. The `BoardRepository` seam from M1 makes this additive.
 
 ---
@@ -58,16 +77,19 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 ## Now / Next / Later
 
 **Now**
+
 - [x] Research round 1 (six agents: anatomy, landscape, architecture, style, UI, content) - docs/research/, docs/content/
 - [x] Owner decisions on the open questions below (name still workshopping - not a blocker)
 - [x] Pre-M0 design audit: expansion paths + customization boundaries + end-to-end user flows (docs/design/)
-- [ ] M0 foundations - **approved 2026-08-13, in progress**
+- [ ] M0 foundations - **scaffold landed 2026-08-13; only the owner's manual hello-world deploy remains** (per-item progress in the M0 section above)
 
 **Next**
+
 - [ ] M1 board format + editor core
 - [ ] M2 game engine
 
 **Later**
+
 - M3 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
 - M6 -> M8 as appetite allows
 
@@ -77,9 +99,9 @@ Resolved 2026-08-13 (see docs/decisions/2026-08-13-stack-choices.md): SvelteKit 
 
 Resolved 2026-08-13 (see docs/decisions/2026-08-13-theming-as-feature.md): art direction - no single winner; all three directions ship as theme presets and the game screen becomes highly customizable (fonts, colors, background) via the theme document + M7 customizer.
 
-| # | Decision | Status |
-|---|---|---|
-| 5 | Product name | Shortlist under review: Buzzboard · Big Board · What Is · Podium · Answers First · Clueboard · Double Down. Will not ship as "Jeopardy"; repo may stay Jeopardy_Machine |
+| #   | Decision     | Status                                                                                                                                                                  |
+| --- | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 5   | Product name | Shortlist under review: Buzzboard · Big Board · What Is · Podium · Answers First · Clueboard · Double Down. Will not ship as "Jeopardy"; repo may stay Jeopardy_Machine |
 
 ## Update protocol
 
@@ -90,14 +112,20 @@ Resolved 2026-08-13 (see docs/decisions/2026-08-13-theming-as-feature.md): art d
 
 ## Document map
 
-| You need | Home |
-|---|---|
-| Owner directives + feature ideas log | docs/research/00-user-directives.md |
-| Expansion paths + customization boundaries (the design law) | docs/design/expansion-and-boundaries.md |
-| End-to-end user flows: guest / creator / host | docs/design/user-flows.md |
-| Game rules, buzzer mechanics, 42-setting rules matrix | docs/research/01-game-anatomy.md |
-| Competitor features, paywalls, lessons | docs/research/02-landscape.md |
-| Stack, DO design, storage, auth phases, costs | docs/research/03-architecture.md |
-| Owner coding conventions + divergence questions | docs/research/04-style-guide.md |
-| UI tooling, art direction, tokens, buzzer UX | docs/research/05-ui-design.md |
-| Event question pool (105 clues, media sources, fact-check flags) | docs/content/event-content-pool.md |
+| You need                                                         | Home                                         |
+| ---------------------------------------------------------------- | -------------------------------------------- |
+| Conventions, hard rules, commands (repo operating manual)        | CLAUDE.md                                    |
+| Dev loop, testing, adding a package                              | docs/DEVELOPMENT.md                          |
+| Stamped live state + reproduce-commands                          | docs/STATUS.md                               |
+| Cloudflare account/provisioning/deploy runbook (owner-run)       | docs/cloudflare-setup.md                     |
+| Exact version pins + SvelteKit 3 breaking-change notes           | docs/decisions/2026-08-13-m0-version-pins.md |
+| M1 protocol schema proposal (under review)                       | docs/proposals/m1-protocol.md                |
+| Owner directives + feature ideas log                             | docs/research/00-user-directives.md          |
+| Expansion paths + customization boundaries (the design law)      | docs/design/expansion-and-boundaries.md      |
+| End-to-end user flows: guest / creator / host                    | docs/design/user-flows.md                    |
+| Game rules, buzzer mechanics, 42-setting rules matrix            | docs/research/01-game-anatomy.md             |
+| Competitor features, paywalls, lessons                           | docs/research/02-landscape.md                |
+| Stack, DO design, storage, auth phases, costs                    | docs/research/03-architecture.md             |
+| Owner coding conventions + divergence questions                  | docs/research/04-style-guide.md              |
+| UI tooling, art direction, tokens, buzzer UX                     | docs/research/05-ui-design.md                |
+| Event question pool (105 clues, media sources, fact-check flags) | docs/content/event-content-pool.md           |
