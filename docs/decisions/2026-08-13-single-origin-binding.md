@@ -15,6 +15,15 @@ Yes - **single-origin is the M3 connection architecture.** Players, displays, an
 1. A WebSocket upgrade can pass through the SvelteKit-on-Workers request path. If SvelteKit 3's server routes cannot return a 101-with-socket, the known fallback is a thin custom entry: `main` points at a shim that checks `Upgrade: websocket` + `/room/*/ws` and forwards to the binding BEFORE delegating everything else to the Kit-generated handler. Validate against the pinned adapter early.
 2. Local dev parity: vite-dev-side emulation of a cross-script DO call was the one untested piece in M0 (DEVELOPMENT.md); this decision makes it mandatory to validate. Fallback remains multi-config `wrangler dev`.
 
+## Room lifecycle: creation is explicit (owner, 2026-08-13)
+
+Connecting must never create a room. With `idFromName`, ANY code names a DO, so a naive design would instantiate rooms for every typo (the owner spotted this on the echo stub, which deliberately answers any code - stub-only behavior). The M3 contract:
+
+1. **Create is an explicit host action**: "Host this game" -> web server route -> DO binding call that initializes room state (game definition, settings, host token) and returns the code. Codes are **server-allocated** (random, from the room-code alphabet), retried on collision with a still-active room - never user-chosen.
+2. **Joining an uncreated/expired room is refused**: the WS upgrade for a code whose DO has no initialized state answers with a close/error ("no such room") - the friendly bad-code error in user-flows A1. The DO instance that briefly wakes to say "no" holds no state and costs effectively nothing; it evicts immediately.
+3. **Lifecycle**: created -> lobby -> active -> ended -> expired (cleanup alarm, default 2h idle). Expired rooms free their code for reuse; a code in the wild for an expired room gets the same "no such room" answer.
+4. Host identity for the room = a creation-time token (the host console presents it; no accounts involved).
+
 ## Consequences
 - `/dev/echo` and `REALTIME_ORIGIN` are interim scaffolding; M3 replaces them with same-origin room routes (the env var and its dev-only localhost fallback get deleted).
 - The realtime Worker no longer needs a public route for players; consider disabling its workers.dev URL after M3.
