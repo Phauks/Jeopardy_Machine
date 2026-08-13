@@ -33,6 +33,10 @@
 - **Audio routing: selectable** - per-device "play room audio here" toggle (display on by default); multiple devices can opt in.
 - **Late-join score: flexible** - a setting (0 default / match lowest / prompt host), rules matrix #43.
 
+## Audio pipeline (owner, 2026-08-13)
+
+- **Standardized sound onset.** Source audio has inconsistent leading silence; every bundled sound gets a uniform onset (~10 ms to first audible energy - not too short: a micro fade-in prevents clicks; not too long: onset is perceived buzz latency, and non-uniform onsets are unfair across teams). Spec in docs/content/media-and-sounds.md checklist §7b; playback uses pre-decoded Web Audio buffers (M4).
+
 ## Development simulation (owner, 2026-08-13)
 
 - **Built-in mocking of players/teams/actions for development.** We must be able to pretend that teams and players are present and acting - without real phones. Three layers, matching the milestones:
