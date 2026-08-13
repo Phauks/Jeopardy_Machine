@@ -211,3 +211,54 @@ Kahoot's lobby theme proves the pattern: one upbeat, anticipation-building track
 2. Process per pipeline: trim to best hit, enforce 0.5-1.5 s buzzer window, uniform ~10 ms onset (§7b), -16 LUFS, single format/sample rate.
 3. Loop-prep think tracks to clean 30 s beds.
 4. Implement the synthesized double-beep in-app (M4 audio module) - two 150 ms square beeps ~880 Hz, 120 ms apart.
+
+---
+
+## 8. Round-2 candidates (sourced 2026-08-13, second pass)
+
+Auditioned via **Listening Room 2** (follow-up review page). Verification level for this section: **every Freesound row below had its individual sound page fetched this session** and the license line under the waveform read directly — all say the literal text "Creative Commons 0" linking to creativecommons.org/publicdomain/zero/1.0/. Durations are the values from each sound page.
+
+### 8.1 Buzzer pack round 2 — CC0 only, targeting the 0.5–1.5 s window
+
+Owner directives applied: animal calls welcome (loon, wolf, elephant, frog, kookaburra, owl targeted); timbres distinct from the approved six (bell/ding/honk/squeak/zap/klaxon). Durations outside the window are marked **trim** — each has a strong ≤1.5 s moment. Honest gap: **no CC0 loon field recording exists on Freesound in a usable length** (the 3 CC0 hits are 10 s+ ambiences or eagle cries); the loon below is a designed/synthetic wail (tagged `synthetic`, `sound-design`) — judge whether it reads as "loon" in the room.
+
+| #   | Sound                                   | URL                                | License | Duration        | Character                                                                                  |
+| --- | --------------------------------------- | ---------------------------------- | ------- | --------------- | ------------------------------------------------------------------------------------------ |
+| 1   | 13-Aullido Lobo.wav (wolf howl)         | https://freesound.org/s/427694/    | CC0     | 1.7 s (≈window) | Wolf howl from an SFX pack — compact, in-window after a light trim                         |
+| 2   | elephant (gordonez)                     | https://freesound.org/s/766592/    | CC0     | 1.1 s           | Elephant trumpet, in-window as-is                                                          |
+| 3   | Frog Croak (willcarpenter3)             | https://freesound.org/s/716959/    | CC0     | 1.3 s           | Croak (tagged `guiro` — may be a guiro-made croak; sounds the part)                        |
+| 4   | kookaburra (soundofsong)                | https://freesound.org/s/841979/    | CC0     | 6.4 s — trim    | Real field recording, Australia; trim to one 1–1.5 s laugh burst                           |
+| 5   | loon.wav (pschrandt)                    | https://freesound.org/s/428077/    | CC0     | 3.8 s — trim    | Designed/synthetic loon wail (see gap note); trim to one wail                              |
+| 6   | Hoot_2.wav (owl)                        | https://freesound.org/s/164652/    | CC0     | 2.2 s — trim    | Owl hoot, close and clear; trim to the best double-hoot                                    |
+| 7   | Airhorn (jacksonacademyashmore)         | https://freesound.org/s/414208/    | CC0     | 1.6 s (≈window) | Air horn blast — party-crowd energy, loud                                                  |
+| 8   | Gong_Center_Clear.wav (Q.K.)            | https://freesound.org/s/56240/     | CC0     | 1.6 s (≈window) | Clear gong strike; natural decay lands near window edge                                    |
+| 9   | Slide Whistle.wav (WalliumVA)           | https://freesound.org/s/672965/    | CC0     | 0.8 s           | Classic cartoon slide-whistle rise, in-window as-is                                        |
+| 10  | Game Powerup (Jofae)                    | https://freesound.org/s/368651/    | CC0     | 1.1 s           | Retro power-up climb — distinct from the approved LASRGun zap (rising vs. zapping)         |
+
+**Alternates** (also page-verified CC0, embedded on the review page as a bench):
+
+| Alt | Sound                                | URL                             | License | Duration     | Note                                                                    |
+| --- | ------------------------------------ | ------------------------------- | ------- | ------------ | ----------------------------------------------------------------------- |
+| a   | Great Horned Owl Hooting (distant)   | https://freesound.org/s/863463/ | CC0     | 1.5 s        | In-window but distant/reverberant — may be too soft to cut through a room |
+| b   | Elephant Trumpets Growls.flac        | https://freesound.org/s/527845/ | CC0     | 2.0 s — trim | Beefier trumpet+growl than #2                                           |
+| c   | FX swanee whistle up.wav             | https://freesound.org/s/497092/ | CC0     | 1.2 s        | Rounder slide-whistle alt to #9                                         |
+
+Dead-ends this pass: CC0 "loon call" (see gap note above); CC0 kookaburra under 6 s (all real recordings are 6 s+ — trimming required); xeno-canto not needed this round (its CC0 subset stays the documented backup for bird calls).
+
+### 8.2 Lobby music — signature-track candidates
+
+Judged against the §7 requirements: one track forever, upbeat, playful tension, survives 5+ min of looping, seamless loop. **Loop-cleanness below is inferred from each item's own loop labeling — confirm by ear in Listening Room 2** (play twice back-to-back).
+
+| #   | Track                                          | Source / URL                                                                 | License                                                     | Length | Honest read                                                                                                                                 |
+| --- | ---------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| L1  | quiz game music loop BPM 90 (portwain)         | https://freesound.org/s/220060/                                              | **CC0** (page-verified)                                     | 16 s   | Purpose-made quiz-game loop, on-genre without imitating anything; 16 s bed is short — the loop must really be seamless to survive 5 min       |
+| L2  | Upbeat Game Loop - Aurora Ride (Venus17)       | https://freesound.org/s/841299/                                              | **CC0** (page-verified)                                     | 31 s   | Named and built as an upbeat game loop; 31 s gives more phrase variety per lap than L1                                                        |
+| L3  | Racing game menu music (fmceretta)             | https://freesound.org/s/426701/                                              | **CC0** (page-verified)                                     | 16 s   | Cheeky menu-music energy ("while buying fancy cars we will never have!") — playful-tension fit is strong if the loop point is clean          |
+| L4  | LobbyMusic (gmonster0314)                      | https://freesound.org/s/798228/                                              | **CC0** (page-verified)                                     | 33 s   | Literally written as lobby music; the exact use-case, judge the character                                                                    |
+| L5  | Hyperactive chiptune loop (Rolly-SFX)          | https://freesound.org/s/626274/                                              | **CC0** (page-verified)                                     | 30 s   | High-energy chiptune — anticipation for sure, but "hyperactive" is a real annoyance risk over 5+ min; audition with that specifically in mind |
+| L6  | **Kevin MacLeod — Fluffing a Duck**            | https://incompetech.com/music/royalty-free/mp3-royaltyfree/Fluffing%20a%20Duck.mp3 | **CC-BY — attribution required** (in-app credits screen; incompetech licenses page verified this session: free use = Creative Commons w/ credit) | ~1:08  | Instantly recognizable quirky-playful — the closest thing to "Kahoot energy" in this list; NOT loop-engineered (has an arranged ending), needs a loop edit; CC-BY ships in every deploy → credits screen becomes mandatory |
+| L7  | Quirky Rock Funky Loop (Sonican) — *link only* | https://pixabay.com/music/funk-quirky-rock-funky-loop-405243/                | Pixabay Content License ("Free for use", no attribution — track page verified this session via reader; **direct audio not fetchable without a browser**) | 1:00   | Built as a 1:00 quirky funk loop; audition at source — Pixabay blocks non-browser fetches (curl 403), so it could not be embedded            |
+
+Bench (not auditioned, link-only): Kevin MacLeod "Monkeys Spinning Monkeys" (CC-BY, ~2:06, famous playful earworm — big file, left out of the review page for size) and "Bit Quest" (CC-BY, upbeat chiptune adventure); Pixabay "Retro Arcade Game Music" (HitsLab, 1:00) and "8Bit theme Loop - Chiptune Symphony" (MusicInMedia, 1:13) from the verified search page https://pixabay.com/music/search/game%20show%20upbeat%20loop/.
+
+Sourcing note for the record: Pixabay pages return HTTP 403 to plain fetches (Cloudflare); the search page and the L7 track page were read via the reader pipeline instead, and the license wording above is quoted from the track page. Re-verify all of §8 per checklist §5 before bundling; CC-BY candidates additionally trigger checklist §8 (attribution audit).
