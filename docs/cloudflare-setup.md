@@ -64,6 +64,24 @@ pnpm -F web run deploy             # 2nd: ...before web's cross-script DO bindin
 
 Verify: the deploy output prints both `*.workers.dev` URLs; open the web URL, and the M0 scaffold's dev page should complete its WebSocket echo against the deployed DO. Deploys stay **manual and owner-run** (per the repo's deploy-deny convention in .claude/settings.json) until we deliberately add CI deploys with a scoped token.
 
+## 3b. Continuous deploys via Workers Builds (dashboard-managed - recommended steady state)
+
+Workers Builds connects the GitHub repo to Cloudflare so **every push to the production branch auto-builds and deploys** - no CLI in the loop after setup. Two Workers = connect the same repo twice, one project per Worker:
+
+| Setting | `jeopardy-realtime` (connect FIRST) | `jeopardy-web` |
+|---|---|---|
+| Repository | `Phauks/Jeopardy_Machine` | `Phauks/Jeopardy_Machine` |
+| Root directory | `apps/realtime` | `apps/web` |
+| Build command | `pnpm install --frozen-lockfile` | `pnpm install --frozen-lockfile && pnpm build` |
+| Deploy command | `npx wrangler deploy` | `npx wrangler deploy` |
+| Production branch | `main` | `main` |
+
+Setup: Dashboard -> Workers & Pages -> Create -> **Import a repository** -> authorize the Cloudflare GitHub App for this repo -> fill the table above. Realtime must complete its first deploy before web's first deploy succeeds (cross-script DO binding). If a build can't resolve the pnpm workspace from the app root directory, fall back to root directory `/` with build command `pnpm install --frozen-lockfile && pnpm -F <app> build` and deploy command `npx wrangler deploy -c apps/<app>/wrangler.jsonc`.
+
+Branch semantics: pushes to `main` = production deploys; pushes to other branches = **preview versions** (each PR gets preview URLs - useful for reviewing UI work live). This means the deployment flow becomes: work lands on the feature branch -> PR -> merge to `main` -> both Workers redeploy automatically.
+
+**Interim note (while all work still lives on `claude/jeopardy-suite-research-rm1kao`):** either do one manual CLI deploy (§3) to see things live now, or temporarily set the Builds production branch to the feature branch and flip it to `main` at first merge. Flipping later is one dropdown.
+
 ## 4. Custom domain (when the name is chosen)
 
 1. Registrar: buy the domain (Cloudflare Dashboard -> Domain Registration), or transfer one in.
