@@ -33,6 +33,15 @@
 - **Audio routing: selectable** - per-device "play room audio here" toggle (display on by default); multiple devices can opt in.
 - **Late-join score: flexible** - a setting (0 default / match lowest / prompt host), rules matrix #43.
 
+## UI gallery feedback round 1 (owner, 2026-08-13)
+
+- **Kick / make-leader go behind a per-member "..." overflow menu** - not exposed buttons. (Answers the gallery's kick-exposure question.)
+- **Emoji skepticism**: owner is unsure about raw emoji as player identity markers. Next UI iteration explores a curated emblem set (consistent, designed marks - could be a custom SVG icon set or a tightly curated emoji subset rendered uniformly) instead of free emoji.
+- **Post-join customization required**: players can change appearance after joining a team (see user-flows "Post-join customization").
+- **Host mirror view required**: host's screen is sometimes literally mirrored to the projector; console needs a mirror mode whose private layer (answers, DD locations) moves to a host-phone companion view or the print pack (see user-flows C1b).
+- **Interactive token swap**: gallery presets were static; owner wanted to actually flip themes. Next gallery revision gets a working preset switcher (also a proof-drill for the token contract). Owner endorses the constraint: "having theming this way forces our theming to be very well designed."
+- **Team-scoped buzz sounds**: in team mode the room-audible sound is the team's (leader-picked), acting as double confirmation (audio + visual) of who won the buzz; personal sounds play locally only (see user-flows "Teams & leadership").
+
 ## Team leadership (owner, 2026-08-13)
 
 - Team creator = **team leader**: names the team, kicks members who don't belong, controls team-level customization (e.g. team color), and can **hand off the leader role** to another player.

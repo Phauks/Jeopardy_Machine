@@ -108,6 +108,15 @@ Autosave to library on every change. Export = versioned JSON (game definition + 
 Laptop -> Library -> game card -> **"Host this game"** -> room created (DO spun up, code allocated).
 Host console opens; first action offered: **"Open board display"** -> new browser window (route `/room/BQKX7/display`), dragged to the projector, fullscreened. Console and display are independent WS clients of the same room - a display crash never touches the game; reopening the URL restores it instantly. (Casting the display tab via Chromecast/AirPlay works the same way.)
 
+### C1b. Mirrored single-screen setups (owner-specified 2026-08-13)
+
+Not every venue gives the host an extended desktop - sometimes the laptop screen IS the projector (mirrored), so whatever the host sees, the room sees. The console needs an explicit **mirror mode**:
+
+- Toggling mirror mode reshapes the console into a display-first layout: the board/clue fills the screen exactly like the public display, with host controls reduced to a slim, unobtrusive dock (arm / correct / wrong / no-takers / undo) that is acceptable for the room to see.
+- **Answers never render on a mirrored screen.** The private layer (per-clue correct responses, DD locations, wager amounts in progress) moves to one of: (a) the **host companion view** - a phone-sized route the host opens on their own phone, joined with a host token, showing exactly the private layer synced to the current clue; or (b) the **print pack** (flow B4) as the low-tech fallback.
+- Keyboard shortcuts still work in mirror mode (the dock is for visibility, not the only input).
+- Mirror mode is a per-device toggle (like audio routing), not a room setting - a co-host on a second laptop can run the full private console simultaneously.
+
 ### C2. Doors open
 
 Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments (drag to rebalance), rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
@@ -153,13 +162,17 @@ Two customization tiers that never collide:
 
 | Tier         | Who controls | What it covers                                                                                                                                                                                                                       |
 | ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Team**     | Team leader  | Team name, team color/emblem (picked from a theme-safe palette), team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation)                                                                             |
+| **Team**     | Team leader  | Team name, team color/emblem (picked from a theme-safe palette), **the team's room-audible buzz sound**, team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation)                                                                             |
 | **Personal** | Each player  | Own nickname, personal avatar/accent, personal buzzer sound - always visible _within_ the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal emblem) |
+
+**Buzz sounds are team-scoped in team mode (owner-specified 2026-08-13).** The room-audible buzz-in sound belongs to the team tier: the leader picks it, and when any member wins the buzz the room hears the *team's* sound while the display shows the team name/color - a **double confirmation** (audio + visual) of who has been selected. One sound per team is learnable by the host and crowd; per-player sounds at 20 teams x 5 members would be noise. Personal buzzer sounds still exist: in individuals mode they ARE the room sound; in team mode they play **locally on the buzzing player's own phone only** as private feedback. The display may additionally show *which member* buzzed, small, under the team name - identification without audio clutter.
+
+**Post-join customization (owner-specified 2026-08-13).** Joining is not a one-shot identity commitment: players can reopen their appearance (avatar/accent, personal buzzer sound, nickname) at any time from the player screen (tap your own avatar chip), and leaders can reopen team customization the same way. Changes apply immediately and sync everywhere. Guardrails: name changes are rate-limited (anti-confusion, not anti-fun), and identity edits are locked during the brief armed/answering window so the display never relabels mid-adjudication.
 
 **Leadership mechanics:**
 
 - Creating a team makes you its leader (crown affordance on your card). Host-premade teams: leader = first joiner, until changed.
-- Leader powers, all from the phone lobby screen: rename team, pick team color/emblem, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly).
+- Leader powers, all from the phone lobby screen: rename team, pick team color/emblem + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly). **Kick and hand-off live behind a per-member "..." overflow menu** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name.
 - Kicked players return to team selection (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list).
 - **Leader disconnect**: after a grace period (missed heartbeats), leadership auto-passes to the longest-tenured connected member; if the original leader returns they rejoin as a regular member.
 - **Host supremacy is unchanged** (guiding principle 4): the host console can rename/kick/merge/reassign leaders over any team decision, and sees a feed entry for kicks (abuse visibility). Team self-governance reduces host workload; it never gates the host.
