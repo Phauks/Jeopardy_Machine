@@ -188,15 +188,18 @@ For **every** image/sound that makes the final cut:
 **Owner feedback on rejects: several were too short.** Pack standard updated — bundled buzz sounds target a **0.5-1.5 s duration window** (after onset trim): long enough to register in a noisy room and carry identity, short enough not to stall the game. Round 2 sourcing targets ~4-6 more CC0 candidates in that window (distinct timbres from the approved set: consider air horn, gong/chime, slide whistle, "wrong-family" horn, retro power-up, bell tree), auditioned via a Listening Room follow-up. **Animal noises welcome** (owner 2026-08-13 - the round-1 quacks fell to the duration standard, not the concept): target calls that fill the 0.5-1.5 s window with character - loon call, wolf howl (trimmed), elephant trumpet, frog croak, kookaburra, owl hoot. On-theme for the environmental crowd; Freesound CC0 first, xeno-canto as a backup source for bird calls (check per-recording license - xeno-canto is largely CC BY-SA/BY-NC, so most of it fails the CC0-only pack policy; use its CC0 subset only).
 
 ### System cues: all approved
+
 - **Arm/board-ready:** Countdown Start (Blink 01 rejected).
 - **Time-up:** synthesize double-beep in-app (primary, per recommendation); Top-of-hour Beep + Breviceps error buzz kept as fallbacks/alternates.
 - **Wrong answer:** both approved (pick per sound-set feel later).
 - **Wager sting:** both approved (drum-roll bed + rimshot reveal plan stands).
 
 ### Think music: 3 approved
+
 Short Elevator Music Loop · Bossa Nova "Thank You for Shopping!" · Lounging Smooth Keys. (2.2 s bossa bar and Blues Impro rejected.) Three tracks = enough variety for a night; rotate per Final round or let the theme sound-set pick.
 
 ### Bundling next steps
+
 1. Download originals of all approved (free Freesound account), verify license on each page same-day (checklist §5), screenshot to docs/content/licenses/.
 2. Process per pipeline: trim to best hit, enforce 0.5-1.5 s buzzer window, uniform ~10 ms onset (§7b), -16 LUFS, single format/sample rate.
 3. Loop-prep think tracks to clean 30 s beds.
