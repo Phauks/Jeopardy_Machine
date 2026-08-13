@@ -61,6 +61,26 @@
 - **Interactive token swap**: gallery presets were static; owner wanted to actually flip themes. Next gallery revision gets a working preset switcher (also a proof-drill for the token contract). Owner endorses the constraint: "having theming this way forces our theming to be very well designed."
 - **Team-scoped buzz sounds**: in team mode the room-audible sound is the team's (leader-picked), acting as double confirmation (audio + visual) of who won the buzz; personal sounds play locally only (see user-flows "Teams & leadership").
 
+## Avatars: Kenney 3D only (owner, 2026-08-13 - RESOLVES the avatar decision)
+
+- **No 2D packs. Kenney 3D assets exclusively, for consistency** with the environments direction - characters and worlds are one visual universe.
+- Candidate sets (all CC0): **Cube Pets** (15 animals - recolor + legibility proven in the Cube Pets Proof artifact), **Mini Characters** (kenney.nl/assets/mini-characters), **Blocky Characters** (kenney.nl/assets/blocky-characters). Humans + pets can coexist as avatar categories if styles mesh - render proof to verify.
+- The **baked-sprite pipeline** (headless three.js -> webp at build time) is the canonical avatar path: phones get sprites, never 3D. The proven palette-recolor mechanism applies; verify per-pack how skins/materials store color.
+- Small-size story per the proof: avatars render at 48px+; at 24px the team/player accent-colored chip carries identity. Accepted trade-off (owner chose charm + consistency over 24px face detail).
+
+## 3D environments - "worlds where the players live" (owner, 2026-08-13)
+
+Owner direction: use Kenney's 3D asset kits (all CC0, one consistent low-poly style) to build **environments the player avatars inhabit** - pirate ship deck, dungeon, forest, etc. Cube Pets avatars + Kenney world kits = a coherent visual universe.
+
+Scoping (proposed, to keep this shippable):
+- **Display-device only.** 3D renders on the big screen (a laptop driving a projector - three.js, low-poly = cheap). Phones never render 3D; their chips use the pre-rendered avatar sprites. Console untouched.
+- **Lobby first.** The signature moment: as players join, their pets appear IN the environment (wandering/dancing - Cube Pets ship with walk/run/dance animations) under the QR code while the lobby track plays. Kahoot-lobby energy, but a diorama filling with your friends.
+- **Environment = a theme-document slot.** Like sound sets: a curated `environment` field (forest / pirate / dungeon / none) in the presentation layer, zero game-logic coupling (design law holds). "None" keeps the clean 2D lobby - 3D is additive, never required.
+- **In-game stays 2D.** The board/clue screens remain the readable 2D surfaces; environments may frame interstitials (round transitions, winner podium - pets on deck celebrating) later.
+- **First event fit**: the forest/nature kit IS the environmental theme. Terra Verde lobby = pets in a low-poly forest.
+- Candidate kits to evaluate: Nature Kit, Pirate Kit, Graveyard/dungeon kits, Castle Kit (verify current names/contents at build time).
+- Milestone placement: after M5 (event may get a v0 forest lobby ONLY if M4/M5 land early; otherwise first post-event delight milestone). The Cube Pets render pipeline (sprite baking) is the same tooling foundation either way.
+
 ## Team leadership (owner, 2026-08-13)
 
 - Team creator = **team leader**: names the team, kicks members who don't belong, controls team-level customization (e.g. team color), and can **hand off the leader role** to another player.

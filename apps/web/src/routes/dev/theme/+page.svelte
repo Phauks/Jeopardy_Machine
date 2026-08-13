@@ -70,14 +70,11 @@
   <title>Dev: theme gallery</title>
 </svelte:head>
 
-<!-- The whole page sits inside the themed scope on purpose: gallery chrome runs on the
-     derived surface tokens (Tailwind-reflected), so a preset flip restyles the page itself -
-     the derivation formula gets tested along with the board. -->
-<main
-  class="min-h-screen bg-surface-page text-surface-text"
-  style={themeStyle}
-  data-effects={effectsLevel}
->
+<!-- Gallery chrome is deliberately NOT themed (2026-08-13, second light-theme bug): the
+     page runs on the default token values (dark), and ONLY the preview panels below carry
+     the selected theme. A previewed theme may be light, dark, or ugly - the gallery around
+     it must stay readable regardless. Same rule as the picker chips. -->
+<main class="min-h-screen bg-surface-page text-surface-text">
   <div class="mx-auto flex max-w-6xl flex-col gap-8 p-6">
     <header class="flex flex-col gap-4">
       <h1 class="chrome-title text-2xl">Theme gallery</h1>
@@ -124,16 +121,26 @@
 
     <section class="flex flex-col gap-3">
       <h2 class="chrome-title text-lg">Board</h2>
-      <BoardDisplay board={sampleBoard} />
-      <p class="text-sm text-surface-text-muted">
-        Click a cell for the clue card; Done marks it used ({preset?.tokens.usedCellTreatment}
-        treatment).
-      </p>
+      <div
+        class="preview-panel bg-surface-page text-surface-text"
+        style={themeStyle}
+        data-effects={effectsLevel}
+      >
+        <BoardDisplay board={sampleBoard} />
+        <p class="mt-3 text-sm text-surface-text-muted">
+          Click a cell for the clue card; Done marks it used ({preset?.tokens.usedCellTreatment}
+          treatment).
+        </p>
+      </div>
     </section>
 
     <section class="flex flex-col gap-3">
       <h2 class="chrome-title text-lg">Type specimens</h2>
-      <div class="flex flex-col gap-4 rounded-sm border border-surface-border bg-surface-raised p-5">
+      <div
+        class="preview-panel flex flex-col gap-4 bg-surface-raised text-surface-text"
+        style={themeStyle}
+        data-effects={effectsLevel}
+      >
         {#each fontSpecimens as specimen (specimen.token)}
           <div class="flex flex-col gap-1">
             <span class="text-xs tracking-wide text-surface-text-muted uppercase">
@@ -149,7 +156,11 @@
 
     <section class="flex flex-col gap-3">
       <h2 class="chrome-title text-lg">Token swatches</h2>
-      <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div
+        class="preview-panel grid grid-cols-1 gap-2 bg-surface-page text-surface-text sm:grid-cols-2 lg:grid-cols-3"
+        style={themeStyle}
+        data-effects={effectsLevel}
+      >
         {#each paintableTokens as [name, value] (name)}
           <div
             class="flex items-center gap-3 rounded-sm border border-surface-border bg-surface-raised p-2"
@@ -193,7 +204,11 @@
           </button>
         {/each}
       </div>
-      <div class="emblem-grid rounded-sm border border-surface-border bg-surface-raised p-5">
+      <div
+        class="preview-panel emblem-grid bg-surface-raised text-surface-text"
+        style={themeStyle}
+        data-effects={effectsLevel}
+      >
         {#each emblems as emblem (emblem.id)}
           <figure class="flex flex-col items-center gap-2">
             <span class="emblem-tile" style="color: {emblemTint}">
@@ -212,6 +227,14 @@
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.06em;
+  }
+
+  /* Every preview panel paints its own themed ground, so a light theme's light text sits
+     on that theme's own surfaces - never on the gallery's dark chrome (and vice versa). */
+  .preview-panel {
+    border-radius: 6px;
+    border: 1px solid #3a3a48;
+    padding: 1.25rem;
   }
 
   /* The picker controls are deliberately NOT themed: they switch the theme under preview,

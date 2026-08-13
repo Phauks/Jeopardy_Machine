@@ -188,12 +188,14 @@ For **every** image/sound that makes the final cut:
 **Owner feedback on rejects: several were too short.** Pack standard updated — bundled buzz sounds target a **0.5-1.5 s duration window** (after onset trim): long enough to register in a noisy room and carry identity, short enough not to stall the game. Round 2 sourcing targets ~4-6 more CC0 candidates in that window (distinct timbres from the approved set: consider air horn, gong/chime, slide whistle, "wrong-family" horn, retro power-up, bell tree), auditioned via a Listening Room follow-up. **Animal noises welcome** (owner 2026-08-13 - the round-1 quacks fell to the duration standard, not the concept): target calls that fill the 0.5-1.5 s window with character - loon call, wolf howl (trimmed), elephant trumpet, frog croak, kookaburra, owl hoot. On-theme for the environmental crowd; Freesound CC0 first, xeno-canto as a backup source for bird calls (check per-recording license - xeno-canto is largely CC BY-SA/BY-NC, so most of it fails the CC0-only pack policy; use its CC0 subset only).
 
 ### System cues: all approved
+
 - **Arm/board-ready:** Countdown Start (Blink 01 rejected).
 - **Time-up:** synthesize double-beep in-app (primary, per recommendation); Top-of-hour Beep + Breviceps error buzz kept as fallbacks/alternates.
 - **Wrong answer:** both approved (pick per sound-set feel later).
 - **Wager sting:** both approved (drum-roll bed + rimshot reveal plan stands).
 
 ### Think music: 3 approved
+
 Short Elevator Music Loop · Bossa Nova "Thank You for Shopping!" · Lounging Smooth Keys. (2.2 s bossa bar and Blues Impro rejected.) Three tracks = enough variety for a night; rotate per Final round or let the theme sound-set pick.
 
 ### Lobby music - the signature track (owner directive 2026-08-13)
@@ -207,6 +209,7 @@ Kahoot's lobby theme proves the pattern: one upbeat, anticipation-building track
 - Round-2 sourcing hunts candidates; a genuinely iconic option may also come from commissioning/generating an original 8-16 bar loop later - candidates first, then judge.
 
 ### Bundling next steps
+
 1. Download originals of all approved (free Freesound account), verify license on each page same-day (checklist §5), screenshot to docs/content/licenses/.
 2. Process per pipeline: trim to best hit, enforce 0.5-1.5 s buzzer window, uniform ~10 ms onset (§7b), -16 LUFS, single format/sample rate.
 3. Loop-prep think tracks to clean 30 s beds.
@@ -278,3 +281,34 @@ All proceed through the pipeline: original downloads, license re-verify + screen
 ### Lobby track: round 3 with a locked vibe
 
 All seven round-2 candidates rejected except **Quirky Rock Funky Loop** (Sonican, Pixabay) - vibe approved ("I like the vibe but I want more options"). Round-3 brief: **quirky rock / funky loops** in that lane - upbeat, guitar/bass-forward, playful, loop-ready. Sources: Pixabay music search (that vibe's home turf; Pixabay Content License = free, no attribution, usable in the app, but individual track pages must be verified and tracks cannot be redistributed standalone - flag this in the final license review), plus Freesound CC0 funk/rock loops. Keep Sonican's track in the running as the benchmark row.
+
+### Round-3 lobby candidates (sourced 2026-08-13, third pass — LOBBY TRACK ONLY)
+
+Auditioned via **Listening Room 3**. Vibe locked to the benchmark: quirky rock/funk — upbeat, guitar/bass-forward, playful, groovy, loop-ready. Rejected lanes (generic quiz loops, racing-menu synth, chiptune, MacLeod whimsy) excluded by construction.
+
+**Verification level, honest per source:**
+
+- **Pixabay** — every track page below was opened this session via the reader pipeline (plain fetches still 403) and shows the literal wording **"Free for use under the Pixabay Content License"**. Audio itself is not fetchable without a browser, so all Pixabay rows are **link-only** on the review page — audition at source. Reminder for the final license review: Pixabay tracks are app-usable with no attribution but **cannot be redistributed standalone**.
+- **Freesound** — every sound page below was fetched this session; each license line reads the literal text **"Creative Commons 0"**. All Freesound rows are **embedded** on the review page (each sound's own HQ preview MP3). Durations are from the sound pages.
+
+| #   | Track                                     | Source / URL                                                                        | License                                  | Lap length | Honest read                                                                                                                                          |
+| --- | ----------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------- | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ★   | **Quirky Rock Funky Loop — BENCHMARK**    | https://pixabay.com/music/funk-quirky-rock-funky-loop-405243/ (Sonican)             | Pixabay Content License (page verified)  | 1:00       | The bar. Round-2 survivor; its own tags include "Game Show". Link-only.                                                                                |
+| P1  | Funky Rock Quirky Loop                    | https://pixabay.com/music/rock-funky-rock-quirky-loop-419453/ (Sonican)             | Pixabay Content License (page verified)  | 0:53       | Sonican's own sister take on the benchmark — same tag family; most on-vibe find of the round                                                           |
+| P2  | Quirky Funky — 60 Sec Whimsical Rock      | https://pixabay.com/music/funk-quirky-funky-60-sec-whimsical-rock-408561/ (Sonican) | Pixabay Content License (page verified)  | 0:59       | Same family, sillier ("whimsical", tagged Funny) — watch for whimsy fatigue at minute 4                                                                |
+| P3  | Quirky Funky — Uplifting Funk Rock        | https://pixabay.com/music/upbeat-quirky-funky-uplifting-funk-rock-402525/ (Sonican) | Pixabay Content License (page verified)  | 1:30       | Longest lap of the round (~3.3 laps/5 min = least lap-fatigue); movement "medium fast/running" — most driving Sonican                                  |
+| P4  | Funky Fun Uplifting Rock Loop             | https://pixabay.com/music/funk-funky-fun-uplifting-rock-loop-453055/ (Sonican)      | Pixabay Content License (page verified)  | 1:08       | Brightest/happiest — more "win screen" than "tension builds". ⚠ Page shows **Content ID Registered** — YouTube-claim risk on uploaded lobby footage    |
+| P5  | Fairground Rock — Quirky Rock Loop        | https://pixabay.com/music/rock-fairground-rock-quirky-rock-loop-559901/ (Sonican)   | Pixabay Content License (page verified)  | 1:11       | Wildcard: fairground/circus/psychedelic tags — could tip from "quirky" into "carnival"                                                                 |
+| P6  | Funny Funk Rock                           | https://pixabay.com/music/rock-funny-funk-rock-203362/ (Emmraan)                    | Pixabay Content License (page verified)  | 1:03       | The non-Sonican Pixabay option; NOT titled as a loop — assume an arranged ending, budget a loop edit                                                    |
+| F1  | Funky Groove (code_box)                   | https://freesound.org/s/566952/                                                     | **CC0** (page verified)                  | 0:49       | "Do that stank face!" — tight guitar + organ cartoon-funk; most *quirky* Freesound find; embedded                                                      |
+| F2  | Southside Funk.wav (BaDoink)              | https://freesound.org/s/553380/                                                     | **CC0** (page verified)                  | 1:19       | Full-band funk backing loop; mid-energy head-nod groove — judge whether it builds enough anticipation                                                  |
+| F3  | FunkaRock168.wav (BaDoink)                | https://freesound.org/s/545394/                                                     | **CC0** (page verified)                  | 1:09       | Funk-rock fusion, 168 BPM, author-built "perpetual loop" — most driving Freesound candidate, closest to the benchmark's rock half                       |
+| F4  | Rockin Rhythm B7 ~ Funk.wav (BaDoink)     | https://freesound.org/s/537610/                                                     | **CC0** (page verified)                  | 1:17       | Real guitars/bass/electric drums, bluesy rock-funk from a "perfect loops" series — does "bluesy" read playful or bar-band?                             |
+| F5  | Give it LOOP BASS & DRUMS 90 BPM.wav      | https://freesound.org/s/614195/ (johntrap)                                          | **CC0** (page verified)                  | 0:11       | Pure bass+drums pocket — ~27 laps/5 min; no hook to wear out, none to love; more bed than signature                                                    |
+| F6  | FunkyJam-C300.wav (visual)                | https://freesound.org/s/105095/                                                     | **CC0** (page verified)                  | 0:15       | Most bass-forward row; warm noodly funk jam; same short-lap caveat as F5                                                                               |
+| f-a | *bench:* Groove Loop #1 (danlucaz)        | https://freesound.org/s/513957/                                                     | **CC0** (page verified)                  | 0:10       | Faith No More-inspired grungier groove — control row                                                                                                   |
+| f-b | *bench:* Fminor_Bass&DrumGroove (GRD)     | https://freesound.org/s/413261/                                                     | **CC0** (page verified)                  | 0:20       | Clean 97 BPM bass+drum bed, low quirk — "is simpler better?" control row                                                                               |
+
+Loopability caveat for all embedded rows: the review page plays MP3 previews, and MP3 encoding pads start/end with a few ms of silence — an audible seam gap there may not exist in the WAV original played gaplessly in-app (Web Audio, sample-accurate loop points). Judge the music on the page; verify the seam against the original before the final cut.
+
+Searches run this pass — Pixabay: "funky loop", "quirky rock", "funk groove loop", "funky bass"; Freesound (CC0 filter): "funk loop", "funky groove", "funk rock loop", "funky bass loop", "bass groove loop", "funk guitar loop", "groovy loop". Dead-ends: Pixabay audio remains un-embeddable (search + track pages readable via reader pipeline; audio CDN URLs not exposed in rendered pages); Freesound's CC0 funk shelf is heavy on solo-instrument loops (bass-only, drums-only, synth) — full-band quirky-funk in CC0 is scarce, which is why the Pixabay/Sonican family carries this round. Re-verify everything per checklist §5 before bundling.

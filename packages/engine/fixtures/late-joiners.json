@@ -1,0 +1,31 @@
+{
+  "name": "late-joiners",
+  "description": "A game in progress under the match-lowest late-join policy (#43): one player has fallen negative, a latecomer matches that literal lowest score, then the host corrects it with the always-on override, and the latecomer plays a clue.",
+  "seed": "late-joiners",
+  "preset": "casual-party",
+  "overrides": { "join": { "lateJoinScore": "match-lowest" } },
+  "rounds": [{ "columns": 3, "rows": 3, "wagerPlacement": "manual" }],
+  "hasFinalClue": false,
+  "actions": [
+    { "type": "player-join", "at": 1000, "playerId": "p1", "name": "Ada" },
+    { "type": "player-join", "at": 1001, "playerId": "p2", "name": "Ben" },
+    { "type": "start-game", "at": 2000 },
+    { "type": "select-cell", "at": 2100, "category": 0, "row": 2 },
+    { "type": "arm-buzzers", "at": 2200 },
+    { "type": "buzz", "at": 2300, "playerId": "p2" },
+    { "type": "judge", "at": 2400, "verdict": "wrong" },
+    { "type": "buzz", "at": 2500, "playerId": "p1" },
+    { "type": "judge", "at": 2600, "verdict": "correct" },
+    { "type": "player-join", "at": 3000, "playerId": "p3", "name": "Late Cleo" },
+    { "type": "score-set", "at": 3100, "entityId": "p3", "score": 0 },
+    { "type": "select-cell", "at": 3200, "category": 1, "row": 0, "entityId": "p1" },
+    { "type": "arm-buzzers", "at": 3300 },
+    { "type": "buzz", "at": 3400, "playerId": "p3" },
+    { "type": "judge", "at": 3500, "verdict": "correct" }
+  ],
+  "expect": {
+    "phase": "awaiting-selection",
+    "scores": { "p1": 600, "p2": -600, "p3": 200 },
+    "rejectedCount": 0
+  }
+}

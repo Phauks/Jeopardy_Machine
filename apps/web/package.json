@@ -2,8 +2,8 @@
   "name": "@jeopardy/web",
   "version": "0.0.0",
   "private": true,
-  "license": "AGPL-3.0-only",
   "description": "SvelteKit app Worker: pages (editor, host console, board display, buzzer), REST API, and later D1/R2. Realtime WebSockets live in the sibling realtime Worker.",
+  "license": "AGPL-3.0-only",
   "type": "module",
   "imports": {
     "#lib/*": "./src/lib/*"
@@ -17,6 +17,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@jeopardy/engine": "workspace:*",
     "@jeopardy/protocol": "workspace:*"
   },
   "devDependencies": {
