@@ -18,4 +18,8 @@
     <a class="underline" href="/dev/echo">Dev: WebSocket echo check</a>
     - proves the local two-Worker dev loop end to end.
   </p>
+  <p>
+    <a class="underline" href="/dev/theme">Dev: theme gallery</a>
+    - board + presets + emblems on the live token contract (M4 phase 1).
+  </p>
 </main>
