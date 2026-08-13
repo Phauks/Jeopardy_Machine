@@ -1,0 +1,139 @@
+# User Flows
+
+> 2026-08-13 · Pre-M0 design audit.
+> Honest status: research round 1 covered *fragments* (join-flow UX patterns in 05-ui-design.md, the host's moment-to-moment loop in 01-game-anatomy.md §8). This document is the first complete end-to-end design of the three journeys. Screens named here are the canonical route/screen vocabulary for the codebase and all future docs.
+
+Two fundamentally different populations, one hard rule between them:
+
+- **Guests (players)**: phone, zero friction, zero accounts, zero reading-the-manual. They scan a code and play. The app must be *boring* to them in the best way - it never asks for anything.
+- **Creators/hosts**: desktop-first, invest time days before the event, run the room on the night. They get the depth (editor, settings, themes, host console) - organized so the first game requires none of it.
+
+---
+
+## Flow A - Guest player (phone)
+
+### A1. Arrive
+Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `BQKX7`).
+- Scan QR -> lands directly in the room's join screen. Typing the URL manually is equivalent.
+- **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
+- Room full / game over / bad code -> clear friendly error, not a spinner.
+
+### A2. Join (one screen, <15 seconds)
+Single screen: nickname field + (if enabled) pick-your-buzzer-sound (tap to preview locally) + color/emoji pick + **Join**.
+- Team mode, host-premade teams: tap your team's card.
+- Team mode, self-organize: join an existing team card or "+ new team".
+- Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix.
+- On join: session token minted and kept in `sessionStorage`; wake-lock requested; phone registered in lobby.
+
+### A3. Lobby
+"You're in as **Lorax** 🌲 on **Team Sequoia**" + live roster + game title card in the event's theme.
+- Buzzer practice: a disarmed demo button; pressing plays *local* feedback only (no room sound spam). Host may run an official sound check (see C3).
+- Waiting state is explicit: "Waiting for the host to start."
+
+### A4. In game - the phone mirrors room state
+The buzzer screen is a single fixed layout (no scrolling, no zoom, no pull-to-refresh) with a status strip, the buzz area, and a score strip. States:
+
+| Room state | Phone shows |
+|---|---|
+| Board (someone picking) | Scoreboard + "**Maya** is picking..." |
+| Clue being read | The buzz button, visually *cold* + "wait for it..." (buzz text NOT shown by default - listening beats reading) |
+| **Armed** | Button goes hot (theme accent, subtle pulse). Tap -> instant local flash + haptic, server confirms |
+| You won the buzz | Full-screen "**YOU!** Answer out loud" + 5s ring timer |
+| Someone else won | "**Maya** buzzed" dimmed screen |
+| You buzzed early | "Too soon" + 0.25s lockout ring (the penalty made visible = teachable) |
+| Judged | Score delta flash (+$400 green / -$400 red) then back to board state |
+| Daily-Double (yours) | Wager pad: slider + numeric entry, min/max computed and shown, "true DD" shortcut button |
+| Daily-Double (not yours) | "**Maya** found the Double Down! Wager: hidden" |
+| Final round | Category -> wager pad (deadline bar) -> clue + typed answer field + 30s bar -> "locked in" |
+| Between rounds / game over | Scoreboard; game over adds placement + "thanks for playing" |
+
+### A5. The unglamorous 80% - failure & edge handling
+- **Phone sleeps / app backgrounds** (constant at real events): on visibility regain, WS reconnects with session token, state snapshot restores the exact screen. Target: invisible within 2s.
+- **Accidental refresh / tab close+reopen**: same token in `sessionStorage` -> seamless resume. New tab on same phone: token is per-tab; joining again as a new player is prevented by a room-side device hint (best effort, host can merge/kick regardless).
+- **Wi-Fi blip**: thin "reconnecting..." banner; buzzing disabled while stale (never let a player *think* they buzzed); auto-recover.
+- **Late joiner**: allowed by default (setting), enters at current state with score 0; host can gift a starting score (score override exists anyway).
+- **Player leaves / phone dies**: roster marks them away after missed heartbeats; game NEVER blocks on an absent phone (Final round: missing wager = auto 0 at deadline; host sees who's outstanding).
+- **The host kicks/renames**: takes effect immediately, phone shows a polite screen.
+
+### A6. After
+Final standings stay on the phone. Nothing to uninstall, nothing retained beyond the session. "Same room again next week" = same flow, 15 seconds.
+
+---
+
+## Flow B - Creator (desktop, days before)
+
+### B1. First contact
+Landing = **Library** (localStorage-backed in phase 1): Games · Content packs · Themes, plus "New game" and "Import". Empty state carries a 60-second sample game to poke at ("play it solo right now" -> rehearse mode) - the product demos itself.
+
+### B2. Author (the editor)
+"New game" -> mode: Jeopardy (only, for now) -> board editor.
+Two authoring paths, same result (owner's content-portability directive):
+1. **Type straight into the grid** (fast path): click a cell, type clue + answer, tab onward. Content items are created implicitly in the game's own pack.
+2. **Compose from library**: side panel lists existing content items (search by tag/difficulty); drag onto cells. The event's 105-clue pool enters here via one import.
+Media: drag image/audio onto a cell -> uploads (R2) with size caps validated client-side; preview inline. *(Local-only editing keeps media as pending-upload references; see Open Questions #3.)*
+Board-level tools: category rename inline, value-scheme picker, DD placement (auto-weighted / uniform / manual), Final clue slot, round tabs (R1/R2/Final).
+
+### B3. Configure
+Settings panel is **progressive disclosure**: preset first (TV rules / Casual party / Custom), the full 42-setting matrix behind "Customize" with the defaults column pre-filled. Team mode + join options here. Theme: preset picker with live board thumbnail (customizer in M7).
+
+### B4. Validate & rehearse
+- **Lint panel** (always visible count, click to expand): empty cells, missing answers, unused media, DD on empty cell, Final missing, contrast warning if themed oddly.
+- **Rehearse mode**: play the full game solo, keyboard-driven, engine-real (this is M2's hotseat page productized). The creator discovers pacing problems Tuesday, not live on Friday.
+- **Print pack**: host cards (clues + answers ordered), answer key.
+
+### B5. Keep
+Autosave to library on every change. Export = versioned JSON (game definition + embedded pack) or zip-with-media bundle. Import accepts both + CSV. This is also the backup story ("I lost my work once" - never again: export nag on first completed board).
+
+---
+
+## Flow C - Host (game night)
+
+### C1. Setup (arrive 15 min early)
+Laptop -> Library -> game card -> **"Host this game"** -> room created (DO spun up, code allocated).
+Host console opens; first action offered: **"Open board display"** -> new browser window (route `/room/BQKX7/display`), dragged to the projector, fullscreened. Console and display are independent WS clients of the same room - a display crash never touches the game; reopening the URL restores it instantly. (Casting the display tab via Chromecast/AirPlay works the same way.)
+
+### C2. Doors open
+Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments (drag to rebalance), rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
+
+### C3. Sound check (optional, 60 seconds, worth it)
+Console button: "Buzzer check" - arms all buzzers in a no-score dry run; each first press plays that player's buzz sound through the display and lights their name. Confirms audio, teaches the arm rhythm, burns off the first-buzz jitters.
+
+### C4. The loop (per clue - each step is one tap/keypress)
+Console is keyboard-first (spacebar = arm, ←/→ = wrong/correct, U = undo) with giant touch targets as equals.
+1. Board on both screens; console highlights **who has control**. Tap the cell the controlling player calls.
+2. Clue fills both screens (console also shows **the answer**, host-only). Host reads aloud.
+3. **ARM** (spacebar) - the one sacred button.
+4. Winner announced on display + their sound; console starts the 5s ring automatically.
+5. **Correct** (score, control passes, clue closes) / **Wrong** (deduct, lockout, auto re-arm for the rest) / **No penalty**. Rebound continues until correct or **No takers** (reveals answer on display, control unchanged).
+6. DD path: splash + sting -> wager arrives from the player's phone (console can type it on their behalf) -> reveal -> judge once.
+Always available: undo stack, score override, reopen clue, skip, pause (freezes all timers + display shows "one moment").
+
+### C5. Round transitions & Final
+- End of R1 -> interstitial scoreboard -> R2 board (selection auto-passes to lowest score).
+- **Final wizard** (linear, cannot be done wrong): eligibility list (auto, with host override to include the excluded) -> category on display -> wager collection (progress bar per player, deadline, missing = 0) -> clue + 30s music + typed answers -> reveal one by one, lowest-first, host judging each -> winner screen. Batch-reveal mode kicks in above the size threshold (rules matrix #33).
+- Tie -> configured resolution (co-champions default / sudden-death clue).
+
+### C6. When it goes wrong (it will)
+- **Host laptop dies**: room state lives in the DO, not the laptop. Reopen console URL on any device -> full resume. (Hardening in M6; the architecture guarantees it from M3.)
+- **Venue Wi-Fi dies**: phones auto-rejoin on recovery (A5); if it's truly dead, the host falls back to hands-up - and the console still works as scoreboard via phone hotspot. Degrade gracefully, never brick the night.
+- **Projector/display loss**: reopen display URL; meanwhile the console alone can carry a small room.
+- **Disputes**: undo + override + reopen-clue are the escape hatches for every judging argument.
+
+### C7. After
+Winner screen (podium + per-team totals). Console: export results (JSON/CSV: final scores, per-clue log). Room expires via DO alarm (default 2h idle); code becomes reusable.
+
+---
+
+## Cross-flow notes
+
+- **Same person, two hats**: the creator IS the host at our events. The seam is "Host this game" - everything before it is calm desk work, everything after is showtime. Design vocabulary keeps them distinct: *editor* vs *console*.
+- **Roles are explicit in the protocol** (M3): `host | display | player | spectator` - multiple displays allowed, co-host consoles possible later (a second judging phone is a real event request we get for free from this).
+- **The 100-player question**: buzz-race with 100 solo players is legal but socially poor; the flows above assume teams at that scale (20 teams x 5). Everyone-answers mode (M7) is the true 100-solo answer. Host guidance in docs, not a hard gate (boundary 2.7 caps the room, not the fun).
+
+## Open UX questions (to resolve in M1/M4 design, tracked here on purpose)
+
+1. **No-phones fallback**: do we ship a "manual mode" (host awards points, no buzzers) for rooms where phones aren't viable? Cheap to build on the engine; decide in M4 scope.
+2. **Clue text on phones**: default off in-room (listening > reading ahead); the setting exists for remote/accessibility. Confirm default with first playtest.
+3. **Media in local-first editing**: boards edited offline reference media that hasn't uploaded. Proposal: media pends locally (IndexedDB) and uploads on first "Host this game" with connectivity. Decide in M1.
+4. **Late-join score policy**: 0 vs. lowest-current-score vs. host-prompt. Default 0 + host override; confirm at first event.
+5. **Buzzer sound audio routing**: sounds play on the display device (one canonical room audio source). Verify venue-volume adequacy at dress rehearsal; fallback is host-console audio out.

@@ -59,8 +59,9 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 
 **Now**
 - [x] Research round 1 (six agents: anatomy, landscape, architecture, style, UI, content) - docs/research/, docs/content/
-- [ ] Owner decisions on the open questions below
-- [ ] M0 foundations
+- [x] Owner decisions on the open questions below (name still workshopping - not a blocker)
+- [x] Pre-M0 design audit: expansion paths + customization boundaries + end-to-end user flows (docs/design/)
+- [ ] M0 foundations - **approved 2026-08-13, in progress**
 
 **Next**
 - [ ] M1 board format + editor core
@@ -92,6 +93,8 @@ Resolved 2026-08-13 (see docs/decisions/2026-08-13-theming-as-feature.md): art d
 | You need | Home |
 |---|---|
 | Owner directives + feature ideas log | docs/research/00-user-directives.md |
+| Expansion paths + customization boundaries (the design law) | docs/design/expansion-and-boundaries.md |
+| End-to-end user flows: guest / creator / host | docs/design/user-flows.md |
 | Game rules, buzzer mechanics, 42-setting rules matrix | docs/research/01-game-anatomy.md |
 | Competitor features, paywalls, lessons | docs/research/02-landscape.md |
 | Stack, DO design, storage, auth phases, costs | docs/research/03-architecture.md |
