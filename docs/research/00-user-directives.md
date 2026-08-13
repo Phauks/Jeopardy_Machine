@@ -33,6 +33,10 @@
 - **Audio routing: selectable** - per-device "play room audio here" toggle (display on by default); multiple devices can opt in.
 - **Late-join score: flexible** - a setting (0 default / match lowest / prompt host), rules matrix #43.
 
+## Content model (owner, 2026-08-13)
+
+- **Media attaches to both question AND answer.** A content item's prompt and its answer each carry an optional media ref - the reveal can show an image/audio (picture-round reveal shows the labeled park photo; music clue reveals the cover art). In the v1 content-item schema from the start.
+
 ## UI gallery feedback round 1 (owner, 2026-08-13)
 
 - **Kick / make-leader go behind a per-member "..." overflow menu** - not exposed buttons. (Answers the gallery's kick-exposure question.)

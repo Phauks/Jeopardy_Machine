@@ -8,3 +8,4 @@ dist/
 .DS_Store
 vite.config.ts.timestamp-*
 worker-configuration.d.ts
+.claude/worktrees/
