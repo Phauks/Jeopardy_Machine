@@ -1,6 +1,6 @@
 # Licensing
 
-> 2026-08-13 · Status: recommendation made, owner pick pending. Until a LICENSE file exists, the repo is legally all-rights-reserved - the opposite of the project's free-forever intent - so this should be resolved before the repo is ever made public.
+> 2026-08-13 · Status: **RESOLVED - owner chose AGPL-3.0-only.** /LICENSE carries the full text; every package.json declares `AGPL-3.0-only`; README's License section states all four surfaces. The analysis below is kept for the record.
 
 ## The project has four licensing surfaces
 

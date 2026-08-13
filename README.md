@@ -47,4 +47,7 @@ SvelteKit 3 (prerelease, pinned) · Svelte 5 runes · Tailwind v4 · Cloudflare 
 
 ## License
 
-MIT (see package.json; LICENSE file lands with the public release).
+- **Code**: [AGPL-3.0-only](LICENSE) - free to self-host, modify, and share; a hosted service built on modified code must publish its modifications (the network clause is the point: this project exists because the alternatives are paywalled). Rationale: docs/design/licensing.md.
+- **Bundled fonts**: SIL OFL 1.1, per-face texts in apps/web/static/fonts/LICENSES.md.
+- **Bundled sounds**: CC0 only (curated pack policy - docs/design/expansion-and-boundaries.md §2.10), credits ledger kept anyway.
+- **Your content**: boards, packs, and themes you create are yours; exports carry an optional license field you control. The app claims nothing.

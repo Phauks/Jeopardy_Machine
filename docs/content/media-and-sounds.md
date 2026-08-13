@@ -175,3 +175,29 @@ For **every** image/sound that makes the final cut:
 - **incompetech.com track pages** — site is live and server-rendered at the index level, but individual track players are JS-rendered; track metadata was corroborated via secondary sources. Confirm in a browser before relying on it.
 - **Pixabay individual track pages** — not opened this session (search page + license summary were); treat as "listed, pending per-file check."
 - **Not sourced this session (out of scope for this board draft):** bird/animal call audio (xeno-canto) for the benched "Who's Calling?" category, and NASA Mir imagery for "Games in Spaaace" decoration (images.nasa.gov, referenced in the pool but not needed by any current cell). Flag for a follow-up pass if the owner swaps those categories in.
+
+---
+
+## 7. Owner decisions — Listening Room round 1 (2026-08-13)
+
+### Buzzer pack: 6 approved of 14 — SECOND SOURCING ROUND NEEDED
+
+**Approved:** Correct Bell (#2) · ding.wav (#3) · Clown Horn (#4) · Squeaky Toy #4 (#5) · LASRGun Retro Laser (#10, trim to best single zap) · Klaxon (#12).
+**Rejected:** buzzer sportif (#1), both quacks (#6, #7), both boings (#8, #9), Zap_C_03 (#11), Bobby-Car (#13), Annoying Buzzer (#14).
+
+**Owner feedback on rejects: several were too short.** Pack standard updated — bundled buzz sounds target a **0.5-1.5 s duration window** (after onset trim): long enough to register in a noisy room and carry identity, short enough not to stall the game. Round 2 sourcing targets ~4-6 more CC0 candidates in that window (distinct timbres from the approved set: consider air horn, gong/chime, slide whistle, "wrong-family" horn, retro power-up, bell tree), auditioned via a Listening Room follow-up.
+
+### System cues: all approved
+- **Arm/board-ready:** Countdown Start (Blink 01 rejected).
+- **Time-up:** synthesize double-beep in-app (primary, per recommendation); Top-of-hour Beep + Breviceps error buzz kept as fallbacks/alternates.
+- **Wrong answer:** both approved (pick per sound-set feel later).
+- **Wager sting:** both approved (drum-roll bed + rimshot reveal plan stands).
+
+### Think music: 3 approved
+Short Elevator Music Loop · Bossa Nova "Thank You for Shopping!" · Lounging Smooth Keys. (2.2 s bossa bar and Blues Impro rejected.) Three tracks = enough variety for a night; rotate per Final round or let the theme sound-set pick.
+
+### Bundling next steps
+1. Download originals of all approved (free Freesound account), verify license on each page same-day (checklist §5), screenshot to docs/content/licenses/.
+2. Process per pipeline: trim to best hit, enforce 0.5-1.5 s buzzer window, uniform ~10 ms onset (§7b), -16 LUFS, single format/sample rate.
+3. Loop-prep think tracks to clean 30 s beds.
+4. Implement the synthesized double-beep in-app (M4 audio module) - two 150 ms square beeps ~880 Hz, 120 ms apart.

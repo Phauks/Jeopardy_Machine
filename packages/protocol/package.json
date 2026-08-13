@@ -2,6 +2,7 @@
   "name": "@jeopardy/protocol",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "description": "Shared wire/document contracts: versioned envelope, ext extension-bag convention, operational limits. The modularity keystone - client, SvelteKit server, and GameRoomDO all import identical types and validators.",
   "type": "module",
   "sideEffects": false,

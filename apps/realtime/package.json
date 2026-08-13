@@ -2,6 +2,7 @@
   "name": "@jeopardy/realtime",
   "version": "0.0.0",
   "private": true,
+  "license": "AGPL-3.0-only",
   "description": "Realtime Worker: owns GameRoomDO (one Durable Object per game room). WebSocket-only surface; the SvelteKit app is a sibling Worker that reaches these DOs via a cross-script binding.",
   "type": "module",
   "scripts": {
