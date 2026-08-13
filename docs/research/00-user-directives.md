@@ -24,6 +24,11 @@
   - Custom category header styling, custom win screens, custom "Daily Double"-equivalent branding per game.
   - Treat personalization as a module ("cosmetics") so it can grow without touching game logic.
 
+## UX questions resolved (owner, 2026-08-13)
+- **No-phones "manual mode": ship it** (M4) - host awards points from the console, no buzzers; doubles as the Wi-Fi-failure fallback.
+- **Audio routing: selectable** - per-device "play room audio here" toggle (display on by default); multiple devices can opt in.
+- **Late-join score: flexible** - a setting (0 default / match lowest / prompt host), rules matrix #43.
+
 ## Team leadership (owner, 2026-08-13)
 - Team creator = **team leader**: names the team, kicks members who don't belong, controls team-level customization (e.g. team color), and can **hand off the leader role** to another player.
 - Personal customization stays personal: players keep their own identity assets (avatar/accent/buzzer sound) visible within the team display, independent of team-level choices.

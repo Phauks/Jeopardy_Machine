@@ -147,10 +147,15 @@ Two customization tiers that never collide:
 - **Roles are explicit in the protocol** (M3): `host | display | player | spectator` - multiple displays allowed, co-host consoles possible later (a second judging phone is a real event request we get for free from this).
 - **The 100-player question**: buzz-race with 100 solo players is legal but socially poor; the flows above assume teams at that scale (20 teams x 5). Everyone-answers mode (M7) is the true 100-solo answer. Host guidance in docs, not a hard gate (boundary 2.7 caps the room, not the fun).
 
-## Open UX questions (to resolve in M1/M4 design, tracked here on purpose)
+## Open UX questions (tracked here on purpose)
 
-1. **No-phones fallback**: do we ship a "manual mode" (host awards points, no buzzers) for rooms where phones aren't viable? Cheap to build on the engine; decide in M4 scope.
-2. **Clue text on phones**: default off in-room (listening > reading ahead); the setting exists for remote/accessibility. Confirm default with first playtest.
-3. **Media in local-first editing**: boards edited offline reference media that hasn't uploaded. Proposal: media pends locally (IndexedDB) and uploads on first "Host this game" with connectivity. Decide in M1.
-4. **Late-join score policy**: 0 vs. lowest-current-score vs. host-prompt. Default 0 + host override; confirm at first event.
-5. **Buzzer sound audio routing**: sounds play on the display device (one canonical room audio source). Verify venue-volume adequacy at dress rehearsal; fallback is host-console audio out.
+Resolved by owner 2026-08-13:
+
+1. ~~No-phones fallback~~ -> **Ship it (M4)**: "manual mode" - no buzzers, host awards points from the console ("award to..." on each clue). Also doubles as the total-Wi-Fi-failure fallback in C6 and makes the suite usable for classrooms/pubs with zero player devices. Board + engine + console only; the room simply has no player connections.
+2. ~~Late-join score policy~~ -> **Flexible (a setting)**: `late-join score` = start at 0 (default) / match lowest current score / host is prompted per joiner. Host score override remains the universal escape hatch. Joins the rules matrix as setting #43.
+3. ~~Audio routing~~ -> **Selectable**: every connected room client (display, console, future spectator) has a local "play room audio here" toggle; default on for the display, off elsewhere. Multiple devices may opt in (e.g. console near the host + display speakers). Client-side toggle, no server routing logic - cheap, as suspected.
+
+Still open:
+
+4. **Clue text on phones**: default off in-room (listening > reading ahead); the setting exists for remote/accessibility. Confirm default with first playtest.
+5. **Media in local-first editing**: boards edited offline reference media that hasn't uploaded. Proposal: media pends locally (IndexedDB) and uploads on first "Host this game" with connectivity. Decide in M1.
