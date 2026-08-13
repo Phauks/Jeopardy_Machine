@@ -1,6 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "jeopardy-web",
+  // Name matches the Workers Builds project (owner created it as jeopardy-machine-web;
+  // CI overrides mismatches and nags with a PR, so config follows the deployed reality).
+  "name": "jeopardy-machine-web",
   // The adapter emits the Worker entry + static assets here on `vite build`.
   "main": ".svelte-kit/cloudflare/_worker.js",
   "compatibility_date": "2026-08-01",
