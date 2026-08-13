@@ -97,7 +97,27 @@ If you want future Claude sessions to run wrangler against the account, add to t
 
 Notes: this hands deploy power to agent sessions - the repo's `.claude/settings.json` deploy-denies still gate _unasked_ deploys, but the trust boundary is yours to draw. Rotating the token in the dashboard kills access instantly. Skipping this section entirely is a fine steady state: agents prepare everything, you run the two deploy commands.
 
-## 6. Later phases (do nothing now)
+## 6. GitHub repo settings (one-time, ~5 min - matters because main now auto-deploys)
+
+Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate. Settings -> in the repo:
+
+**Required:**
+
+1. **Branch protection / ruleset on `main`** (Settings -> Rules -> Rulesets -> New branch ruleset, target `main`):
+   - Require a pull request before merging (no direct pushes - this makes "PR merge = deploy" the only path to production).
+   - Require status checks to pass: add the CI workflow's check (`ci`) as required, so a red build physically cannot reach main - "never deploy red" becomes enforced, not aspirational.
+   - No required reviewers (solo project; the CI gate is the reviewer).
+2. **Confirm default branch is `main`** (Settings -> General) - Workers Builds and the PR flow both key off it.
+
+**Recommended:**
+
+3. **Auto-delete head branches** (Settings -> General -> Pull Requests) - merged feature branches clean themselves up.
+4. **Merge style**: allow "Create a merge commit" and disable squash/rebase for consistency - the agents' incremental commits are individually verified (gates run before each), so preserving them keeps history bisectable. (Prefer squash if you'd rather read main as one-commit-per-PR - either is fine; pick one and stay with it.)
+5. **Dependabot: security alerts ON, version-bump PRs OFF** (Settings -> Code security). Versions are deliberately pinned in the pnpm catalog (prerelease combination is sensitive); automated bump PRs would fight the pins. The planned scheduled "canary" CI job against `@next` covers staying current instead.
+
+**Not needed:** repo secrets (CI doesn't deploy - Cloudflare pulls via the GitHub App you already authorized), issue templates, CODEOWNERS.
+
+## 7. Later phases (do nothing now)
 
 - **Phase 2 auth**: Cloudflare Zero Trust -> Access application in front of `/editor` and `/host` routes (one policy: your email). No code changes - documented when M8 arrives.
 - **Observability**: Workers Logs is on by default; consider Logpush only if the suite goes multi-tenant.

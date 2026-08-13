@@ -10,7 +10,7 @@ A free, self-hosted **quiz-show game suite** (Jeopardy-inspired; product name pe
 
 - **No deploys from agent sessions.** Denied in `.claude/settings.json`; deploys are deliberate, local, owner-run (`docs/cloudflare-setup.md`). Verify with tests, builds, and `wrangler deploy --dry-run` only.
 - **Docs update in the same commit as the behavior they describe.** A stale doc is worse than none; if a doc disagrees with code, fix the doc. ROADMAP checkboxes move in the same PR as the work (unenforced - discipline).
-- **Customization lives in documents, never in code paths** (docs/design/expansion-and-boundaries.md - the design law). Settings / theme / content pack / game definition are the four documents; unknown fields only in the reverse-domain `ext` bag.
+- **Customization lives in documents, never in code paths** (docs/design/expansion-and-boundaries.md - the design law). Content pack / rule set / theme / game definition are the portable documents (the settings object travels embedded in the latter two - M1 resolution R4); unknown fields only in the reverse-domain `ext` bag.
 - **Players never log in.** Room code is the entire join flow (guiding principle 3). Nothing may add player-side accounts, prompts, or install nags.
 - **Operational limits live only in `@jeopardy/protocol/limits`** and hosts cannot lift them. Enforced by convention + the limits gate test.
 - **Runes only** (`compilerOptions.runes: true` - enforced by the compiler). **kebab-case filenames everywhere**, including Svelte components. **Fully spelled-out identifiers**, no abbreviations. **No emojis** in UI, docs, or commits. **No barrel files** (enforced: `oxc/no-barrel-file` = error); across packages, import only through `package.json` exports maps.

@@ -18,6 +18,9 @@ export default defineConfig({
       "**/worker-configuration.d.ts",
       "**/dist/**",
       "pnpm-lock.yaml",
+      // Generated from the settings registry (packages/protocol/src/settings/docs-table.ts);
+      // the gate test diffs it byte-for-byte, so the formatter must never touch it.
+      "docs/reference/settings.md",
     ],
   },
   lint: {

@@ -6,5 +6,5 @@
     // Workers-compatible - node:* imports are allowed in test-support modules only.
     "types": ["node"]
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts"]
 }

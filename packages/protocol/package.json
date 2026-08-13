@@ -12,6 +12,7 @@
   },
   "scripts": {
     "check": "tsc --noEmit",
+    "generate:settings-docs": "node --experimental-strip-types scripts/generate-settings-docs.ts",
     "test": "vitest run"
   },
   "dependencies": {

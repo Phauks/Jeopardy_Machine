@@ -5,18 +5,19 @@
 
 ## The design law
 
-**Customization lives in documents, never in code paths.** Everything a user can change is expressed in one of four portable, versioned, zod-validated documents:
+**Customization lives in documents, never in code paths.** Everything a user can change is expressed in one of five versioned, zod-validated document forms (updated 2026-08-13, M1 owner resolution R4: rules got the same first-class portable treatment as themes):
 
-| Document            | Customizes      | Examples                                                  |
-| ------------------- | --------------- | --------------------------------------------------------- |
-| **Settings object** | The rules       | all 42 matrix settings, presets (TV / casual / custom)    |
-| **Theme document**  | The look        | tokens, font slots, background, effects level             |
-| **Content pack**    | The material    | questions, media, tags, difficulty                        |
-| **Game definition** | The composition | mode, layout, cell->content refs, settings ref, theme ref |
+| Document            | Customizes           | Examples                                                                                                                                |
+| ------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Settings object** | The rules' values    | all 43 matrix settings, registry-derived and fully defaulted; travels embedded in rule sets and game definitions, never as its own file |
+| **Rule set**        | The rules, shareable | `.rules.json`: named base preset (tv / casual-party) + sparse overrides over the settings registry                                      |
+| **Theme document**  | The look             | tokens, font slots, background, effects level                                                                                           |
+| **Content pack**    | The material         | questions, media, tags, difficulty                                                                                                      |
+| **Game definition** | The composition      | mode, layout, cell->content refs; references-or-embeds rule set, theme, and pack                                                        |
 
 If a proposed feature can't be expressed as data in one of these documents, it is either a **new game mode** (a new consumer of content packs), or it is **out of bounds**. This is the test every future "can we make X customizable?" question runs through.
 
-Every document round-trips through export/import. A namespaced `ext` field (object keyed by reverse-domain strings) is preserved untouched on parse/serialize in all four documents, so third parties and future-us can annotate without forking the format.
+Every document round-trips through export/import. A namespaced `ext` field (object keyed by reverse-domain strings) is preserved untouched on parse/serialize in all of these documents, so third parties and future-us can annotate without forking the format.
 
 ---
 
@@ -132,17 +133,17 @@ Each boundary: what's locked, why, the pressure we expect, and the escape valve 
 
 ### Summary table
 
-| #    | Area              | Customizable?                                   | Verdict                                       |
-| ---- | ----------------- | ----------------------------------------------- | --------------------------------------------- |
-| 2.1  | Buzz adjudication | Settings only                                   | Locked hard                                   |
-| 2.2  | Player identity   | Never required                                  | Locked; claim-a-name later                    |
-| 2.3  | Scoring           | 42 settings, no scripts                         | Locked hard                                   |
-| 2.4  | Board grammar     | Sizes/values yes; structure no                  | Locked per mode; new modes for new structures |
-| 2.5  | Fonts             | Curated set                                     | Locked thru M7, revisit                       |
-| 2.6  | Protocol/schemas  | `ext` bag only                                  | Locked                                        |
-| 2.7  | Ops limits        | No                                              | Locked, values tunable by us                  |
-| 2.8  | Host authority    | Overrides yes, autopilot no                     | Locked; solo mode covers practice             |
-| 2.9  | Player a11y floor | Theme never overrides                           | Locked                                        |
-| 2.10 | Sounds            | Curated packs only - no uploads (owner)         | Locked; curated sound-set slot in M7          |
+| #    | Area              | Customizable?                           | Verdict                                       |
+| ---- | ----------------- | --------------------------------------- | --------------------------------------------- |
+| 2.1  | Buzz adjudication | Settings only                           | Locked hard                                   |
+| 2.2  | Player identity   | Never required                          | Locked; claim-a-name later                    |
+| 2.3  | Scoring           | 42 settings, no scripts                 | Locked hard                                   |
+| 2.4  | Board grammar     | Sizes/values yes; structure no          | Locked per mode; new modes for new structures |
+| 2.5  | Fonts             | Curated set                             | Locked thru M7, revisit                       |
+| 2.6  | Protocol/schemas  | `ext` bag only                          | Locked                                        |
+| 2.7  | Ops limits        | No                                      | Locked, values tunable by us                  |
+| 2.8  | Host authority    | Overrides yes, autopilot no             | Locked; solo mode covers practice             |
+| 2.9  | Player a11y floor | Theme never overrides                   | Locked                                        |
+| 2.10 | Sounds            | Curated packs only - no uploads (owner) | Locked; curated sound-set slot in M7          |
 
 The pattern: **rules, look, and material are radically open; the referee, the wire, and the guest's phone are closed.** That split is what lets the open parts be fearless.
