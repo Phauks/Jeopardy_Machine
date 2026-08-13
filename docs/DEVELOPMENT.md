@@ -23,6 +23,8 @@ runs both dev servers in parallel:
 
 The realtime origin the web app uses comes from `REALTIME_ORIGIN` (declared in `apps/web/src/env.ts`, value in `apps/web/.env`, default `http://localhost:8787`).
 
+**Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and emblem set with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change.
+
 ### Cross-worker DO access (architecture risk 6 - validated)
 
 The web Worker will reach the same `GameRoomDO` instances via a cross-script binding (`script_name: "jeopardy-realtime"` - present but commented in `apps/web/wrangler.jsonc` until M3 uses it). The local story was proven during M0:
@@ -42,7 +44,7 @@ pnpm -F @jeopardy/realtime test   # one package (same for web/protocol)
 
 - `packages/protocol` - plain vitest, co-located `*.test.ts` next to sources; `limits.gate.test.ts` is an invariant gate (cross-field sanity of the caps).
 - `apps/realtime` - vitest **inside workerd** via `@cloudflare/vitest-pool-workers` (the `cloudflareTest` plugin in vitest.config.ts reads wrangler.jsonc, so tests exercise the real DO with real hibernation APIs). `wrangler types` runs automatically first (pretest is part of the script).
-- `apps/web` - plain vitest for pure logic; component/browser tests arrive with M4 surfaces.
+- `apps/web` - plain vitest for pure logic plus server-render component tests (`svelte/server` `render()` inside node vitest - see `src/lib/board/board-display.test.ts`); browser-mode interaction tests arrive with the M4 phase 2 surfaces. Invariant gates: `theme-contract.gate.test.ts` (every preset emits the full token contract), `emblem-set.gate.test.ts` (curated-set design rules).
 
 `pnpm check` runs svelte-check (web, plus a separate `tsc -p src/service-worker` for WebWorker libs) and `tsc --noEmit` elsewhere. `pnpm lint` / `pnpm fmt` are repo-wide via Vite+ (`vp`), configured in the root `vite.config.ts`.
 
