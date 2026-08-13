@@ -33,6 +33,14 @@
 - **Audio routing: selectable** - per-device "play room audio here" toggle (display on by default); multiple devices can opt in.
 - **Late-join score: flexible** - a setting (0 default / match lowest / prompt host), rules matrix #43.
 
+## Development simulation (owner, 2026-08-13)
+
+- **Built-in mocking of players/teams/actions for development.** We must be able to pretend that teams and players are present and acting - without real phones. Three layers, matching the milestones:
+  - **Engine level (M2)**: scripted action sequences (join, buzz at t+ms, answer wrong, disconnect, late-join) as data - the same fixtures drive unit tests and the hotseat/rehearse page.
+  - **Realtime level (M3)**: **bot players** - headless clients speaking the real WS protocol against a real GameRoomDO (join with names/teams, configurable buzz latency distributions, scripted or seeded-random behavior). Highest fidelity: exercises the exact code paths phones use.
+  - **UI level (M4)**: a dev-only **simulation panel** on the host console (spawn N bots, assign teams, trigger specific events: leader kick, phone-sleep reconnect, mass buzz race) - feature-flagged, available on preview deploys, never reachable by players.
+- Seeded randomness so any simulated game is reproducible in a bug report.
+
 ## Content model (owner, 2026-08-13)
 
 - **Media attaches to both question AND answer.** A content item's prompt and its answer each carry an optional media ref - the reveal can show an image/audio (picture-round reveal shows the labeled park photo; music clue reveals the cover art). In the v1 content-item schema from the start.
