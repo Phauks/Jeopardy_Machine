@@ -5,11 +5,11 @@
 
 ## 0. Account decisions (once)
 
-| Decision | Recommendation | Why |
-|---|---|---|
-| Plan | **Workers Paid ($5/mo)** | Free plan now runs SQLite-backed Durable Objects, so free *works* - but Paid removes every limit question (DO duration, D1 size, request caps) for less than one JeopardyLabs subscription. Decide by feel; the app runs on free. |
-| workers.dev subdomain | Claim one (Dashboard -> Workers & Pages -> your subdomain) | The app is fully usable at `*.workers.dev` URLs while the product name / custom domain is still being workshopped. |
-| Custom domain | Defer until the name lands | When ready: buy through Cloudflare Registrar (at-cost) and attach - see §4. |
+| Decision              | Recommendation                                             | Why                                                                                                                                                                                                                               |
+| --------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan                  | **Workers Paid ($5/mo)**                                   | Free plan now runs SQLite-backed Durable Objects, so free _works_ - but Paid removes every limit question (DO duration, D1 size, request caps) for less than one JeopardyLabs subscription. Decide by feel; the app runs on free. |
+| workers.dev subdomain | Claim one (Dashboard -> Workers & Pages -> your subdomain) | The app is fully usable at `*.workers.dev` URLs while the product name / custom domain is still being workshopped.                                                                                                                |
+| Custom domain         | Defer until the name lands                                 | When ready: buy through Cloudflare Registrar (at-cost) and attach - see §4.                                                                                                                                                       |
 
 ## 1. Local prerequisites (your machine, not the agent's)
 
@@ -32,6 +32,27 @@ wrangler r2 bucket create jeopardy-media
 ```
 
 Durable Objects need **no manual creation** - the `GameRoomDO` namespace is created automatically by the migration block in apps/realtime/wrangler.jsonc on first deploy.
+
+### 2b. Dashboard path (equivalent - owner prefers dash.cloudflare.com)
+
+Both resources can be created in the dashboard instead of the CLI; the *only* CLI-ish step that remains is pasting one ID into config:
+
+1. **D1**: Dashboard -> Storage & Databases -> D1 -> Create database -> name it. Then open the database and copy its **Database ID** into `apps/web/wrangler.jsonc` under `[[d1_databases]]` (the code binds by ID, not by name).
+2. **R2**: Dashboard -> R2 -> Create bucket -> name it (location: automatic). No ID needed - the binding uses the bucket name; make the name in wrangler.jsonc match exactly.
+3. **The two Workers cannot be pre-created in the dashboard** in any useful way - they are born from the repo's build output on first `wrangler deploy` (§3). The dashboard is where you *manage* them afterward (logs, settings, domains, rename).
+
+### 2c. Renameability (verified 2026-08-13 - plan around this when naming)
+
+| Resource | Renameable later? | Notes |
+|---|---|---|
+| Worker (each of the two) | **Yes**, in the dashboard | Workers now have stable UUIDs under the hood; after a dashboard rename, update `name` in that app's wrangler.jsonc to match (Workers Builds even auto-PRs the mismatch if ever connected). workers.dev URL changes with the name - reprint QR codes. |
+| workers.dev subdomain | **Yes** (change anytime) | Changing breaks all old `*.workers.dev` URLs at once. |
+| Custom domain | **Freely attach/detach** | This is the real user-facing identity - swap domains anytime with zero resource changes. |
+| D1 database name | **Treat as fixed** | No official rename; low stakes - the app binds by database ID, so the display name is cosmetic. Worst case: export -> create new -> import. |
+| R2 bucket name | **No** (S3-style, by design) | Rename = new bucket + copy objects. Pick a name-agnostic bucket name now. |
+| DO class/namespace | Config-level only | Renaming the class is a wrangler `renamed_classes` migration, not a dashboard action. Not a concern unless we rename `GameRoomDO` in code. |
+
+**Practical upshot while the product name is still being workshopped:** nothing is blocked. Give the un-renameable things (R2 bucket, D1) *project-neutral* names (`jm-media`, `jm-data` or similar) rather than the future product name; Workers can be renamed to match the final brand later, and the identity players actually see lives in the custom domain, which is always swappable.
 
 ## 3. First deploy (order matters)
 
@@ -56,7 +77,7 @@ If you want future Claude sessions to run wrangler against the account, add to t
 - `CLOUDFLARE_ACCOUNT_ID` = your account id
 - `CLOUDFLARE_API_TOKEN` = a **custom token**, scoped to exactly: Workers Scripts:Edit, Workers KV Storage:Edit (unused today), D1:Edit, Workers R2 Storage:Edit, Account Settings:Read. No zone/DNS permissions unless/until we automate domains.
 
-Notes: this hands deploy power to agent sessions - the repo's `.claude/settings.json` deploy-denies still gate *unasked* deploys, but the trust boundary is yours to draw. Rotating the token in the dashboard kills access instantly. Skipping this section entirely is a fine steady state: agents prepare everything, you run the two deploy commands.
+Notes: this hands deploy power to agent sessions - the repo's `.claude/settings.json` deploy-denies still gate _unasked_ deploys, but the trust boundary is yours to draw. Rotating the token in the dashboard kills access instantly. Skipping this section entirely is a fine steady state: agents prepare everything, you run the two deploy commands.
 
 ## 6. Later phases (do nothing now)
 
