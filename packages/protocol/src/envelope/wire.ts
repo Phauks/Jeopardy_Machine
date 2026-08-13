@@ -16,7 +16,7 @@
 // research: the style rule is fully-spelled-out names, and envelope overhead per message is
 // tens of bytes against 4 KB message caps - compactness never earns the abbreviation.
 import { z } from "zod";
-import { extensionBagSchema } from "./ext.ts";
+import { extensionBagSchema } from "../ext.ts";
 
 // Bump only with a migration story. Version 1 covers everything up to the first public format.
 export const protocolVersion = 1;

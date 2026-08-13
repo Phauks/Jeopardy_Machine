@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseEnvelope, protocolVersion } from "./envelope.ts";
+import { parseEnvelope, protocolVersion } from "./wire.ts";
 
 describe("parseEnvelope", () => {
   it("accepts a current-version envelope from a raw ws string", () => {

@@ -68,13 +68,13 @@ Verify: the deploy output prints both `*.workers.dev` URLs; open the web URL, an
 
 Workers Builds connects the GitHub repo to Cloudflare so **every push to the production branch auto-builds and deploys** - no CLI in the loop after setup. Two Workers = connect the same repo twice, one project per Worker:
 
-| Setting | `jeopardy-realtime` (connect FIRST) | `jeopardy-web` |
-|---|---|---|
-| Repository | `Phauks/Jeopardy_Machine` | `Phauks/Jeopardy_Machine` |
-| Root directory | `apps/realtime` | `apps/web` |
-| Build command | `pnpm install --frozen-lockfile` | `pnpm install --frozen-lockfile && pnpm build` |
-| Deploy command | `npx wrangler deploy` | `npx wrangler deploy` |
-| Production branch | `main` | `main` |
+| Setting           | `jeopardy-realtime` (connect FIRST) | `jeopardy-web`                                 |
+| ----------------- | ----------------------------------- | ---------------------------------------------- |
+| Repository        | `Phauks/Jeopardy_Machine`           | `Phauks/Jeopardy_Machine`                      |
+| Root directory    | `apps/realtime`                     | `apps/web`                                     |
+| Build command     | `pnpm install --frozen-lockfile`    | `pnpm install --frozen-lockfile && pnpm build` |
+| Deploy command    | `npx wrangler deploy`               | `npx wrangler deploy`                          |
+| Production branch | `main`                              | `main`                                         |
 
 Setup: Dashboard -> Workers & Pages -> Create -> **Import a repository** -> authorize the Cloudflare GitHub App for this repo -> fill the table above. Realtime must complete its first deploy before web's first deploy succeeds (cross-script DO binding). If a build can't resolve the pnpm workspace from the app root directory, fall back to root directory `/` with build command `pnpm install --frozen-lockfile && pnpm -F <app> build` and deploy command `npx wrangler deploy -c apps/<app>/wrangler.jsonc`.
 
