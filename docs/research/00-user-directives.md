@@ -35,6 +35,7 @@
 
 ## Audio pipeline (owner, 2026-08-13)
 
+- **No player sound uploads, ever** (owner, 2026-08-13): buzzer sounds are curated-pack-only long-term. Low benefit, too many issues (live-event moderation, music rights, pipeline QA). The pack grows by request instead - adding a vetted CC0 sound is a PR. Supersedes the earlier upload-with-host-veto idea in M7.
 - **Only the winning buzz is heard.** When multiple players buzz, exactly one room sound plays - the adjudicated winner's. Room audio is driven by the server's buzz-won event (one per clue arming), never by client presses, so overlap is structurally impossible rather than merely avoided. Losing buzzers get silent local feedback on their own phone only. Rebounds re-arm and may produce a second (sequential) winner sound; that is correct. Rule generalizes: the room audio channel plays buzz sounds in an exclusive slot - a would-overlap event is dropped, not queued (a late sound after the moment is confusing). Exception: the host's sound-check mode intentionally plays every team's sound, serialized through a queue.
 - **Standardized sound onset.** Source audio has inconsistent leading silence; every bundled sound gets a uniform onset (~10 ms to first audible energy - not too short: a micro fade-in prevents clicks; not too long: onset is perceived buzz latency, and non-uniform onsets are unfair across teams). Spec in docs/content/media-and-sounds.md checklist §7b; playback uses pre-decoded Web Audio buffers (M4).
 

@@ -126,9 +126,9 @@ Each boundary: what's locked, why, the pressure we expect, and the escape valve 
 
 ### 2.10 Sounds
 
-**Current split:** per-player buzzer sounds - curated pack in M4, player upload with host veto in M7 (cosmetics module). System cues (arm, time-up, DD sting, think music) ship as one original sound set, toggleable per cue.
-**Gap we should open (cheap):** theme documents get an optional **sound-set slot** (choose among our packs) in M7 alongside the customizer - a "retro" and a "minimal beeps" set make themes feel complete. Uploading arbitrary system-cue audio stays out (event chaos, rights).
-**Verdict: bend - add curated sound-set choice to themes in M7.**
+**Locked (owner decision 2026-08-13): all sounds are curated - player sound uploads are permanently out.** Originally planned as upload-with-host-veto in M7; owner cut it: low benefit, too many issues (moderation at a live event, music rights, and every upload would need the standardized-onset/loudness pipeline to not break buzz fairness). Buzzer sounds: players/teams pick from the curated pack (grown by us on request - adding a CC0 sound is a PR, same escape valve as fonts). System cues: one original set, toggleable per cue.
+**Gap we still open (cheap):** theme documents get an optional **sound-set slot** (choose among our curated packs) in M7 alongside the customizer - a "retro" and a "minimal beeps" set make themes feel complete.
+**Verdict: locked (uploads out); bend only via curated sound-set choice in themes (M7).**
 
 ### Summary table
 
@@ -143,6 +143,6 @@ Each boundary: what's locked, why, the pressure we expect, and the escape valve 
 | 2.7  | Ops limits        | No                                              | Locked, values tunable by us                  |
 | 2.8  | Host authority    | Overrides yes, autopilot no                     | Locked; solo mode covers practice             |
 | 2.9  | Player a11y floor | Theme never overrides                           | Locked                                        |
-| 2.10 | Sounds            | Buzzer per-player; system cues via curated sets | Bend in M7 (sound-set slot)                   |
+| 2.10 | Sounds            | Curated packs only - no uploads (owner)         | Locked; curated sound-set slot in M7          |
 
 The pattern: **rules, look, and material are radically open; the referee, the wire, and the guest's phone are closed.** That split is what lets the open parts be fearless.
