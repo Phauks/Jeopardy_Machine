@@ -1,0 +1,26 @@
+{
+  // Shared strictness baseline for every package. Apps layer their framework-specific
+  // options on top (apps/web extends the SvelteKit-generated tsconfig instead, but must
+  // keep these flags on - svelte-check enforces them there).
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "target": "es2023",
+    "lib": ["es2023"],
+    // Workspace packages ship raw .ts consumed by bundlers (vite, wrangler/esbuild, vitest),
+    // so imports carry explicit .ts extensions and nothing here ever emits JS.
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}

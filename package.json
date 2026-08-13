@@ -1,0 +1,25 @@
+{
+  "name": "jeopardy-machine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Free, self-hosted Jeopardy-style game suite: board editor, big-screen board, host console, phone buzzers.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @jeopardy/web --filter @jeopardy/realtime dev",
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "lint": "vp lint",
+    "fmt": "vp fmt",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": ">=22.17"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
