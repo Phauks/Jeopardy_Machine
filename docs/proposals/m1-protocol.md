@@ -584,7 +584,7 @@ packages/protocol/src/
 
 ### R2. Settings: registry-derived, not a hand-written matrix object
 
-The 43-row matrix is the *inventory* (a research artifact); the implementation is a **settings registry**: each setting defined exactly once as an entry - key, group, zod schema, default, label, description, constraints - from which we **derive** (a) the composed zod settings schema, (b) TS types, (c) the settings UI (progressive-disclosure panel renders from the registry), and (d) the documentation table (generated, so docs cannot drift from code). Cross-field rules are group-level zod refinements. Presets are **sparse overrides on a named base** (`preset: "tv"` + diffs only) - small exports, and the UI can show "changed from TV rules" for free.
+The 43-row matrix is the _inventory_ (a research artifact); the implementation is a **settings registry**: each setting defined exactly once as an entry - key, group, zod schema, default, label, description, constraints - from which we **derive** (a) the composed zod settings schema, (b) TS types, (c) the settings UI (progressive-disclosure panel renders from the registry), and (d) the documentation table (generated, so docs cannot drift from code). Cross-field rules are group-level zod refinements. Presets are **sparse overrides on a named base** (`preset: "tv"` + diffs only) - small exports, and the UI can show "changed from TV rules" for free.
 
 ### R3. IDs: UUIDv7 (resolves open question)
 
@@ -594,9 +594,9 @@ RFC 9562 UUIDv7 replaces ULID everywhere ids appear: time-sortable like ULID, st
 
 Rules get the same first-class treatment as themes: a **rule-set document** (`.rules.json`, format `rule-set`, same envelope) so house rules are shareable and reusable across games. Game definitions reference-or-embed a rule set with the identical embed-on-export semantics as themes (§3). The design law's table gains a row (update docs/design/expansion-and-boundaries.md in the same M1 PR):
 
-| Document | Customizes |
-|---|---|
-| Content pack | The material |
-| **Rule set** | **The rules** |
-| Theme | The look |
+| Document        | Customizes                                             |
+| --------------- | ------------------------------------------------------ |
+| Content pack    | The material                                           |
+| **Rule set**    | **The rules**                                          |
+| Theme           | The look                                               |
 | Game definition | The composition (references or embeds the other three) |

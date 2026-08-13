@@ -1,13 +1,14 @@
 # Research: Coding Style & Conventions from `magna-carta` and `sagebrush-barrister`
 
 > Research round 1 · Agent: Style Analysis · 2026-08-13
-> Purpose: extract the owner's conventions so this project feels native. Both repos are siblings in philosophy: Cloudflare-native, pnpm + Vite+ (`vp`), Svelte 5 runes-only, TypeScript strict, heavy documentation discipline with `CLAUDE.md` as the operating system of the repo. `magna-carta` is the newer, larger, more formalized project; `sagebrush-barrister` is a shipped single-app product. Where they disagree, magna-carta generally represents the *current* preferences.
+> Purpose: extract the owner's conventions so this project feels native. Both repos are siblings in philosophy: Cloudflare-native, pnpm + Vite+ (`vp`), Svelte 5 runes-only, TypeScript strict, heavy documentation discipline with `CLAUDE.md` as the operating system of the repo. `magna-carta` is the newer, larger, more formalized project; `sagebrush-barrister` is a shipped single-app product. Where they disagree, magna-carta generally represents the _current_ preferences.
 
 ---
 
 ## 1. Stack & tooling per repo
 
 ### magna-carta (`/workspace/magna-carta`)
+
 - **Shape**: pnpm **monorepo** (`pnpm-workspace.yaml`: `apps/*`, `packages/*`, `plugins/*`), ~57 packages, 13 apps (worker + 11 sibling workers + `web`), plus **Rust** `crates/` (Tantivy search, PDF, OCR, email cores → WASM) and `containers/` (Collabora, LibreOffice, OCR, clamd).
 - **Frontend**: **SvelteKit** SPA — `apps/web/svelte.config.js` uses `@sveltejs/adapter-static` with `fallback: "index.html"`; the build is served as **Workers Static Assets** by the main worker (`apps/worker/wrangler.jsonc`: `assets.directory: "../web/build"`, `not_found_handling: "single-page-application"`, `run_worker_first: ["/api/*"]`).
 - **Backend**: Cloudflare **Workers + Hono**, REST as **OpenAPI 3.1 code-as-contract with zod**; committed OpenAPI snapshot with byte-exact drift gates; generated Hey API + Svelte Query client in `packages/api-client` (never hand-edited, lint/format-exempt).
@@ -18,6 +19,7 @@
 - **Custom tooling culture**: `tooling/` full of bespoke lint/fitness scripts (process-reference lint, status lint, license lint, worktrees registry, doc-fragment assemblers). Renovate + `osv-scanner.toml`.
 
 ### sagebrush-barrister (`/workspace/sagebrush-barrister`)
+
 - **Shape**: single app under `app/` (repo root holds docs + raw resources). Not a monorepo, but the same layered discipline.
 - **Frontend**: **Svelte 5 (runes only, `compilerOptions.runes: true`) + plain Vite — NOT SvelteKit.** Custom small History-API router (`app/src/lib/router.svelte.ts`); SPA fallback via Workers assets. PWA via `vite-plugin-pwa` (prompt-style update toast, curated precache globs).
 - **Backend**: Cloudflare **Worker** at `app/worker/index.ts` (no framework; hand-rolled `http.ts` + per-domain modules: `auth/`, `ai/`, `payments/`, `email/`, `friends/`, `admin/`). `wrangler.jsonc` with `run_worker_first: true` (rationale comment: security headers must always run), **D1**, `send_email` binding, cron trigger, custom-domain routes. `@cloudflare/vite-plugin` gives one dev server for SPA + Worker.
@@ -32,6 +34,7 @@
 ## 2. Project structure & naming
 
 ### magna-carta
+
 - `apps/web/src/lib/` organized **by feature domain** (`auth/`, `navigation/`, `matters/`, `settings/`, ...), plus `lib/components/` for shared pieces; SvelteKit `routes/` with route groups (`(app)/`, `login/`, `[...missing]` catch-all 404).
 - **File naming: kebab-case everything**, including Svelte components — `app-shell.svelte`, `command-palette.svelte`, `drag-reorder.svelte.ts`. Design-system components one-per-directory exposed via curated `package.json` `exports` maps.
 - **No barrel files** (ADR-0070, enforced by `oxc/no-barrel-file: error`): within a package import the specific module; across packages only the `exports` map; `"sideEffects": false`.
@@ -39,6 +42,7 @@
 - **Naming rule (golden rule 12): fully spelled-out names, no shorthand** — `newIdentifier()` not `newId()`; sole exceptions: specced storage encodings and universal terms (`id`, `URL`, `JSON`).
 
 ### sagebrush-barrister
+
 - Strict **layer architecture** documented in `app/CLAUDE.md`: `lib/api/ → lib/data/ → lib/services/ → lib/stores/ → lib/components/ → lib/pages/`, plus `types/`, `util/`, `actions/`. "Never import upward. If a lower layer needs something from above, refactor the contract."
 - **File naming: PascalCase Svelte components** (`PageShell.svelte`, `EmptyState.svelte`), **camelCase TS modules** (`accountCode.ts`). Pages named `<Name>Page.svelte`.
 - Registry pattern for extensible surfaces: `sections.ts` / `adminSections.ts` / `searchDestinations.ts` SSOTs from which nav, search, and footers derive automatically.
@@ -80,7 +84,7 @@ Both repos treat docs as load-bearing infrastructure with CI gates. Key patterns
 - **STATUS.md = stamped live state** (both): opens "Stamp: verified against commit `<sha>`... `<date>` UTC" and carries reproduce-commands next to every number ("Prefer the reproduce-commands over the copied numbers").
 - **Decision records**: sagebrush uses dated one-pagers `docs/decisions/YYYY-MM-DD-<slug>.md` ("check before building on an assumption, add one when you make a call other sessions could contradict"); magna-carta uses formal ADR-NNNN in a generated register.
 - **Fragment workflow for parallel agents** (magna-carta): branches never edit `CHANGELOG.md`/`STATUS.md` directly — they commit `changelog.d/<slug>.md`, `status.d/`, `docs/decisions/pending/` fragments; assemblers render on main. Built so concurrent worktrees never collide.
-- **Docs-in-the-same-commit is definition-of-done** (both, verbatim rule): "No feature is done until its docs (developer *and* user) are updated — same commit." "The code is the source of truth. When a doc disagrees with the code, fix the doc; a stale doc is worse than none."
+- **Docs-in-the-same-commit is definition-of-done** (both, verbatim rule): "No feature is done until its docs (developer _and_ user) are updated — same commit." "The code is the source of truth. When a doc disagrees with the code, fix the doc; a stale doc is worse than none."
 - **docs/ taxonomy**: sagebrush: `architecture/`, `decisions/`, `proposals/` (design docs per feature, one .md each), `launch/` runbook, `roadmap.md` ("forward-looking only, shipped items get pruned"). magna-carta: `conventions/` (~20 standards files each with "Scope (single home for):" headers), `specs/`, `research/`, `user/`, `maintenance/`.
 - **ROADMAP style** (magna-carta): "Now / Next / Recently shipped" living tracker updated in the same PR; explicitly separated from phase strategy and stage tracking (STATUS.md).
 - **README**: sagebrush's is a real product README (what it is, Features with bold lead-ins, Quick start, Documentation links, Stack, License); magna-carta's is deliberately minimal, pointing at CLAUDE.md.
@@ -107,6 +111,7 @@ Both repos treat docs as load-bearing infrastructure with CI gates. Key patterns
 ## 8. Synthesis — style guide for the Jeopardy project
 
 ### Adopt outright (both repos agree)
+
 1. **Stack**: pnpm (pinned via `packageManager`) + Node 22+ pinned in `.nvmrc`; **Vite+ (`vp`) for dev/build/test/lint/fmt** (Oxlint + Oxfmt, no Prettier/ESLint); TypeScript `strict` with the extra flags; **Svelte 5 runes only**; Vitest with co-located `*.test.ts` + `*.gate.test.ts` fitness tests; `svelte-check` in the gate.
 2. **Cloudflare**: `wrangler.jsonc` (JSONC, `$schema` line, richly commented with rationale per binding), Workers Static Assets with `not_found_handling: "single-page-application"` and commented `run_worker_first`, D1 with **timestamp-named migrations** `YYYYMMDDHHMMSS_<slug>.sql` + migrations README ledger + a `check-migrations.ts` gate, secrets only via `wrangler secret put`, `observability.enabled: true`, `upload_source_maps: true`. **Deny `wrangler deploy` in `.claude/settings.json`**; deploys are deliberate and local.
 3. **Formatting**: 2-space, LF, `.editorconfig`, double quotes, semicolons, printWidth 100, never hand-wrap, prose unwrapped. Pin the fmt block explicitly in `vite.config.ts`.
@@ -127,17 +132,18 @@ Both repos treat docs as load-bearing infrastructure with CI gates. Key patterns
 
 ### Divergences — ask the owner or default to the newer repo (magna-carta)
 
-| Question | sagebrush (older) | magna-carta (newer) | Suggested default |
-|---|---|---|---|
-| **SvelteKit vs plain Vite + hand router** | Plain Vite + tiny custom router | SvelteKit (adapter-static SPA on Workers assets) | Brief says SvelteKit — use magna-carta's pattern |
-| **CSS** | Plain scoped CSS + `tokens.css`, explicitly "No Tailwind" | Tailwind v4 + tokens + design system on Bits UI | **Ask.** Genuine philosophical fork; for a small game app sagebrush's tokens.css + scoped styles is far lighter, but magna-carta is the newer conviction |
-| **Component file naming** | PascalCase `EmptyState.svelte` | kebab-case `empty-state.svelte` | kebab-case (newer convention) — or ask |
-| **Svelte quote style** | single quotes in `.svelte` | double everywhere | Double everywhere (formatter-consistent) |
-| **Worker framework** | none (hand-rolled http.ts) | Hono + zod OpenAPI | Hand-rolled matches project size; Hono if routes multiply |
-| **Decision records** | dated one-pagers | numbered ADRs + generated register | Dated one-pagers (right-sized) |
-| **Em-dashes in prose** | banned repo-wide (hyphens only) | used in docs, emojis banned everywhere | Hyphens-only in user-facing prose; ask about docs |
+| Question                                  | sagebrush (older)                                         | magna-carta (newer)                              | Suggested default                                                                                                                                        |
+| ----------------------------------------- | --------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SvelteKit vs plain Vite + hand router** | Plain Vite + tiny custom router                           | SvelteKit (adapter-static SPA on Workers assets) | Brief says SvelteKit — use magna-carta's pattern                                                                                                         |
+| **CSS**                                   | Plain scoped CSS + `tokens.css`, explicitly "No Tailwind" | Tailwind v4 + tokens + design system on Bits UI  | **Ask.** Genuine philosophical fork; for a small game app sagebrush's tokens.css + scoped styles is far lighter, but magna-carta is the newer conviction |
+| **Component file naming**                 | PascalCase `EmptyState.svelte`                            | kebab-case `empty-state.svelte`                  | kebab-case (newer convention) — or ask                                                                                                                   |
+| **Svelte quote style**                    | single quotes in `.svelte`                                | double everywhere                                | Double everywhere (formatter-consistent)                                                                                                                 |
+| **Worker framework**                      | none (hand-rolled http.ts)                                | Hono + zod OpenAPI                               | Hand-rolled matches project size; Hono if routes multiply                                                                                                |
+| **Decision records**                      | dated one-pagers                                          | numbered ADRs + generated register               | Dated one-pagers (right-sized)                                                                                                                           |
+| **Em-dashes in prose**                    | banned repo-wide (hyphens only)                           | used in docs, emojis banned everywhere           | Hyphens-only in user-facing prose; ask about docs                                                                                                        |
 
 ### Also worth replicating for agent ergonomics
+
 - `.claude/settings.json` with deploy denies + a SessionStart cloud-install hook; `scripts/cloud-install.sh` no-oping unless `CLAUDE_CODE_REMOTE=true`; a "Cloud sessions" section in CLAUDE.md (headless verification only, never deploy).
 - Hard-rules section in CLAUDE.md written as short bolded imperatives with the enforcement mechanism named for each ("enforced by `<script>` in CI"; anything unenforced says so).
 - Every custom gate is deterministic and runs in both CI and `pnpm test`; regenerating any generated artifact must leave the tree clean ("if a regeneration dirties the tree, that is drift, not noise").

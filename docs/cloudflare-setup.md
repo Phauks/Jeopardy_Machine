@@ -35,24 +35,24 @@ Durable Objects need **no manual creation** - the `GameRoomDO` namespace is crea
 
 ### 2b. Dashboard path (equivalent - owner prefers dash.cloudflare.com)
 
-Both resources can be created in the dashboard instead of the CLI; the *only* CLI-ish step that remains is pasting one ID into config:
+Both resources can be created in the dashboard instead of the CLI; the _only_ CLI-ish step that remains is pasting one ID into config:
 
 1. **D1**: Dashboard -> Storage & Databases -> D1 -> Create database -> name it. Then open the database and copy its **Database ID** into `apps/web/wrangler.jsonc` under `[[d1_databases]]` (the code binds by ID, not by name).
 2. **R2**: Dashboard -> R2 -> Create bucket -> name it (location: automatic). No ID needed - the binding uses the bucket name; make the name in wrangler.jsonc match exactly.
-3. **The two Workers cannot be pre-created in the dashboard** in any useful way - they are born from the repo's build output on first `wrangler deploy` (§3). The dashboard is where you *manage* them afterward (logs, settings, domains, rename).
+3. **The two Workers cannot be pre-created in the dashboard** in any useful way - they are born from the repo's build output on first `wrangler deploy` (§3). The dashboard is where you _manage_ them afterward (logs, settings, domains, rename).
 
 ### 2c. Renameability (verified 2026-08-13 - plan around this when naming)
 
-| Resource | Renameable later? | Notes |
-|---|---|---|
-| Worker (each of the two) | **Yes**, in the dashboard | Workers now have stable UUIDs under the hood; after a dashboard rename, update `name` in that app's wrangler.jsonc to match (Workers Builds even auto-PRs the mismatch if ever connected). workers.dev URL changes with the name - reprint QR codes. |
-| workers.dev subdomain | **Yes** (change anytime) | Changing breaks all old `*.workers.dev` URLs at once. |
-| Custom domain | **Freely attach/detach** | This is the real user-facing identity - swap domains anytime with zero resource changes. |
-| D1 database name | **Treat as fixed** | No official rename; low stakes - the app binds by database ID, so the display name is cosmetic. Worst case: export -> create new -> import. |
-| R2 bucket name | **No** (S3-style, by design) | Rename = new bucket + copy objects. Pick a name-agnostic bucket name now. |
-| DO class/namespace | Config-level only | Renaming the class is a wrangler `renamed_classes` migration, not a dashboard action. Not a concern unless we rename `GameRoomDO` in code. |
+| Resource                 | Renameable later?            | Notes                                                                                                                                                                                                                                                |
+| ------------------------ | ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Worker (each of the two) | **Yes**, in the dashboard    | Workers now have stable UUIDs under the hood; after a dashboard rename, update `name` in that app's wrangler.jsonc to match (Workers Builds even auto-PRs the mismatch if ever connected). workers.dev URL changes with the name - reprint QR codes. |
+| workers.dev subdomain    | **Yes** (change anytime)     | Changing breaks all old `*.workers.dev` URLs at once.                                                                                                                                                                                                |
+| Custom domain            | **Freely attach/detach**     | This is the real user-facing identity - swap domains anytime with zero resource changes.                                                                                                                                                             |
+| D1 database name         | **Treat as fixed**           | No official rename; low stakes - the app binds by database ID, so the display name is cosmetic. Worst case: export -> create new -> import.                                                                                                          |
+| R2 bucket name           | **No** (S3-style, by design) | Rename = new bucket + copy objects. Pick a name-agnostic bucket name now.                                                                                                                                                                            |
+| DO class/namespace       | Config-level only            | Renaming the class is a wrangler `renamed_classes` migration, not a dashboard action. Not a concern unless we rename `GameRoomDO` in code.                                                                                                           |
 
-**Practical upshot while the product name is still being workshopped:** nothing is blocked. Give the un-renameable things (R2 bucket, D1) *project-neutral* names (`jm-media`, `jm-data` or similar) rather than the future product name; Workers can be renamed to match the final brand later, and the identity players actually see lives in the custom domain, which is always swappable.
+**Practical upshot while the product name is still being workshopped:** nothing is blocked. Give the un-renameable things (R2 bucket, D1) _project-neutral_ names (`jm-media`, `jm-data` or similar) rather than the future product name; Workers can be renamed to match the final brand later, and the identity players actually see lives in the custom domain, which is always swappable.
 
 ## 3. First deploy (order matters)
 

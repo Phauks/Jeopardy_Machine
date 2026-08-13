@@ -12,7 +12,7 @@ Owner resolved the open decisions from research round 1:
 
 ## Content portability (owner directive, same day)
 
-Quiz content must be usable across game modes. Questions, media assets, and their metadata form a **game-mode-agnostic content layer**; a Jeopardy board is a *presentation* of content items, not their owner. Consequences:
+Quiz content must be usable across game modes. Questions, media assets, and their metadata form a **game-mode-agnostic content layer**; a Jeopardy board is a _presentation_ of content items, not their owner. Consequences:
 
 - `packages/protocol` splits into `content` (question items: prompt, answer, media refs, tags, difficulty, source note) and `modes/jeopardy` (board layout: rounds, categories, cell -> content-item references, values, wager cells).
 - The file-format story follows: a **content pack** (questions + assets) exports/imports independently of a **game definition** (which mode, which layout, which settings). A single bundle can carry both.

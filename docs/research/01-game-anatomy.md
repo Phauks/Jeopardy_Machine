@@ -8,6 +8,7 @@
 ## 1. Round structure
 
 ### 1.1 Jeopardy! round (Round 1)
+
 - **Board**: 6 categories × 5 clues = 30 clues.
 - **Dollar values (current TV, since Nov 2001 doubling)**: $200, $400, $600, $800, $1000 per column, top to bottom (increasing difficulty).
 - **Pre-2001 values**: $100–$500 (still common in hobby/classroom versions; many house games also use plain points 100–500).
@@ -15,15 +16,18 @@
 - **Round end**: When all 30 clues are exhausted **or** time runs out (on TV, uncalled clues are simply forfeited when the round's time expires — a digital version can make time limits optional and default to playing out the full board).
 
 ### 1.2 Double Jeopardy! round (Round 2)
+
 - Same 6×5 structure with **new categories**.
 - **Values doubled**: $400, $800, $1200, $1600, $2000.
 - **Selection starts with the player in last place** (lowest score) at the start of Double Jeopardy.
 - Two Daily Doubles instead of one (see §2).
 
 ### 1.3 Final Jeopardy! round
+
 - Single category, single clue, all eligible players participate simultaneously via written wager + written response (see §3).
 
 ### 1.4 Clue/answer inversion
+
 - Signature format: the board shows an **answer** ("This president appears on the $5 bill") and players respond with a **question** ("Who is Lincoln?"). See §5 for enforcement nuances.
 
 ---
@@ -48,8 +52,9 @@
 ## 3. Final Jeopardy
 
 Mechanics, in order:
+
 1. **Eligibility check**: Any player/team with a score of **$0 or less is excluded** (on TV they leave the stage). House variant: let everyone play with a minimum wager of 0, or grant excluded players a token stake.
-2. **Category reveal**: Category shown first, *before* wagers.
+2. **Category reveal**: Category shown first, _before_ wagers.
 3. **Wagering**: Each eligible player secretly wagers **$0 up to their full current score** (integer dollars; TV allows any whole-dollar amount). Wagers lock before the clue is shown. Because the max wager equals current score, no one can finish Final Jeopardy below $0.
 4. **Clue reveal + think music**: All players write their response simultaneously during a **30-second** timer (the length of the famous "think" music). On TV, responses are written on a light pen display; in our app, typed on the phone. TV rule trivia: writing must stop when time expires; partial/illegible responses are judged as-is.
 5. **Reveal order**: Responses and wagers revealed **from lowest pre-Final score to highest** — this is critical for drama and should be automated. For each player: show response → judge → show wager → apply delta.
@@ -73,15 +78,15 @@ How the TV system works (per Jeopardy.com's own behind-the-scenes explanations):
 
 **Timers that matter for the app** (all should be configurable):
 
-| Timer | TV convention | Notes |
-|---|---|---|
-| Clue reading | variable (host-paced) | app: manual arm button, or TTS-then-arm |
-| Early-buzz lockout | 0.25 s | per press, re-triggerable |
-| Buzz-in window after arming | ~5 s, then time's-up beep | |
-| Answer window after buzzing | 5 s | verbal on TV; app may use host judgment or typed answers |
-| Daily Double / wager entry | host-paced (~15–30 s reasonable) | |
-| Final Jeopardy writing | 30 s | matches think music length |
-| Clue selection | host prods stallers; tournaments have used shot clocks | optional 10–15 s selection timer |
+| Timer                       | TV convention                                          | Notes                                                    |
+| --------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| Clue reading                | variable (host-paced)                                  | app: manual arm button, or TTS-then-arm                  |
+| Early-buzz lockout          | 0.25 s                                                 | per press, re-triggerable                                |
+| Buzz-in window after arming | ~5 s, then time's-up beep                              |                                                          |
+| Answer window after buzzing | 5 s                                                    | verbal on TV; app may use host judgment or typed answers |
+| Daily Double / wager entry  | host-paced (~15–30 s reasonable)                       |                                                          |
+| Final Jeopardy writing      | 30 s                                                   | matches think music length                               |
+| Clue selection              | host prods stallers; tournaments have used shot clocks | optional 10–15 s selection timer                         |
 
 ## 5. Scoring rules & edge cases
 
@@ -106,16 +111,18 @@ How the TV system works (per Jeopardy.com's own behind-the-scenes explanations):
 ## 6. Adaptations for live party/team play
 
 ### Team modes
+
 - **One phone per team (shared buzzer)**: simplest and most robust; the phone-holder buzzes for the team; any teammate may answer aloud. TV analog: contestants may not confer — teams obviously do confer, so consider a "confer allowed" flag that just informs the host script.
 - **Every member has a phone, team shares a score**:
-  - *First-teammate-buzz mode*: first buzz from any member counts for the team; lockouts apply team-wide.
-  - *Designated buzzer / rotating captain*: only one member's buzzer active per clue (rotation keeps everyone engaged).
+  - _First-teammate-buzz mode_: first buzz from any member counts for the team; lockouts apply team-wide.
+  - _Designated buzzer / rotating captain_: only one member's buzzer active per clue (rotation keeps everyone engaged).
   - Early-buzz penalty should apply team-wide to prevent teams "spamming" with multiple members.
 - **Large crowds (50–100 players)**: buzz-in races stay fun, but consider "**everyone answers**" modes: all players type an answer within a timer; all correct answers score (full or speed-decayed points). This turns the game into a Kahoot-style hybrid and is essential for keeping 100 individuals engaged — should be a per-game (or even per-round) mode toggle.
 
 ### House rules worth making configurable
+
 - **No negative scoring** (wrong answers deduct nothing, or floor at 0) — great for casual/kids.
-- **Rebound on/off** — off means one attempt per clue; also configurable whether the *same* player can re-buzz after a wrong answer by someone else (TV: a player who missed is locked out for that clue).
+- **Rebound on/off** — off means one attempt per clue; also configurable whether the _same_ player can re-buzz after a wrong answer by someone else (TV: a player who missed is locked out for that clue).
 - **Question-format requirement off** (default off for typed answers; toggle for verbal purists).
 - **Timer lengths** — all timers in §4 table.
 - **Board sizes** other than 6×5 (e.g., 5×5, 4×5, 6×4, 3×5 for short games).
@@ -131,14 +138,16 @@ How the TV system works (per Jeopardy.com's own behind-the-scenes explanations):
 ## 7. Presentation elements (and IP considerations)
 
 ### The look
+
 - **Board**: grid of deep-blue cells with thick black/dark gutters; category names in white condensed sans caps (TV uses Swiss 911/Helvetica-condensed family for categories, Korinna for clue text); **dollar values in gold/yellow** (classic gold ≈ #D69F4C–#FFCC00 range) with a drop shadow.
-- **Blue**: the commonly cited Jeopardy board blue is **#060CE9** (with darker gradients toward #0000AF/#00003C for depth). A clone should pick a *similar but not identical* palette — the vibe is "game-show blue," not a pixel-match.
+- **Blue**: the commonly cited Jeopardy board blue is **#060CE9** (with darker gradients toward #0000AF/#00003C for depth). A clone should pick a _similar but not identical_ palette — the vibe is "game-show blue," not a pixel-match.
 - **Clue reveal flow**: click cell → value zooms/flips → full-screen blue card with the clue in white serif-ish caps → after adjudication, card dismisses and the cell goes permanently blank (dark/empty).
 - **Category reveal**: at round start, category strip revealed one at a time (TV pans across them with a whoosh); worth an animated sequence + host reads each.
 - **Daily Double**: full-screen splash with its own sting sound before the wager prompt.
 - **Score displays**: contestant podium look — name (handwritten-style on TV) over a score readout; negative in red.
 
 ### Sounds (all should be re-created, not sampled)
+
 - **Board-fill sound**: rapid ascending "boop-boop-boop" as cells populate at round start.
 - **Daily Double sting**: dramatic swoosh/alarm.
 - **Final Jeopardy "Think!" music**: 30-second lounge waltz — **copyrighted composition (Merv Griffin)**; a clone must use an original 30-second "thinking" track, not the real melody.
@@ -146,11 +155,12 @@ How the TV system works (per Jeopardy.com's own behind-the-scenes explanations):
 - **Ring-in**: on TV there's no audible buzz to viewers (just the podium light); house versions usually add a buzz/ding per player — useful in a big room; consider distinct sounds or announcing the buzzer-winner's name on screen.
 
 ### Trademark / copyright — what a hobby clone must avoid
+
 - **"Jeopardy!" name and logo**: registered trademarks of Jeopardy Productions, Inc. Do not use the name, the exclamation-point logotype, or confusingly similar names in the product name or marketing. Use a generic name ("Quiz Board," "Trivia Grid," etc.).
 - **Theme music and "Think!"**: copyrighted — no sampling, no close melodic imitation.
-- **Trade dress**: the exact combination of board look, fonts, set design, and catchphrases enjoys protection; a clone should evoke the genre (blue board, gold values, answer-and-question format — game *mechanics themselves are not copyrightable*) without replicating the precise logo fonts, exact colors, or on-screen graphics package.
+- **Trade dress**: the exact combination of board look, fonts, set design, and catchphrases enjoys protection; a clone should evoke the genre (blue board, gold values, answer-and-question format — game _mechanics themselves are not copyrightable_) without replicating the precise logo fonts, exact colors, or on-screen graphics package.
 - **Catchphrases**: avoid verbatim branded phrases in the UI ("This is Jeopardy!", "Daily Double" is heavily associated — many clones rename it "Double Down"/"Wild Wager"; low legal risk as a phrase but renaming plus generic styling is the safe pattern).
-- Clue *content* the users write is theirs; do not bundle actual aired Jeopardy clues (J! Archive content is fan-transcribed but the clues are the show's copyrighted material).
+- Clue _content_ the users write is theirs; do not bundle actual aired Jeopardy clues (J! Archive content is fan-transcribed but the clues are the show's copyrighted material).
 
 ## 8. Host workflow during a live game → host UI implications
 
@@ -159,7 +169,7 @@ Moment-to-moment loop for one clue (the host console must make each step one tap
 1. **See the board** (host mirror of the public display) → tap a cell on behalf of the controlling player, or confirm the player's spoken selection. UI: highlight who has control.
 2. **Clue appears** → host **reads it aloud** (or triggers TTS). Buzzers dead; host UI shows "reading" state.
 3. **Arm buzzers** — single big button (spacebar-sized). Optional auto-arm on TTS end.
-4. **Buzz result** — UI announces who won the buzz (name big + sound), starts the 5-second answer timer automatically, shows the correct answer *privately to the host*.
+4. **Buzz result** — UI announces who won the buzz (name big + sound), starts the 5-second answer timer automatically, shows the correct answer _privately to the host_.
 5. **Adjudicate** — two huge buttons: **Correct** (adds value, gives control, closes clue) / **Wrong** (deducts value unless disabled, locks that player out, **re-arms remaining buzzers automatically**). Optional third: **No penalty** (for judge's-discretion cases).
 6. **Timeout path** — "No takers" button (or auto after buzz window): reveal answer to the room, close clue, control unchanged.
 7. **Daily Double path** — splash → UI prompts wager from the controlling player's phone (host sees allowed min/max computed automatically, can type the wager on their behalf) → reveal clue → single Correct/Wrong adjudication.
@@ -173,62 +183,63 @@ Key design principle from the TV production: **three humans run the show** — h
 
 ## Configurable rules matrix
 
-| # | Setting | Options | Default |
-|---|---|---|---|
-| **Game structure** |||
-| 1 | Rounds played | R1 only / R1+R2 / R1+R2+Final / R1+Final | R1 + R2 + Final |
-| 2 | Board size | rows 3–6 × columns 3–6 | 6 categories × 5 clues |
-| 3 | Value scheme | TV ($200–1000, doubled R2) / classic ($100–500) / points (100–500) / custom per row | TV values |
-| 4 | Currency label | $ / points / custom | $ |
-| 5 | Round 2 multiplier | ×2 / ×1 / custom | ×2 |
-| 6 | Round time limit | off / minutes | off (play out board) |
-| **Board control** |||
-| 7 | Who selects next clue | last correct answerer (TV) / rotate / host picks / auto-sweep | TV rule |
-| 8 | First selector R1 | random / host picks | random |
-| 9 | First selector R2 | lowest score (TV) / same as R1 | TV rule |
-| 10 | Selection shot clock | off / 10–30 s | off |
-| **Buzzing** |||
-| 11 | Arm mode | manual host button / auto after TTS / auto after fixed reading delay | manual |
-| 12 | Early-buzz lockout | off / 0.1–1.0 s | 0.25 s |
-| 13 | Buzz-in window | 3–15 s / unlimited until host closes | 5 s |
-| 14 | Answer window after buzz | 3–15 s | 5 s |
-| 15 | Rebound after wrong answer | on (TV) / off | on |
-| 16 | Wrong answerer locked out of clue | yes (TV) / no | yes |
-| **Scoring** |||
-| 17 | Deduct on wrong answer | yes (TV) / no / floor at 0 | yes |
-| 18 | Deduct on answer-timeout after buzz | yes (TV) / no | yes |
-| 19 | Question-format required | off / host-reminder only / strict in R2+Final | off (typed) or host-reminder (verbal) |
-| 20 | Host score override & undo | always on | always on |
-| **Answer mode** |||
-| 21 | Answer capture | verbal + host judges / typed + auto-judge with host override | verbal |
-| 22 | Everyone-answers mode (no buzzer race; all type within timer) | off / on per round / speed-weighted scoring | off (on suggested for 30+ solo players) |
-| **Daily Doubles** |||
-| 23 | Count per round | 0 / 1 / 2 / custom | 1 in R1, 2 in R2 |
-| 24 | Placement | weighted-realistic (row-4-heavy, never row 1) / uniform rows 2–5 / manual | weighted-realistic |
-| 25 | Min wager | $5 / 0 / custom | $5 |
-| 26 | Max wager | max(score, top row value of round) (TV) / score only / unlimited cap | TV rule |
-| 27 | DD wager timer | off / 15–60 s | 30 s |
-| 28 | DD name & branding | genericized label (e.g. "Double Down") | genericized |
-| **Final round** |||
-| 29 | Final round enabled | on / off | on |
-| 30 | Eligibility | score > 0 (TV) / everyone plays (min stake for ≤0) | TV rule |
-| 31 | Wager range | 0 to current score (TV) / fixed stake | TV rule |
-| 32 | Writing timer | 15–60 s | 30 s |
-| 33 | Reveal style | lowest-first individual (TV) / top-N individual + batch / leaderboard animation | lowest-first (≤6 players/teams), top-N + batch otherwise |
-| **Teams** |||
-| 34 | Player mode | individuals / teams | individuals |
-| 35 | Team buzzer | one shared phone / any member (first buzz counts) / rotating designated buzzer | one shared phone |
-| 36 | Team-wide early-buzz penalty | on / off | on |
-| **End of game** |||
-| 37 | Tie for first | sudden-death tiebreaker clue (TV) / co-champions / shared win | co-champions (party default; tiebreaker for competitive) |
-| 38 | All-non-positive finish | no winner / highest score wins anyway | highest wins anyway (party-friendly) |
-| **Presentation** |||
-| 39 | Sounds (board fill, DD sting, think music, time's-up, buzz-in) | individually toggleable, original/royalty-free assets only | all on |
-| 40 | Announce buzz winner | screen only / screen + sound / screen + name TTS | screen + sound |
-| 41 | Category reveal animation | on / skip | on |
-| 42 | Show correct answer on dead clue | auto-display / host reads only | auto-display |
+| #                  | Setting                                                        | Options                                                                             | Default                                                  |
+| ------------------ | -------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| **Game structure** |                                                                |                                                                                     |
+| 1                  | Rounds played                                                  | R1 only / R1+R2 / R1+R2+Final / R1+Final                                            | R1 + R2 + Final                                          |
+| 2                  | Board size                                                     | rows 3–6 × columns 3–6                                                              | 6 categories × 5 clues                                   |
+| 3                  | Value scheme                                                   | TV ($200–1000, doubled R2) / classic ($100–500) / points (100–500) / custom per row | TV values                                                |
+| 4                  | Currency label                                                 | $ / points / custom                                                                 | $                                                        |
+| 5                  | Round 2 multiplier                                             | ×2 / ×1 / custom                                                                    | ×2                                                       |
+| 6                  | Round time limit                                               | off / minutes                                                                       | off (play out board)                                     |
+| **Board control**  |                                                                |                                                                                     |
+| 7                  | Who selects next clue                                          | last correct answerer (TV) / rotate / host picks / auto-sweep                       | TV rule                                                  |
+| 8                  | First selector R1                                              | random / host picks                                                                 | random                                                   |
+| 9                  | First selector R2                                              | lowest score (TV) / same as R1                                                      | TV rule                                                  |
+| 10                 | Selection shot clock                                           | off / 10–30 s                                                                       | off                                                      |
+| **Buzzing**        |                                                                |                                                                                     |
+| 11                 | Arm mode                                                       | manual host button / auto after TTS / auto after fixed reading delay                | manual                                                   |
+| 12                 | Early-buzz lockout                                             | off / 0.1–1.0 s                                                                     | 0.25 s                                                   |
+| 13                 | Buzz-in window                                                 | 3–15 s / unlimited until host closes                                                | 5 s                                                      |
+| 14                 | Answer window after buzz                                       | 3–15 s                                                                              | 5 s                                                      |
+| 15                 | Rebound after wrong answer                                     | on (TV) / off                                                                       | on                                                       |
+| 16                 | Wrong answerer locked out of clue                              | yes (TV) / no                                                                       | yes                                                      |
+| **Scoring**        |                                                                |                                                                                     |
+| 17                 | Deduct on wrong answer                                         | yes (TV) / no / floor at 0                                                          | yes                                                      |
+| 18                 | Deduct on answer-timeout after buzz                            | yes (TV) / no                                                                       | yes                                                      |
+| 19                 | Question-format required                                       | off / host-reminder only / strict in R2+Final                                       | off (typed) or host-reminder (verbal)                    |
+| 20                 | Host score override & undo                                     | always on                                                                           | always on                                                |
+| **Answer mode**    |                                                                |                                                                                     |
+| 21                 | Answer capture                                                 | verbal + host judges / typed + auto-judge with host override                        | verbal                                                   |
+| 22                 | Everyone-answers mode (no buzzer race; all type within timer)  | off / on per round / speed-weighted scoring                                         | off (on suggested for 30+ solo players)                  |
+| **Daily Doubles**  |                                                                |                                                                                     |
+| 23                 | Count per round                                                | 0 / 1 / 2 / custom                                                                  | 1 in R1, 2 in R2                                         |
+| 24                 | Placement                                                      | weighted-realistic (row-4-heavy, never row 1) / uniform rows 2–5 / manual           | weighted-realistic                                       |
+| 25                 | Min wager                                                      | $5 / 0 / custom                                                                     | $5                                                       |
+| 26                 | Max wager                                                      | max(score, top row value of round) (TV) / score only / unlimited cap                | TV rule                                                  |
+| 27                 | DD wager timer                                                 | off / 15–60 s                                                                       | 30 s                                                     |
+| 28                 | DD name & branding                                             | genericized label (e.g. "Double Down")                                              | genericized                                              |
+| **Final round**    |                                                                |                                                                                     |
+| 29                 | Final round enabled                                            | on / off                                                                            | on                                                       |
+| 30                 | Eligibility                                                    | score > 0 (TV) / everyone plays (min stake for ≤0)                                  | TV rule                                                  |
+| 31                 | Wager range                                                    | 0 to current score (TV) / fixed stake                                               | TV rule                                                  |
+| 32                 | Writing timer                                                  | 15–60 s                                                                             | 30 s                                                     |
+| 33                 | Reveal style                                                   | lowest-first individual (TV) / top-N individual + batch / leaderboard animation     | lowest-first (≤6 players/teams), top-N + batch otherwise |
+| **Teams**          |                                                                |                                                                                     |
+| 34                 | Player mode                                                    | individuals / teams                                                                 | individuals                                              |
+| 35                 | Team buzzer                                                    | one shared phone / any member (first buzz counts) / rotating designated buzzer      | one shared phone                                         |
+| 36                 | Team-wide early-buzz penalty                                   | on / off                                                                            | on                                                       |
+| **End of game**    |                                                                |                                                                                     |
+| 37                 | Tie for first                                                  | sudden-death tiebreaker clue (TV) / co-champions / shared win                       | co-champions (party default; tiebreaker for competitive) |
+| 38                 | All-non-positive finish                                        | no winner / highest score wins anyway                                               | highest wins anyway (party-friendly)                     |
+| **Presentation**   |                                                                |                                                                                     |
+| 39                 | Sounds (board fill, DD sting, think music, time's-up, buzz-in) | individually toggleable, original/royalty-free assets only                          | all on                                                   |
+| 40                 | Announce buzz winner                                           | screen only / screen + sound / screen + name TTS                                    | screen + sound                                           |
+| 41                 | Category reveal animation                                      | on / skip                                                                           | on                                                       |
+| 42                 | Show correct answer on dead clue                               | auto-display / host reads only                                                      | auto-display                                             |
 
 ### Sources (key references)
+
 - [Jeopardy.com — How Does the Jeopardy! Buzzer Work?](https://www.jeopardy.com/jbuzz/behind-scenes/how-does-jeopardy-buzzer-work)
 - [Jeopardy.com — The Infamous Jeopardy! Buzzer](https://www.jeopardy.com/jbuzz/behind-scenes/infamous-jeopardy-buzzer-key-becoming-jeopardy-champion)
 - [FlowingData — Where to Find Jeopardy! Daily Doubles](https://flowingdata.com/2015/03/03/where-to-find-jeopardy-daily-doubles/) (J! Archive data, seasons 1–31)
