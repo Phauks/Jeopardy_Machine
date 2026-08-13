@@ -312,3 +312,10 @@ Auditioned via **Listening Room 3**. Vibe locked to the benchmark: quirky rock/f
 Loopability caveat for all embedded rows: the review page plays MP3 previews, and MP3 encoding pads start/end with a few ms of silence — an audible seam gap there may not exist in the WAV original played gaplessly in-app (Web Audio, sample-accurate loop points). Judge the music on the page; verify the seam against the original before the final cut.
 
 Searches run this pass — Pixabay: "funky loop", "quirky rock", "funk groove loop", "funky bass"; Freesound (CC0 filter): "funk loop", "funky groove", "funk rock loop", "funky bass loop", "bass groove loop", "funk guitar loop", "groovy loop". Dead-ends: Pixabay audio remains un-embeddable (search + track pages readable via reader pipeline; audio CDN URLs not exposed in rendered pages); Freesound's CC0 funk shelf is heavy on solo-instrument loops (bass-only, drums-only, synth) — full-band quirky-funk in CC0 is scarce, which is why the Pixabay/Sonican family carries this round. Re-verify everything per checklist §5 before bundling.
+
+### Round-4 lobby brief: lap length >= 2-3 minutes (owner, 2026-08-13)
+
+Owner rejected minute-scale laps: the lobby track needs **at least 2-3 minutes per lap** before repeating (still loop-ready at the seam). Consequences for sourcing:
+- Target full-length quirky-funk **tracks** (2-4 min) that end loop-cleanly, not "loop" assets (which are inherently short). Pixabay full tracks are the main shelf; CC-BY sources (Free Music Archive, incompetech full catalog) are acceptable with the credits screen; multi-minute CC0 full-band funk is rare (known gap).
+- **Engineering alternative if sourcing stays thin**: a client-side sequenced medley - 3-4 compatible shorter loops (matched BPM/key or crossfaded) rotated by the lobby audio player into a 3+ minute effective lap. Keeps CC0 purity as an option; needs musical curation so transitions feel intentional.
+- Vibe stays locked: quirky rock/funk per the Sonican benchmark.
