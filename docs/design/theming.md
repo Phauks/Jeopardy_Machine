@@ -46,6 +46,8 @@ The M7 customizer exposes only document fields; chrome follows automatically. `t
 | `--surface-text-muted` | text at 62% alpha               | Secondary text.                                                                                                                        |
 | `--surface-border`     | text at 20% alpha               | Hairlines, input borders.                                                                                                              |
 | `--surface-scrim`      | constant `rgb(0 0 0 / 0.55)`    | Overlay backdrop (clue layer, dialogs).                                                                                                |
+| `--score-positive`     | constant `#21b45e`              | Positive score deltas (judged flash on phones, console feedback). Paired with a sign/label, never color alone.                         |
+| `--score-negative`     | constant `#ff5470`              | Negative deltas and negative score readouts. Same pairing rule.                                                                        |
 
 ### Effects tokens (the flat/dimensional switch)
 
@@ -83,3 +85,7 @@ Apply: `style={themeToStyleAttribute(preset)}` + `data-effects={preset.effectsLe
 Add a preset: add the object to `theme-presets.ts` and to `themePresets`; the contract gate then enforces token completeness automatically. Add it to the settings preset enum (docs/proposals/m1-protocol.md §3) in the same change. No CSS edits - if a new preset seems to need component CSS, the contract is missing a token and _that_ is the change to make (token + serializer + gate + this doc, same commit).
 
 Contrast guardrails (WCAG warn-not-block on clue-text/cell and value/cell pairs) are the M7 customizer's job per the decision; presets are hand-checked today (gold-on-blue and white-on-blue pairs clear AA large-text comfortably in all four).
+
+## Player accents and avatars (adjacent to, not part of, the token contract)
+
+Player identity is full-color baked avatar sprites (Kenney Cube Pets + Mini Characters, CC0 - the successor to the retired single-color emblem set), each avatar pre-rendered per **player accent color**. The 8-color player-accent palette is defined once in `tools/avatar-bake/src/accent-palette.mjs` and reaches shipped code only through the generated manifest (`apps/web/src/lib/avatars/avatar-manifest.json`, loader `avatar-manifest.ts`); components (`avatar-chip.svelte`, `avatar-picker.svelte`) take accents as props and hard-code nothing. Player accents are a player's own choice and deliberately do NOT re-derive from the active theme - but the palette must contain every preset's `accentColor` (bake-time check + `avatar-manifest.gate.test.ts`), so accent-matching-theme always has an exact sprite. Adding a preset with a new `accentColor` therefore includes a palette addition + re-bake (`tools/avatar-bake/README.md`).

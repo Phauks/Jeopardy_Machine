@@ -21,6 +21,21 @@
       note: "WebSocket lab against the GameRoomDO stub: latency, ordering bursts, hibernation probe, malformed input, reconnect tools.",
     },
     {
+      href: "/room/DUMYX",
+      title: "Player room",
+      note: "A2 join, A3 lobby, A4 buzzer - open on a phone (M4 mock room seeded from the fixture dataset; ?theme=modern-flat previews presets).",
+    },
+    {
+      href: "/room/DUMYX/display",
+      title: "Display screen",
+      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the live 3D avatar diorama on lobby and winner phases.",
+    },
+    {
+      href: "/room/DUMYX/host",
+      title: "Host console",
+      note: "C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.",
+    },
+    {
       href: "/api/version",
       title: "/api/version",
       note: "Deployment identity as JSON: commit, build time, wire protocol version.",

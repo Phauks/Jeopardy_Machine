@@ -1,0 +1,144 @@
+{
+  "format": "game-definition",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Dummy Mini 3x3",
+    "author": "Jeopardy Machine fixtures",
+    "license": "CC0-1.0",
+    "created": "2026-08-14T00:00:00.000Z",
+    "modified": "2026-08-14T00:00:00.000Z"
+  },
+  "ext": {
+    "com.example.fixtures": { "role": "canonical-dummy-dataset", "profile": "fast-tests" }
+  },
+  "body": {
+    "mode": "jeopardy",
+    "rounds": [
+      {
+        "name": "The Only Round",
+        "categories": [
+          {
+            "title": "Tiny Parks",
+            "cells": [
+              { "itemId": "0198f00d-0004-7000-8000-000000000111" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000112" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000113" }
+            ]
+          },
+          {
+            "title": "Tiny Speedruns",
+            "cells": [
+              { "itemId": "0198f00d-0004-7000-8000-000000000121" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000122" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000123" }
+            ]
+          },
+          {
+            "title": "Tiny Compost",
+            "cells": [
+              { "itemId": "0198f00d-0004-7000-8000-000000000131" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000132" },
+              { "itemId": "0198f00d-0004-7000-8000-000000000133" }
+            ]
+          }
+        ]
+      }
+    ],
+    "final": null,
+    "valueScheme": { "kind": "custom", "rowValues": [100, 200, 300] },
+    "content": {
+      "kind": "embedded",
+      "pack": {
+        "format": "content-pack",
+        "schemaVersion": "1.0.0",
+        "meta": {
+          "title": "Dummy Mini Pack",
+          "author": "Jeopardy Machine fixtures",
+          "license": "CC0-1.0",
+          "created": "2026-08-14T00:00:00.000Z",
+          "modified": "2026-08-14T00:00:00.000Z"
+        },
+        "body": {
+          "description": "Nine ultra-short fictional items embedded in the mini game so fast tests need exactly one file.",
+          "tags": ["dummy", "fixtures", "mini"],
+          "items": [
+            {
+              "id": "0198f00d-0004-7000-8000-000000000111",
+              "type": "basic",
+              "prompt": { "text": "The number of trees in Tiny Park (it is a very tiny park)." },
+              "answer": { "canonical": "one", "accepted": ["1"] },
+              "tags": ["tiny-parks"],
+              "difficulty": 1
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000112",
+              "type": "basic",
+              "prompt": { "text": "Tiny Park's only amenity, which faces the tree." },
+              "answer": { "canonical": "the bench" },
+              "tags": ["tiny-parks"],
+              "difficulty": 2
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000113",
+              "type": "basic",
+              "prompt": { "text": "Tiny Park closes at this time, which is also when it opens." },
+              "answer": { "canonical": "noon" },
+              "tags": ["tiny-parks"],
+              "difficulty": 3
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000121",
+              "type": "basic",
+              "prompt": { "text": "The tiny-speedrun world record for opening this very file." },
+              "answer": { "canonical": "one second", "accepted": ["1 second"] },
+              "tags": ["tiny-speedruns"],
+              "difficulty": 1
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000122",
+              "type": "basic",
+              "prompt": {
+                "text": "Tiny speedrunners skip the tutorial by doing this to the tutorial."
+              },
+              "answer": { "canonical": "closing it", "accepted": ["skipping it"] },
+              "tags": ["tiny-speedruns"],
+              "difficulty": 2
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000123",
+              "type": "basic",
+              "prompt": { "text": "The only split tracked in a tiny speedrun." },
+              "answer": { "canonical": "the whole run" },
+              "tags": ["tiny-speedruns"],
+              "difficulty": 3
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000131",
+              "type": "basic",
+              "prompt": { "text": "Tiny compost is stored in this vessel." },
+              "answer": { "canonical": "a thimble", "accepted": ["the thimble"] },
+              "tags": ["tiny-compost"],
+              "difficulty": 1
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000132",
+              "type": "basic",
+              "prompt": { "text": "The number of worms in the tiny bin." },
+              "answer": { "canonical": "two", "accepted": ["2"] },
+              "tags": ["tiny-compost"],
+              "difficulty": 2
+            },
+            {
+              "id": "0198f00d-0004-7000-8000-000000000133",
+              "type": "basic",
+              "prompt": { "text": "How long the tiny pile takes to finish composting." },
+              "answer": { "canonical": "a fortnight", "accepted": ["two weeks"] },
+              "tags": ["tiny-compost"],
+              "difficulty": 3
+            }
+          ]
+        }
+      }
+    }
+  }
+}

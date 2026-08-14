@@ -26,3 +26,15 @@
 - The engine has no transport: nothing speaks WebSockets to it yet (M3 wires `GameRoomDO` to `transition()`); the hotseat page and tests are its only drivers. Everyone-answers mode (#22) and teams (#34-#36) are engine-complete with tests but exercised by no UI surface.
 - No real format has ever version-bumped: all four portable formats sit at 1.0.0 with empty migration chains (the machinery is exercised by the synthetic example migration only).
 - The M0 milestone closes only when the owner's manual hello-world deploy succeeds (ROADMAP exit criteria).
+
+## M4 play surfaces (appended 2026-08-14)
+
+| Claim                                                                                                    | Reproduce                                                                                                          |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| The three play surfaces are real routes over the room-store seam (mock rooms until the M3 reconcile)     | `pnpm dev`, open /room/DUMYX (phone), /room/DUMYX/display, /room/DUMYX/host (`?mirror`, `?theme=<preset>` toggles) |
+| Store contract: a full fixture game (teams, wagers, final, undo, manual mode) through the action surface | `pnpm -F @jeopardy/web test` (`src/lib/room/room-store.contract.test.ts`)                                          |
+| Every A4 buzzer state, every C4 console state, and the C1b mirror invariant render-tested                | `pnpm -F @jeopardy/web test` (`buzzer-screen.states`, `host-console.states`, `join-lobby.states`)                  |
+| All four theme presets x all three surfaces smoke-render; QR + room code on the display title screen     | `pnpm -F @jeopardy/web test` (`surfaces-presets.smoke.test.ts`)                                                    |
+| Room audio: only-winner-heard exclusive slot (drop, never queue) + serialized sound check                | `pnpm -F @jeopardy/web test` (`room-audio.test.ts`; sounds are placeholder tones until the M5 bundling pass)       |
+
+Not yet true for M4: the ws room store is a documented stub (each mock room is one isolated tab); clue text has no wire channel; sound files are not bundled; the FLIP clue zoom and the host companion view are deferred (docs/design/surfaces.md "Known gaps").

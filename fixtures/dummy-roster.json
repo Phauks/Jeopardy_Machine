@@ -1,0 +1,373 @@
+{
+  "note": "INFORMAL UI/DEV FIXTURE - not a portable document. There is deliberately no protocol schema for this file: room rosters live in GameRoomDO state (M3), never in exported documents. This snapshot exists so lobby/roster/console UI work has realistic data before M3 lands. Vocabulary follows docs/design/user-flows.md (Teams & leadership): team tier = name/color/room-audible buzz sound picked by the leader; personal tier = nickname/avatar/accent/personal buzz sound. Buzz sound slugs are the 14 approved sounds of docs/content/media-and-sounds.md section 9; avatar slugs are provisional <set>/<name> names for the Kenney Cube Pets + Mini Characters sets (docs/research/00-user-directives.md) until the baked-sprite manifest exists.",
+  "roomCode": "DUMYX",
+  "capturedAt": "2026-08-14T00:00:00.000Z",
+  "buzzSoundCatalog": [
+    "correct-bell",
+    "ding",
+    "clown-horn",
+    "squeaky-toy",
+    "laser-zap",
+    "klaxon",
+    "kookaburra",
+    "loon",
+    "owl-hoot",
+    "airhorn",
+    "gong",
+    "game-powerup",
+    "elephant-trumpet",
+    "swanee-whistle"
+  ],
+  "teams": [
+    {
+      "id": "team-sequoia",
+      "name": "Team Sequoia",
+      "color": "#2e7d32",
+      "buzzSoundId": "klaxon",
+      "leaderId": "p01",
+      "locked": false
+    },
+    {
+      "id": "team-peat-bosses",
+      "name": "Peat Bosses",
+      "color": "#6d4c41",
+      "buzzSoundId": "gong",
+      "leaderId": "p06",
+      "locked": false
+    },
+    {
+      "id": "team-recyclables",
+      "name": "The Recyclables",
+      "color": "#0288d1",
+      "buzzSoundId": "airhorn",
+      "leaderId": "p11",
+      "locked": false
+    },
+    {
+      "id": "team-lag-spikes",
+      "name": "Lag Spikes",
+      "color": "#7b1fa2",
+      "buzzSoundId": "kookaburra",
+      "leaderId": "p16",
+      "locked": false
+    },
+    {
+      "id": "team-solar-sprites",
+      "name": "Solar Sprites",
+      "color": "#f9a825",
+      "buzzSoundId": "elephant-trumpet",
+      "leaderId": "p21",
+      "locked": true
+    },
+    {
+      "id": "team-null-pointers",
+      "name": "Null Pointers",
+      "color": "#455a64",
+      "buzzSoundId": "clown-horn",
+      "leaderId": "p25",
+      "locked": false
+    }
+  ],
+  "players": [
+    {
+      "id": "p01",
+      "nickname": "Captain Canopy",
+      "teamId": "team-sequoia",
+      "avatarId": "cube-pets/fox",
+      "accentColor": "#ff7043",
+      "personalBuzzSoundId": "correct-bell",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p02",
+      "nickname": "Mossback",
+      "teamId": "team-sequoia",
+      "avatarId": "cube-pets/turtle",
+      "accentColor": "#8bc34a",
+      "personalBuzzSoundId": "ding",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p03",
+      "nickname": "PixelFern",
+      "teamId": "team-sequoia",
+      "avatarId": "mini/ranger",
+      "accentColor": "#00e676",
+      "personalBuzzSoundId": "game-powerup",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p04",
+      "nickname": "Sir Mulch",
+      "teamId": "team-sequoia",
+      "avatarId": "cube-pets/pig",
+      "accentColor": "#a1887f",
+      "personalBuzzSoundId": "squeaky-toy",
+      "connection": "away",
+      "lateJoiner": false
+    },
+    {
+      "id": "p05",
+      "nickname": "Wormhole Wendy",
+      "teamId": "team-sequoia",
+      "avatarId": "cube-pets/rabbit",
+      "accentColor": "#f06292",
+      "personalBuzzSoundId": "loon",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p06",
+      "nickname": "Peat Bull",
+      "teamId": "team-peat-bosses",
+      "avatarId": "cube-pets/bear",
+      "accentColor": "#795548",
+      "personalBuzzSoundId": "gong",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p07",
+      "nickname": "Boggart",
+      "teamId": "team-peat-bosses",
+      "avatarId": "cube-pets/frog",
+      "accentColor": "#4caf50",
+      "personalBuzzSoundId": "owl-hoot",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p08",
+      "nickname": "Duckworth",
+      "teamId": "team-peat-bosses",
+      "avatarId": "cube-pets/duck",
+      "accentColor": "#ffca28",
+      "personalBuzzSoundId": "swanee-whistle",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p09",
+      "nickname": "Marsh Mellow",
+      "teamId": "team-peat-bosses",
+      "avatarId": "mini/farmer",
+      "accentColor": "#aed581",
+      "personalBuzzSoundId": "ding",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p10",
+      "nickname": "Sphagnum P.I.",
+      "teamId": "team-peat-bosses",
+      "avatarId": "cube-pets/owl",
+      "accentColor": "#9575cd",
+      "personalBuzzSoundId": "correct-bell",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p11",
+      "nickname": "Recyclosaurus",
+      "teamId": "team-recyclables",
+      "avatarId": "cube-pets/dog",
+      "accentColor": "#29b6f6",
+      "personalBuzzSoundId": "airhorn",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p12",
+      "nickname": "Bin Diesel",
+      "teamId": "team-recyclables",
+      "avatarId": "cube-pets/cat",
+      "accentColor": "#78909c",
+      "personalBuzzSoundId": "klaxon",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p13",
+      "nickname": "Tetra Pak Attack",
+      "teamId": "team-recyclables",
+      "avatarId": "mini/engineer",
+      "accentColor": "#26c6da",
+      "personalBuzzSoundId": "laser-zap",
+      "connection": "away",
+      "lateJoiner": false
+    },
+    {
+      "id": "p14",
+      "nickname": "Glass Half Sorted",
+      "teamId": "team-recyclables",
+      "avatarId": "cube-pets/penguin",
+      "accentColor": "#b0bec5",
+      "personalBuzzSoundId": "ding",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p15",
+      "nickname": "Cardboard Cavalier",
+      "teamId": "team-recyclables",
+      "avatarId": "cube-pets/sheep",
+      "accentColor": "#d7ccc8",
+      "personalBuzzSoundId": "squeaky-toy",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p16",
+      "nickname": "Lag Lord",
+      "teamId": "team-lag-spikes",
+      "avatarId": "cube-pets/monkey",
+      "accentColor": "#ab47bc",
+      "personalBuzzSoundId": "laser-zap",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p17",
+      "nickname": "Miss Chief",
+      "teamId": "team-lag-spikes",
+      "avatarId": "mini/scientist",
+      "accentColor": "#ec407a",
+      "personalBuzzSoundId": "kookaburra",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p18",
+      "nickname": "Glitchling",
+      "teamId": "team-lag-spikes",
+      "avatarId": "cube-pets/chicken",
+      "accentColor": "#ffee58",
+      "personalBuzzSoundId": "game-powerup",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p19",
+      "nickname": "Turbo Turnip",
+      "teamId": "team-lag-spikes",
+      "avatarId": "cube-pets/rabbit",
+      "accentColor": "#ff8a65",
+      "personalBuzzSoundId": "swanee-whistle",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p20",
+      "nickname": "Beetle Bytes",
+      "teamId": "team-lag-spikes",
+      "avatarId": "cube-pets/frog",
+      "accentColor": "#66bb6a",
+      "personalBuzzSoundId": "owl-hoot",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p21",
+      "nickname": "Solar Flair",
+      "teamId": "team-solar-sprites",
+      "avatarId": "mini/pilot",
+      "accentColor": "#ffd54f",
+      "personalBuzzSoundId": "elephant-trumpet",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p22",
+      "nickname": "Photon Phoebe",
+      "teamId": "team-solar-sprites",
+      "avatarId": "cube-pets/cat",
+      "accentColor": "#fff176",
+      "personalBuzzSoundId": "correct-bell",
+      "connection": "away",
+      "lateJoiner": false
+    },
+    {
+      "id": "p23",
+      "nickname": "Baron von Biome",
+      "teamId": "team-solar-sprites",
+      "avatarId": "cube-pets/panda",
+      "accentColor": "#a5d6a7",
+      "personalBuzzSoundId": "gong",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p24",
+      "nickname": "Quiet Quokka",
+      "teamId": "team-solar-sprites",
+      "avatarId": "cube-pets/dog",
+      "accentColor": "#80cbc4",
+      "personalBuzzSoundId": "loon",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p25",
+      "nickname": "Null Nellie",
+      "teamId": "team-null-pointers",
+      "avatarId": "mini/medic",
+      "accentColor": "#90a4ae",
+      "personalBuzzSoundId": "clown-horn",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p26",
+      "nickname": "Segfault Sam",
+      "teamId": "team-null-pointers",
+      "avatarId": "cube-pets/penguin",
+      "accentColor": "#607d8b",
+      "personalBuzzSoundId": "klaxon",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p27",
+      "nickname": "Off By One",
+      "teamId": "team-null-pointers",
+      "avatarId": "cube-pets/owl",
+      "accentColor": "#7986cb",
+      "personalBuzzSoundId": "ding",
+      "connection": "away",
+      "lateJoiner": false
+    },
+    {
+      "id": "p28",
+      "nickname": "Dangling Pointer",
+      "teamId": "team-null-pointers",
+      "avatarId": "cube-pets/monkey",
+      "accentColor": "#4dd0e1",
+      "personalBuzzSoundId": "squeaky-toy",
+      "connection": "connected",
+      "lateJoiner": false
+    },
+    {
+      "id": "p29",
+      "nickname": "Fashionably Late",
+      "teamId": null,
+      "avatarId": "cube-pets/fox",
+      "accentColor": "#ba68c8",
+      "personalBuzzSoundId": "kookaburra",
+      "connection": "connected",
+      "lateJoiner": true
+    },
+    {
+      "id": "p30",
+      "nickname": "Bus Was Composting",
+      "teamId": null,
+      "avatarId": "mini/adventurer",
+      "accentColor": "#ffab91",
+      "personalBuzzSoundId": "game-powerup",
+      "connection": "connected",
+      "lateJoiner": true
+    }
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "format": "game-definition",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Dummy Night at the Museum of Unshipped Games",
+    "author": "Jeopardy Machine fixtures",
+    "license": "CC0-1.0",
+    "created": "2026-08-14T00:00:00.000Z",
+    "modified": "2026-08-14T00:00:00.000Z"
+  },
+  "ext": {
+    "com.example.fixtures": {
+      "role": "canonical-dummy-dataset",
+      "companionPack": "dummy-pack.pack.json"
+    }
+  },
+  "body": {
+    "mode": "jeopardy",
+    "rounds": [
+      {
+        "name": "Round One",
+        "valueMultiplier": 1,
+        "wagerPlacement": "manual",
+        "categories": [
+          {
+            "title": "Imaginary Parks",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000111" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000112" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000113" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000114" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000115" }
+            ]
+          },
+          {
+            "title": "Fake Speedruns",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000121" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000122" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000123" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000124" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000125" }
+            ]
+          },
+          {
+            "title": "Compost Lore",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000131" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000132" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000133" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000134", "wager": true },
+              { "itemId": "0198f00d-0001-7000-8000-000000000135" }
+            ]
+          },
+          {
+            "title": "Invented Board Games",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000141" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000142" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000143" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000144" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000145" }
+            ]
+          },
+          {
+            "title": "Pretend Pollinators",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000151" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000152" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000153" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000154" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000155" }
+            ]
+          },
+          {
+            "title": "Recycled Power-Ups",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000161" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000162" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000163" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000164" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000165" }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "Round Two",
+        "valueMultiplier": 2,
+        "wagerPlacement": "manual",
+        "categories": [
+          {
+            "title": "Chiptune Birdsong",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000211" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000212" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000213" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000214" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000215" }
+            ]
+          },
+          {
+            "title": "Made-Up MMOs",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000221" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000222" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000223", "wager": true },
+              { "itemId": "0198f00d-0001-7000-8000-000000000224" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000225" }
+            ]
+          },
+          {
+            "title": "Cryptid Conservation",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000231" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000232" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000233" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000234" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000235" }
+            ]
+          },
+          {
+            "title": "Glitched Geography",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000241" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000242" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000243", "value": 750 },
+              { "itemId": "0198f00d-0001-7000-8000-000000000244" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000245" }
+            ]
+          },
+          {
+            "title": "Fictional Field Guides",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000251" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000252" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000253" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000254" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000255", "wager": true }
+            ]
+          },
+          {
+            "title": "Solar-Punk Startups",
+            "cells": [
+              { "itemId": "0198f00d-0001-7000-8000-000000000261" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000262" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000263" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000264" },
+              { "itemId": "0198f00d-0001-7000-8000-000000000265" }
+            ]
+          }
+        ]
+      }
+    ],
+    "final": {
+      "category": "The Museum of Unshipped Games",
+      "itemId": "0198f00d-0001-7000-8000-000000000999"
+    },
+    "valueScheme": { "kind": "preset", "preset": "tv" },
+    "content": {
+      "kind": "external",
+      "packId": "0198f00d-0000-7000-8000-00000000000f",
+      "sha256": "9aa0fecec496564046dec9b0448f135c23814c457a7e73da4a70eed22b74a00c"
+    },
+    "rules": {
+      "kind": "inline",
+      "ruleSet": {
+        "format": "rule-set",
+        "schemaVersion": "1.0.0",
+        "meta": {
+          "title": "Dummy Casual House Rules (embedded)",
+          "author": "Jeopardy Machine fixtures",
+          "license": "CC0-1.0",
+          "created": "2026-08-14T00:00:00.000Z",
+          "modified": "2026-08-14T00:00:00.000Z"
+        },
+        "body": {
+          "base": "casual-party",
+          "overrides": {
+            "scoring": { "wrongAnswerPenalty": "floor-at-zero" },
+            "teams": { "playerMode": "teams", "teamBuzzer": "any-member" },
+            "join": { "lateJoinScore": "match-lowest" }
+          },
+          "description": "Casual party base with house tweaks: teams buzz from any member's phone, wrong answers never go below zero, and late joiners match the current lowest score (rules-matrix #43, non-default)."
+        }
+      }
+    },
+    "theme": {
+      "kind": "inline",
+      "theme": {
+        "format": "theme",
+        "schemaVersion": "1.0.0",
+        "meta": {
+          "title": "Terra Pixel (embedded)",
+          "author": "Jeopardy Machine fixtures",
+          "license": "CC0-1.0",
+          "created": "2026-08-14T00:00:00.000Z",
+          "modified": "2026-08-14T00:00:00.000Z"
+        },
+        "body": {
+          "tokens": {
+            "boardBackground": {
+              "kind": "gradient",
+              "from": "#0b3d2e",
+              "to": "#071f18",
+              "angleDeg": 200
+            },
+            "cellBackground": { "kind": "solid", "color": "#10513c" },
+            "categoryBackground": { "kind": "solid", "color": "#072b1f" },
+            "valueColor": "#ffd166",
+            "clueTextColor": "#f2f7f4",
+            "accentColor": "#7ce38b",
+            "usedCellTreatment": "dimmed"
+          },
+          "fontSlots": {
+            "display": "alfa-slab-one",
+            "values": "six-caps",
+            "clue": "bitter",
+            "chrome": "oswald"
+          },
+          "background": {
+            "kind": "image",
+            "media": { "mediaId": "0198f00d-0005-7000-8000-000000000001" },
+            "dim": 0.55
+          },
+          "effectsLevel": "dimensional",
+          "soundSet": "minimal-beeps",
+          "media": [
+            {
+              "id": "0198f00d-0005-7000-8000-000000000001",
+              "kind": "image",
+              "mime": "image/webp",
+              "bytes": 409600,
+              "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0001",
+              "alt": "Placeholder low-poly forest backdrop for the dummy theme",
+              "storage": {
+                "state": "remote",
+                "url": "https://media.example.com/fixtures/terra-pixel-backdrop.webp"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

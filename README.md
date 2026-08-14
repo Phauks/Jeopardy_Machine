@@ -30,6 +30,7 @@ Then open <http://localhost:5173/dev/echo> to see a WebSocket round-trip through
 | `apps/web/`          | SvelteKit 3 app Worker - all UI, later REST API + D1/R2                              |
 | `apps/realtime/`     | Plain Worker - `GameRoomDO`, WebSocket-only                                          |
 | `packages/protocol/` | Shared contracts: wire envelope, `ext` bag, operational limits                       |
+| `tools/avatar-bake/` | Offline pipeline that bakes the committed avatar sprites from Kenney CC0 3D packs    |
 | `docs/`              | Development guide, stamped status, dated decisions, proposals, design docs, research |
 | `CLAUDE.md`          | Conventions + hard rules (the repo's operating manual)                               |
 
@@ -49,5 +50,6 @@ SvelteKit 3 (prerelease, pinned) · Svelte 5 runes · Tailwind v4 · Cloudflare 
 
 - **Code**: [AGPL-3.0-only](LICENSE) - free to self-host, modify, and share; a hosted service built on modified code must publish its modifications (the network clause is the point: this project exists because the alternatives are paywalled). Rationale: docs/design/licensing.md.
 - **Bundled fonts**: SIL OFL 1.1, per-face texts in apps/web/static/fonts/LICENSES.md.
+- **Bundled avatar sprites**: baked from Kenney CC0 1.0 packs, provenance in apps/web/static/avatars/LICENSES.md.
 - **Bundled sounds**: CC0 only (curated pack policy - docs/design/expansion-and-boundaries.md §2.10), credits ledger kept anyway.
 - **Your content**: boards, packs, and themes you create are yours; exports carry an optional license field you control. The app claims nothing.

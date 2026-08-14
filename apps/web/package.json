@@ -18,7 +18,8 @@
   },
   "dependencies": {
     "@jeopardy/engine": "workspace:*",
-    "@jeopardy/protocol": "workspace:*"
+    "@jeopardy/protocol": "workspace:*",
+    "uqr": "catalog:"
   },
   "devDependencies": {
     "@sveltejs/adapter-cloudflare": "catalog:",
