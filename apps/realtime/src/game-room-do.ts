@@ -32,7 +32,9 @@ import { parseRoomClientMessage } from "@jeopardy/protocol/room/client-messages"
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
 import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
+import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
+import { deleteRegistryRow, touchRegistryRow } from "./room/registry-writer.ts";
 import { emptySchedule, nextWakeAt, toWireRosterEntry } from "./room/storage.ts";
 import type { GameAction } from "@jeopardy/engine/actions";
 import type { GameEvent } from "@jeopardy/engine/events";
@@ -43,6 +45,7 @@ import type { RoomClientMessage } from "@jeopardy/protocol/room/client-messages"
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
 import type { RoomRole } from "@jeopardy/protocol/room/identity";
 import type { RosterPayload, TeamDoc } from "@jeopardy/protocol/room/roster";
+import type { RegistrySnapshot } from "./room/registry-writer.ts";
 import type {
   AlarmSchedule,
   RenameLog,
@@ -54,6 +57,11 @@ import type {
 
 // What a connection remembers about itself across hibernation (WebSocket attachment).
 type Attachment = { role: RoomRole; playerId: string | null };
+
+// Floor between throttled registry writes. A lobby refreshes every
+// limits.lobby.listingRefreshMs, so reporting faster than this could never be seen anyway -
+// while a 100-phone join stampede would otherwise cost 100 D1 writes for one visible number.
+const registrySyncIntervalMs = 5000;
 
 // The loaded room bundle; null = the DO woke for a room that was never initialized (or has
 // expired) and must refuse everything except /initialize.
@@ -91,6 +99,12 @@ export class GameRoomDO extends Server {
   // the meter, which only ever errs in the client's favor.
   private messageStamps = new Map<string, number[]>();
   private lastPersistedActivity = 0;
+  // Wrong-password attempts per connection, in memory for the same reason as messageStamps:
+  // the budget only ever resets in the client's favor, and resetting it costs an attacker a
+  // fresh WebSocket handshake anyway.
+  private passwordAttempts = new Map<string, number[]>();
+  // Coalescing stamp for registry writes (see syncRegistry).
+  private lastRegistrySyncAt = 0;
 
   override onStart(): void {
     // Heartbeat auto-response: phones ping to keep venue Wi-Fi NAT mappings alive; the
@@ -146,6 +160,32 @@ export class GameRoomDO extends Server {
       this.lastPersistedActivity = room.meta.lastActivityAt;
       await this.persist("meta");
     }
+  }
+
+  // ---- registry projection --------------------------------------------------------------
+
+  private registrySnapshot(room: LoadedRoom): RegistrySnapshot {
+    return {
+      code: room.meta.code,
+      phase: room.meta.lifecycle,
+      playerCount: Object.keys(room.roster).length,
+      lastSeenAt: Date.now(),
+      expiresAt: room.meta.lastActivityAt + limits.room.idleExpiryMs,
+    };
+  }
+
+  // Report this room to the D1 registry that backs the public lobby. Coalesced like activity
+  // persistence: a 100-phone join stampede must not cost 100 D1 writes, so ordinary roster
+  // churn is throttled while phase changes (lobby -> active -> ended) always go through -
+  // those are what a browser actually reads. Failures are swallowed inside the writer: the
+  // row is a cache, and a stale row can never let anyone into a dead room.
+  private async syncRegistry(options: { force?: boolean } = {}): Promise<void> {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    const now = Date.now();
+    if (options.force !== true && now - this.lastRegistrySyncAt < registrySyncIntervalMs) return;
+    this.lastRegistrySyncAt = now;
+    await touchRegistryRow(this.env.DB, this.registrySnapshot(room));
   }
 
   private async rescheduleAlarm(): Promise<void> {
@@ -246,12 +286,18 @@ export class GameRoomDO extends Server {
       }
     }
     if (accepted.length === 0) return [];
+    const lifecycleChanged = accepted.some(
+      (event) => event.type === "game-started" || event.type === "game-over",
+    );
     room.meta.stateVersion += 1;
     room.meta.lastActivityAt = Date.now();
     this.lastPersistedActivity = room.meta.lastActivityAt;
     await this.persist("state", "meta", "schedule");
     await this.rescheduleAlarm();
     this.broadcastEngineEvents(accepted);
+    // A phase change is exactly what a lobby browser reads ("in lobby" vs "playing"), so it
+    // is never throttled; ordinary play traffic rides the coalescing window.
+    await this.syncRegistry({ force: lifecycleChanged });
     return accepted;
   }
 
@@ -319,9 +365,17 @@ export class GameRoomDO extends Server {
       const now = Date.now();
       const seed = body.data.seed ?? generateSecretToken();
       const setup = setupFromSpec(body.data.game, seed);
+      // The room password is hashed HERE, at creation, and the plaintext is never stored,
+      // logged, or echoed (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
+      const password =
+        body.data.password === undefined ? null : await hashRoomPassword(body.data.password);
       const meta: RoomMeta = {
         code: this.name,
         hostToken: generateSecretToken(),
+        visibility: body.data.visibility,
+        title: body.data.title ?? "",
+        hostLabel: body.data.hostLabel ?? "",
+        password,
         createdAt: now,
         lastActivityAt: now,
         stateVersion: 0,
@@ -355,6 +409,14 @@ export class GameRoomDO extends Server {
         { hostToken: meta.hostToken, expiresAt: now + limits.room.idleExpiryMs },
         { status: 201 },
       );
+    }
+    if (request.method === "GET" && url.pathname === "/registry-snapshot") {
+      // Ops/debug + the registry reconcile story: what this DO believes about itself right
+      // now. Reachable only through the cross-script binding (the public router forwards
+      // nothing but /room/<CODE>/ws upgrades), and it carries no secrets.
+      const room = await this.load();
+      if (room === null) return Response.json({ error: "no-such-room" }, { status: 404 });
+      return Response.json(this.registrySnapshot(room));
     }
     return Response.json({ error: "not-found" }, { status: 404 });
   }
@@ -500,6 +562,17 @@ export class GameRoomDO extends Server {
     const room = await this.load();
     if (room === null) return;
 
+    // The room password gates every role EXCEPT host: the creation token is the stronger
+    // claim, and a host locked out of their own room by a typo would be absurd. Checked
+    // BEFORE anything else a join could change, so a wrong password leaves no trace in the
+    // room (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
+    if (
+      message.role !== "host" &&
+      !(await this.admitPassword(connection, room, message.password))
+    ) {
+      return;
+    }
+
     if (message.role === "host") {
       if (message.hostToken !== room.meta.hostToken) {
         this.refuse(connection, "bad-host-token", roomCloseCodes.badToken);
@@ -630,6 +703,7 @@ export class GameRoomDO extends Server {
       this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
       this.broadcastEngineEvents(result.events);
       this.broadcastRoster();
+      await this.syncRegistry();
       return;
     }
 
@@ -639,6 +713,43 @@ export class GameRoomDO extends Server {
     connection.setState({ role: "player", playerId });
     this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
     this.broadcastRoster();
+    // The lobby's "7/100" is the one number a browser judges a room by, so a roster change
+    // reports itself (coalesced - see syncRegistry).
+    await this.syncRegistry();
+  }
+
+  // Password verdict for one join attempt. Returns true when the connection may proceed.
+  // Refusals KEEP the socket so the phone can prompt and retry (server-messages close-code
+  // note) - until the per-connection budget runs out, which closes with joinRefused.
+  private async admitPassword(
+    connection: Connection<Attachment>,
+    room: LoadedRoom,
+    offered: string | undefined,
+  ): Promise<boolean> {
+    const stored = room.meta.password;
+    if (stored === null) return true;
+    if (offered === undefined) {
+      // Not counted against the budget: the FIRST join of a password room legitimately
+      // arrives without one (the client cannot know until it is told).
+      this.refuse(connection, "password-required");
+      return false;
+    }
+    if (await verifyRoomPassword(offered, stored)) {
+      this.passwordAttempts.delete(connection.id);
+      return true;
+    }
+    const now = Date.now();
+    const stamps = (this.passwordAttempts.get(connection.id) ?? []).filter(
+      (at) => now - at < limits.room.passwordAttemptWindowMs,
+    );
+    stamps.push(now);
+    this.passwordAttempts.set(connection.id, stamps);
+    if (stamps.length >= limits.room.passwordAttemptBurstMax) {
+      this.refuse(connection, "bad-password", roomCloseCodes.joinRefused);
+      return false;
+    }
+    this.refuse(connection, "bad-password");
+    return false;
   }
 
   private welcomePlayer(
@@ -718,6 +829,7 @@ export class GameRoomDO extends Server {
     }
     await this.persist("roster", "renames", "teams", "schedule");
     this.broadcastRoster();
+    await this.syncRegistry();
   }
 
   /** Longest-tenured CONNECTED member of the team, excluding the departing leader. */
@@ -1120,6 +1232,7 @@ export class GameRoomDO extends Server {
     const room = await this.load();
     if (room === null) return;
     const now = Date.now();
+    const code = room.meta.code;
 
     // Idle expiry first: a dead room fires nothing else, frees its code, and later joins
     // get no-such-room (the storage wipe IS the un-initialization).
@@ -1131,6 +1244,10 @@ export class GameRoomDO extends Server {
       this.room = null;
       await this.ctx.storage.deleteAll();
       await this.ctx.storage.deleteAlarm();
+      // The code is free for reuse now, so its lobby row must go with it - a row outliving
+      // its room would advertise a door that answers no-such-room. If this write fails the
+      // web Worker's sweep collects the row on expires_at anyway (registry-writer.ts).
+      await deleteRegistryRow(this.env.DB, code);
       return;
     }
 

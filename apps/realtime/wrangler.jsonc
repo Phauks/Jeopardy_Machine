@@ -22,9 +22,19 @@
     // hibernation/eviction, and SQLite classes are also what the free plan includes.
     { "tag": "v1", "new_sqlite_classes": ["GameRoomDO"] },
   ],
-  // --- Bindings that arrive with later milestones, declared here so the shape is agreed ---
-  // M3+: flush final game results to the same D1 the web Worker reads (architecture doc §4).
-  // "d1_databases": [
-  //   { "binding": "DB", "database_name": "jeopardy", "database_id": "TBD-created-at-first-deploy" }
-  // ]
+  // The SAME D1 database the web Worker binds (apps/web/wrangler.jsonc) - D1 bindings are
+  // shareable, and this is how the room DO reports its own transitions (phase, roster count,
+  // close/expiry) into the registry that backs the public lobby. Rationale, alternatives
+  // considered, and the drift failure mode: docs/decisions/2026-08-14-room-visibility-and-
+  // lobby.md, "Addendum: how registry updates reach D1".
+  //
+  // The MIGRATIONS live with the web Worker (apps/web/migrations) - one owner for the schema,
+  // one apply command in the runbook. This Worker only ever writes rows.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jeopardy-machine",
+      "database_id": "c12ef3a9-1c69-4f5d-8e87-e190123a74d6",
+    },
+  ],
 }

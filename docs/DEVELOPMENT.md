@@ -34,6 +34,14 @@ runs BOTH Workers in one process with the `GAME_ROOM` binding live (`Durable Obj
 - **Browser:** open <http://localhost:8788/dev/echo> - the room harness. "Create room (sample game)" allocates a code via the create route and fills it in; Connect + "Join as host/player/spectator" speak the real room protocol; "Connect to uncreated room" is a one-click PASS/FAIL probe that connects-never-create holds; Ping rides the runtime auto-response (hibernation check).
 - **Bots:** `pnpm -F @jeopardy/bots bots -- --origin http://localhost:8788 --create --count 5 --host` plays a bots-only game to game-over through the single origin (packages/bots/README.md).
 
+**Local D1 (the room registry, 2026-08-14):** the public lobby reads a `rooms` table in D1; both Workers bind the same database and the schema lives in `apps/web/migrations/`. Create it in the local simulated D1 once per state directory:
+
+```sh
+npx wrangler d1 migrations apply jeopardy-machine --local -c apps/web/wrangler.jsonc
+```
+
+Run it before the multi-config loop above (the two Workers share one `.wrangler` state directory there, so one apply covers both). Skipping it is not fatal - rooms create and join normally, `GET /api/rooms` just answers an empty lobby and the Worker logs a registry warning; that is exactly how an unapplied production migration behaves, on purpose. The realtime test suite applies these same migration files to its own simulated D1 (`apps/realtime/test/apply-migrations.ts`), which is what keeps the DO's registry statements honest against the web app's schema.
+
 **Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and the avatar picker/chips with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change. The avatar sprites themselves are baked, not live-rendered - changing avatars/accents means re-running `tools/avatar-bake` (its README).
 
 **Engine smoke check (M2 exit criteria):** <http://localhost:5173/dev/hotseat> plays a complete game against `@jeopardy/engine` with no server - one keyboard drives host and players (S start, click cells, A arms, 1-8 buzz, C/W/N judge, E expires whichever timer the phase waits on, U undoes anything). Wager cells, the final round, and sudden-death ties are all reachable; the key legend is on the page.

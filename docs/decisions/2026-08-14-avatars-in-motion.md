@@ -8,11 +8,11 @@ Fair challenge. The bake decision (docs/research/00-user-directives.md, avatar s
 
 ## Decision - three tiers, by surface
 
-| Surface | Representation | Why |
-|---|---|---|
-| **Chips** (roster rows, buzz banner, score strip, player lists, phones) | Baked static webp sprite (exists: 216 sprites) | Dozens on screen at once, 24-48 px, must render on a 5-year-old phone with no WebGL cost |
-| **Your own avatar on your own phone** (join preview, lobby "you're in" card) | **Animated sprite sheet** of the walk/idle cycle (webp animation or a strip + CSS steps) | It moves - the identity moment - but costs no three.js payload on a device that exists to buzz. ~8-12 frames per avatar, one avatar shown |
-| **The room diorama** (big-screen lobby, interstitials, winner scene) | **Live three.js with the real GLB models**, walk/run clips, in a Kenney world kit | One device (the display), plugged in, driving a projector. This is where "players live in a world" actually happens - pets wandering a forest/pirate deck while the room fills |
+| Surface                                                                      | Representation                                                                           | Why                                                                                                                                                                            |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Chips** (roster rows, buzz banner, score strip, player lists, phones)      | Baked static webp sprite (exists: 216 sprites)                                           | Dozens on screen at once, 24-48 px, must render on a 5-year-old phone with no WebGL cost                                                                                       |
+| **Your own avatar on your own phone** (join preview, lobby "you're in" card) | **Animated sprite sheet** of the walk/idle cycle (webp animation or a strip + CSS steps) | It moves - the identity moment - but costs no three.js payload on a device that exists to buzz. ~8-12 frames per avatar, one avatar shown                                      |
+| **The room diorama** (big-screen lobby, interstitials, winner scene)         | **Live three.js with the real GLB models**, walk/run clips, in a Kenney world kit        | One device (the display), plugged in, driving a projector. This is where "players live in a world" actually happens - pets wandering a forest/pirate deck while the room fills |
 
 The GLB models therefore **ship as static assets** (they were only downloaded for baking before, never committed - that was the actual mistake). Cube Pets are ~700-900 tris and a shared 8.7 KB palette texture; 27 models is a trivial payload for a display device that loads once.
 

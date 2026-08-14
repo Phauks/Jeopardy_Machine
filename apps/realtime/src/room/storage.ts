@@ -18,13 +18,24 @@
 //               succession, room expiry); the ONE runtime alarm is always min() of these
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 import type { RosterEntry, TeamDoc } from "@jeopardy/protocol/room/roster";
+import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
 import type { GameActionType } from "@jeopardy/engine/actions";
+import type { StoredRoomPassword } from "./password.ts";
 
 export type RoomLifecycle = "lobby" | "active" | "ended";
 
 export type RoomMeta = {
   code: string;
   hostToken: string;
+  // Listing + entry, the two independent axes of docs/decisions/2026-08-14-room-visibility-
+  // and-lobby.md. `visibility` decides whether the registry row is browsable; `password` is
+  // the salted hash of the shared room secret (null = an open room). The hash lives HERE and
+  // only here - the registry row carries has_password and nothing else, so the lobby can
+  // never be used as a password oracle.
+  visibility: RoomVisibility;
+  title: string;
+  hostLabel: string;
+  password: StoredRoomPassword | null;
   createdAt: number;
   // Bumped (coalesced - see the DO's touchActivity) on connects and messages; expiry
   // compares against limits.room.idleExpiryMs.

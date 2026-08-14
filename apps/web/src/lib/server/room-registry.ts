@@ -1,0 +1,165 @@
+// The room registry repository - the ONLY place the web Worker touches the `rooms` D1 table
+// (migrations/0001_create_rooms.sql is that table's canonical schema).
+//
+// SERVER-ONLY: nothing under src/lib/server may be imported from a component; the D1 binding
+// exists solely inside the Worker. Every statement is parameterized - room codes and
+// host-supplied titles are untrusted input, and string-built SQL is how a lobby becomes an
+// injection surface.
+//
+// Contract with the rest of the system (docs/decisions/2026-08-14-room-visibility-and-lobby.md):
+// - rows are a CACHE of DO truth, so every read filters on liveness (phase, ended_at,
+//   expires_at) instead of believing what it finds;
+// - writes are BEST EFFORT - a failed registry write must never fail a room creation or a
+//   join, it may only cost a lobby row (the caller decides, see the route handlers);
+// - the room DO writes this same table directly through its own D1 binding
+//   (apps/realtime/src/room/registry-writer.ts holds its three statements; the realtime
+//   workerd suite runs them against THIS migration so a column rename cannot drift silently).
+import { limits } from "@jeopardy/protocol/limits";
+import type { RoomSummary } from "@jeopardy/protocol/room/registry";
+import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
+
+// The sliver of D1 this module uses, typed structurally for the same reason App.Platform is
+// (src/app.d.ts): pulling @cloudflare/workers-types into a DOM-lib SvelteKit app trades a few
+// lines of shape for a world of lib conflicts. Shapes match D1Database/D1PreparedStatement.
+export type RegistryStatement = {
+  bind(...values: unknown[]): RegistryStatement;
+  run(): Promise<unknown>;
+  all<Row>(): Promise<{ results: Row[] }>;
+};
+export type RegistryDatabase = {
+  prepare(query: string): RegistryStatement;
+  batch(statements: RegistryStatement[]): Promise<unknown[]>;
+};
+
+// What the create route knows at insert time. `expiresAt` comes from the DO's answer, so the
+// row's delisting deadline is the room's real one rather than a second guess at it.
+export type RoomRegistration = {
+  code: string;
+  title: string;
+  hostLabel: string;
+  visibility: RoomVisibility;
+  hasPassword: boolean;
+  createdAt: number;
+  expiresAt: number;
+};
+
+type RoomRow = {
+  code: string;
+  title: string;
+  host_label: string;
+  visibility: string;
+  has_password: number;
+  phase: string;
+  player_count: number;
+  player_cap: number;
+  created_at: number;
+  last_seen_at: number;
+  expires_at: number;
+};
+
+// A code is reusable once its room expires (single-origin decision doc, lifecycle), so the
+// insert must be able to land on a stale row for the same code - upsert, not insert.
+const upsertSql = `INSERT INTO rooms
+  (code, title, host_label, visibility, has_password, phase, player_count, player_cap,
+   created_at, last_seen_at, expires_at, ended_at)
+  VALUES (?, ?, ?, ?, ?, 'lobby', 0, ?, ?, ?, ?, NULL)
+  ON CONFLICT(code) DO UPDATE SET
+    title = excluded.title,
+    host_label = excluded.host_label,
+    visibility = excluded.visibility,
+    has_password = excluded.has_password,
+    phase = 'lobby',
+    player_count = 0,
+    player_cap = excluded.player_cap,
+    created_at = excluded.created_at,
+    last_seen_at = excluded.last_seen_at,
+    expires_at = excluded.expires_at,
+    ended_at = NULL`;
+
+// Live public rooms, newest first. Liveness is asserted here rather than trusted: a room the
+// DO stopped reporting on delists itself when its expiry deadline passes, and `ended` rooms
+// never appear even if the sweep has not run yet.
+const listSql = `SELECT code, title, host_label, visibility, has_password, phase,
+    player_count, player_cap, created_at, last_seen_at, expires_at
+  FROM rooms
+  WHERE visibility = 'public'
+    AND ended_at IS NULL
+    AND phase IN ('lobby', 'active')
+    AND expires_at > ?
+  ORDER BY created_at DESC
+  LIMIT ?`;
+
+// The reconcile sweep the decision doc promises: rows outlive their rooms whenever a DO dies
+// without a clean shutdown (D1 hiccup, eviction mid-write). Nothing here is authoritative, so
+// deleting anything past its deadline is always safe.
+const sweepSql = `DELETE FROM rooms WHERE expires_at <= ?`;
+
+const deleteSql = `DELETE FROM rooms WHERE code = ?`;
+
+export function registerRoom(
+  database: RegistryDatabase,
+  registration: RoomRegistration,
+): Promise<unknown> {
+  return database
+    .prepare(upsertSql)
+    .bind(
+      registration.code,
+      registration.title,
+      registration.hostLabel,
+      registration.visibility,
+      registration.hasPassword ? 1 : 0,
+      limits.room.playerSoftCap,
+      registration.createdAt,
+      registration.createdAt,
+      registration.expiresAt,
+    )
+    .run();
+}
+
+export async function listPublicRooms(
+  database: RegistryDatabase,
+  now: number,
+  listingMax: number = limits.lobby.listingMax,
+): Promise<RoomSummary[]> {
+  // The cap is an operational limit, not a caller preference: hosts (and callers) cannot
+  // lift it, so a hand-written `?limit=500` cannot turn a browse surface into a scraper feed.
+  const cap = Math.min(Math.max(Math.trunc(listingMax), 1), limits.lobby.listingMax);
+  const { results } = await database.prepare(listSql).bind(now, cap).all<RoomRow>();
+  return results.map(toRoomSummary);
+}
+
+/** Delete rows whose room's expiry deadline has passed. Returns nothing useful by design. */
+export function sweepExpiredRooms(database: RegistryDatabase, now: number): Promise<unknown> {
+  return database.prepare(sweepSql).bind(now).run();
+}
+
+/** Host delisting a room, and the cleanup path when a create attempt is rolled back. */
+export function forgetRoom(database: RegistryDatabase, code: string): Promise<unknown> {
+  return database.prepare(deleteSql).bind(code).run();
+}
+
+// D1 has no booleans and stores our phases as text; the row shape is infrastructure and the
+// summary is the wire contract, so the conversion lives here and nowhere else.
+function toRoomSummary(row: RoomRow): RoomSummary {
+  return {
+    code: row.code,
+    title: row.title,
+    hostLabel: row.host_label,
+    visibility: row.visibility === "public" ? "public" : "unlisted",
+    hasPassword: row.has_password !== 0,
+    phase: row.phase === "active" ? "active" : row.phase === "ended" ? "ended" : "lobby",
+    playerCount: row.player_count,
+    playerCap: row.player_cap,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at,
+  };
+}
+
+// Exported for the schema-drift gate test (src/lib/server/room-registry.test.ts), which reads
+// the migration and asserts every column these statements name really exists.
+export const registryStatements = {
+  upsert: upsertSql,
+  list: listSql,
+  sweep: sweepSql,
+  delete: deleteSql,
+} as const;

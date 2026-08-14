@@ -33,6 +33,22 @@ wrangler r2 bucket create jeopardy-media
 
 Durable Objects need **no manual creation** - the `GameRoomDO` namespace is created automatically by the migration block in apps/realtime/wrangler.jsonc on first deploy.
 
+### 2a. Apply the D1 schema (owner-run; required for the public lobby)
+
+D1 has its first real use as of 2026-08-14: the **room registry** that backs the public lobby (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Its schema lives in `apps/web/migrations/` and is applied with wrangler's migration tool - by hand, by the owner, never by CI or an agent session:
+
+```sh
+# see what would run
+npx wrangler d1 migrations list jeopardy-machine --remote -c apps/web/wrangler.jsonc
+
+# apply (repeat after any new file lands in apps/web/migrations/)
+npx wrangler d1 migrations apply jeopardy-machine --remote -c apps/web/wrangler.jsonc
+```
+
+Both Workers bind this database (web writes/reads, the room DO reports its own transitions - see the decision's addendum), but the migration is applied **once**, through the web config that owns the schema.
+
+If the migration is never applied, nothing breaks: `POST /api/rooms` still creates rooms and every join still works - `GET /api/rooms` just answers an empty lobby and the Worker logs a registry warning. Rooms are usable by code from day one; the lobby is the thing that switches on here.
+
 ### 2b. Dashboard path (equivalent - owner prefers dash.cloudflare.com)
 
 Both resources can be created in the dashboard instead of the CLI; the _only_ CLI-ish step that remains is pasting one ID into config:
@@ -129,7 +145,8 @@ Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate
 - [ ] Plan decided (free is fine; $5 removes doubt)
 - [ ] `wrangler login` done locally
 - [ ] workers.dev subdomain claimed
-- [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name)
+- [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name); the same id is bound in apps/realtime/wrangler.jsonc since 2026-08-14
+- [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it
 - [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
 - [ ] realtime deployed, then web; echo page verified
 - [ ] (optional) scoped API token added to agent environment

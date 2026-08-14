@@ -30,15 +30,22 @@
       },
     ],
   },
-  // Provisioned by owner via dashboard 2026-08-13. Server code starts using DB in M8/phase-2
-  // (library stays IndexedDB-first until then) and MEDIA in M5 (Worker-proxied uploads with
-  // limits from @jeopardy/protocol/limits) - bound now so deploys carry them from day one.
+  // Provisioned by owner via dashboard 2026-08-13. DB's FIRST real use is the room registry
+  // (docs/decisions/2026-08-14-room-visibility-and-lobby.md): the `rooms` table backing the
+  // public lobby, created by migrations/0001_create_rooms.sql. The realtime Worker binds the
+  // SAME database (apps/realtime/wrangler.jsonc) so the room DO can report its own
+  // transitions - see that decision's registry-update addendum. The library keeps its
+  // IndexedDB-first story until M8; MEDIA arrives in M5 (Worker-proxied uploads with limits
+  // from @jeopardy/protocol/limits).
   // NOTE: confirm database_name matches the name chosen in the dashboard (id is authoritative).
+  // Migrations are applied by hand from the runbook (docs/cloudflare-setup.md) - never by CI,
+  // never by an agent session.
   "d1_databases": [
     {
       "binding": "DB",
       "database_name": "jeopardy-machine",
       "database_id": "c12ef3a9-1c69-4f5d-8e87-e190123a74d6",
+      "migrations_dir": "migrations",
     },
   ],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "jeopardy-machine-media" }],

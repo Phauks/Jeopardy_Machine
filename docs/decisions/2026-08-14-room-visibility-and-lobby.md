@@ -54,6 +54,30 @@ Server-browser conventions we adopt: lock icons for password rooms, capacity fra
 - Global cap on listed rooms per query, newest-first, with pagination deferred.
 - No free-text chat anywhere in the product, so the lobby cannot become a message board.
 
+## Addendum 2026-08-14 (implementation): how registry updates reach D1
+
+The decision above says the registry is "refreshed by the DO on meaningful transitions" without saying how a Durable Object - which cannot import the web app - performs a D1 write. Three mechanisms were available; **the realtime Worker binds the same D1 database and the DO writes its own rows** (`apps/realtime/src/room/registry-writer.ts`, three statements: touch, end, delete).
+
+| Option                                                              | Why not / why                                                                                                                                                                                                                                                                                                                                 |     |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| DO -> web Worker over a **service binding** to an internal endpoint | Rejected. Web already binds this Worker's DO namespace, so this adds a **circular binding** (awkward first deploy), a network hop on every transition, and an internal write endpoint that needs a shared secret - a new trust boundary and a new secret to rotate, bought for nothing.                                                       |
+| **Web owns all writes**, riding the routes it already touches       | Rejected: it cannot see the events. Phase changes, roster counts and expiry all happen INSIDE the DO with no HTTP request to piggyback on; the registry would be accurate only about rooms nobody has joined yet.                                                                                                                             |
+| **Shared D1 binding** (chosen)                                      | D1 bindings are shareable; a DO writing D1 is ordinary. No new secret, no new hop, no binding cycle - the realtime Worker simply gains `DB` pointing at the same `database_id`. Schema ownership stays singular: the migration lives in `apps/web/migrations`, the web repository is the full one, and this Worker only ever UPDATEs/DELETEs. |
+
+**Write policy.** Roster-count churn is coalesced (5s floor - a 100-phone join stampede must not cost 100 D1 writes for one visible number); phase changes (`lobby -> active -> ended`) are never throttled, because the phase badge is what a browser reads. The expiry alarm deletes the row as it frees the code. Every write is wrapped and swallowed: a registry failure may cost a lobby row, never a room or a join.
+
+**Failure mode: registry drift.** A row can outlive its room (D1 error, eviction between transition and write, unapplied migration) or lag it (coalescing). Three things make that survivable rather than dangerous:
+
+1. **Rows are a cache, never authority.** The DO refuses `no-such-room` on connect regardless of what any row claims - held by a test that lists a live row for a room that was never created.
+2. **The listing query asserts liveness instead of trusting it** (`ended_at IS NULL`, phase in lobby/active, `expires_at > now`), so a row nobody cleaned up delists itself on schedule.
+3. **A reconcile sweep** deletes rows past their deadline; it runs on the create path (rare) rather than the lobby path (constant), and needs no coordination with any DO because a row past its expiry can never be valid.
+
+**Drift between the two Workers' SQL** is gated, not trusted: the realtime workerd suite applies `apps/web/migrations/*.sql` to a real local D1 and runs the DO's statements against it, and a web-side gate parses the same migration and asserts no repository statement names a column it does not define.
+
+**Password crypto.** PBKDF2-HMAC-SHA256, 100k iterations, 16-byte random salt, 32-byte derived key, verified in constant time (`apps/realtime/src/room/password.ts`). workerd's SubtleCrypto has PBKDF2 natively and has neither scrypt nor argon2, which settles the choice; a plain salted SHA-256 would be free to attack offline, while 100k iterations costs one join a few tens of milliseconds of DO CPU. The hash lives only in DO storage - the registry stores `has_password` and nothing else.
+
+**Password on the wire** rides the `join` MESSAGE, never a URL or query string: room links are pasted into group chats and printed onto QR codes, and a secret in a URL lands in history, referrers and access logs. Password refusals keep the socket (retry in place); the connection that burns `limits.room.passwordAttemptBurstMax` attempts is closed with the existing join-refusal code.
+
 ## Consequences
 
 - **D1 gets its first real use** (it was bound but idle) - the registry table plus a migration file; `wrangler d1 migrations` becomes part of the deploy runbook.
