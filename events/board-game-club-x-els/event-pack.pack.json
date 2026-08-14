@@ -1,0 +1,1890 @@
+{
+  "format": "content-pack",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Event Night Pool - Board Game Club x Environmental Law Society",
+    "author": "Jeopardy Machine content agents (owner curation pending)",
+    "license": "CC0-1.0 (clue text); referenced media carry per-file licenses in ext",
+    "created": "2026-08-14T17:00:00.000Z",
+    "modified": "2026-08-14T17:00:00.000Z"
+  },
+  "ext": {
+    "com.jeopardy-machine.library-id": "01a00137-5af6-75a7-93ab-8588a672a078",
+    "com.jeopardy-machine.event.media-verification": {
+      "01a00137-5a81-74f4-b4af-f3c3514b0b15": {
+        "imageId": "img-01",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Spring_Old_Faithful_eruption_from_Observation_Point.jpg",
+        "author": "Yellowstone National Park (NPS)",
+        "license": "Public domain",
+        "commonsSha1": "8f1d6903c28e8275d5d3eca2e9e4f2f7d68ea4fa",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "8688x5792. Original is 37.2 MB - exceeds the 10 MiB image cap in @jeopardy/protocol/limits; downscale/recompress at acquisition (2560 px long edge is plenty)."
+      },
+      "01a00137-5a82-780a-afee-898bbee378c5": {
+        "imageId": "img-02",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Half_dome_in_Yosemite_national_park.jpg",
+        "author": "Gentry George, U.S. Fish and Wildlife Service",
+        "license": "Public domain",
+        "commonsSha1": "ce57610995acccd2d0bd10827abf48016b24f91b",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "3380x5048, portrait - check the crop on a 16:9 projector before event night."
+      },
+      "01a00137-5a83-7df0-9e30-6ad611a6f3a7": {
+        "imageId": "img-03",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_(18686376391).jpg",
+        "author": "NPS / Damon Joyce",
+        "license": "Public domain",
+        "commonsSha1": "bb2650c4ee93c2919dd06b3259d8ff48c67f961b",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "2000x1500 - clears the 1920 px projection target."
+      },
+      "01a00137-5a84-7884-925d-c18d6b2cb7ac": {
+        "imageId": "img-04",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Crater_Lake_from_rim-USGS.jpg",
+        "author": "USGS / Lyn Topinka",
+        "license": "Public domain",
+        "commonsSha1": "a9d4dd56d765ddef39dab20b0c8385a884e2ff56",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "3275x2160. Media doc flag: confirm visually that Wizard Island is prominent before locking."
+      },
+      "01a00137-5a85-7cf9-9d73-5b8852a3b233": {
+        "imageId": "img-05",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Sunset_over_an_interdunal_area_(fc947575-155d-451f-67bd-cd7fbd10c9ce).JPG",
+        "author": "NPS Photo",
+        "license": "Public domain",
+        "commonsSha1": "0029f1f2a1100ea7b0a31d39eab6973c96a4a240",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "3648x2736. Media doc flag: confirm dunes (not just sky) dominate the frame."
+      },
+      "01a00137-5a86-7e1a-944b-bd648d780c1d": {
+        "imageId": "img-06",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Aerial_image_of_Grand_Prismatic_Spring_(view_from_the_south).jpg",
+        "author": "Carsten Steger",
+        "license": "CC BY-SA 4.0",
+        "commonsSha1": "8d2225977948dd70a6ea25623c70c5ba71114f73",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "4800x3400. BENCH swap for img-01 (same answer). CC BY-SA: if this ships, the credits slide is mandatory (TASL row in README)."
+      },
+      "01a00137-5a87-7fae-bc97-a922a14636e9": {
+        "imageId": "img-07",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Denali,_Denali_National_Park_and_Preserve.jpg",
+        "author": "NPS Photo / Emily Mesner",
+        "license": "Public domain",
+        "commonsSha1": "dee2f47df2108193f4335efe83b79ad2db4cc2a8",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "7222x4820. BENCH image (answer: Denali). Just under the 10 MiB cap; recompress anyway at acquisition."
+      },
+      "01a00137-5a88-726d-b565-1dd8bd05d422": {
+        "imageId": "img-08",
+        "filePage": "https://commons.wikimedia.org/wiki/File:Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg",
+        "author": "Jon Zander (Digon3)",
+        "license": "CC BY-SA 3.0",
+        "commonsSha1": "43f415b696f022c09921e0a7e2bedf5832cbe208",
+        "verified": "2026-08-14",
+        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "note": "3827x1570 panorama. BENCH image (answer: Bryce Canyon). CC BY-SA: credits slide mandatory if shipped."
+      }
+    }
+  },
+  "body": {
+    "items": [
+      {
+        "id": "01a00137-5a89-79ef-9fd4-1ff9791b5b62",
+        "type": "basic",
+        "prompt": {
+          "text": "Elizabeth Hargrave's 2019 hit about attracting birds to your wildlife preserve."
+        },
+        "answer": {
+          "canonical": "Wingspan",
+          "accepted": []
+        },
+        "tags": ["birds-meeples-eggs", "pool-a-1", "board", "round-1"],
+        "difficulty": 1,
+        "source": "stonemaiergames.com (Stonemaier Games product page)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8a-7202-a476-a8bbbee9016b",
+        "type": "basic",
+        "prompt": {
+          "text": "Wingspan players store food tokens in a dice tower shaped like this backyard object."
+        },
+        "answer": {
+          "canonical": "A birdfeeder",
+          "accepted": ["birdfeeder", "bird feeder", "bird house feeder"]
+        },
+        "tags": ["birds-meeples-eggs", "pool-a-5", "board", "round-1"],
+        "difficulty": 2,
+        "source": "Stonemaier Games product description",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8b-7508-8ab1-0cd9858429d0",
+        "type": "basic",
+        "prompt": {
+          "text": "Wingspan's base deck has 170 cards, each depicting a unique bird from this continent."
+        },
+        "answer": {
+          "canonical": "North America",
+          "accepted": []
+        },
+        "tags": ["birds-meeples-eggs", "pool-a-2", "board", "round-1"],
+        "difficulty": 3,
+        "source": "Stonemaier Games / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8c-7797-8687-d2c5ee0ebfc5",
+        "type": "basic",
+        "prompt": {
+          "text": "In 2019 Wingspan won this \"expert\" sibling of the Spiel des Jahres."
+        },
+        "answer": {
+          "canonical": "The Kennerspiel des Jahres",
+          "accepted": ["Kennerspiel"]
+        },
+        "tags": ["birds-meeples-eggs", "pool-a-3", "board", "round-1"],
+        "difficulty": 4,
+        "source": "spiel-des-jahres.de",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8d-78a3-94b9-b07256f9cf78",
+        "type": "basic",
+        "prompt": {
+          "text": "Hargrave built Wingspan's bird data starting from this free Cornell-affiliated citizen-science database she used as a birder."
+        },
+        "answer": {
+          "canonical": "eBird",
+          "accepted": []
+        },
+        "tags": ["birds-meeples-eggs", "pool-a-4", "board", "round-1", "recheck"],
+        "difficulty": 5,
+        "source": "Hargrave interviews (meeplemountain.com) - confirm exact phrasing pre-event",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8e-7600-b97c-83f8004347e8",
+        "type": "basic",
+        "prompt": {
+          "text": "Wingspan won the 2019 Kennerspiel under this German name, meaning \"wing beat\"."
+        },
+        "answer": {
+          "canonical": "Fluegelschlag (Flügelschlag)",
+          "accepted": ["Flügelschlag", "Fluegelschlag"]
+        },
+        "tags": ["birds-meeples-eggs", "pool-n-84", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "spiel-des-jahres.de",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a8f-7d2a-9521-c45d7f78d0bb",
+        "type": "basic",
+        "prompt": {
+          "text": "Wingspan's first expansion added 81 new birds from this continent, including the common swift and Eurasian magpie."
+        },
+        "answer": {
+          "canonical": "Europe",
+          "accepted": []
+        },
+        "tags": ["birds-meeples-eggs", "pool-new-a1", "bench", "round-1"],
+        "difficulty": 3,
+        "source": "Stonemaier store page + Wingsplain card list, both confirming 81 European bird cards (verified 2026-08-13)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a90-71ff-9f8b-da97770d2571",
+        "type": "basic",
+        "prompt": {
+          "text": "This 2022 Spiel des Jahres winner by Randy Flynn has players tiling a Pacific Northwest ecosystem with bears, salmon and elk."
+        },
+        "answer": {
+          "canonical": "Cascadia",
+          "accepted": []
+        },
+        "tags": ["games-gone-wild", "pool-b-6", "board", "round-1"],
+        "difficulty": 1,
+        "source": "spiel-des-jahres.de",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a91-7f4d-9038-97960195a0a4",
+        "type": "basic",
+        "prompt": {
+          "text": "Cascadia's title refers to a bioregion of this corner of North America."
+        },
+        "answer": {
+          "canonical": "The Pacific Northwest",
+          "accepted": []
+        },
+        "tags": ["games-gone-wild", "pool-b-7", "board", "round-1"],
+        "difficulty": 2,
+        "source": "Wikipedia. Ordering constraint: must stay BELOW the Cascadia clue - its text spoils this answer if reversed",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a92-7769-be5f-f4dfc2cca0e0",
+        "type": "basic",
+        "prompt": {
+          "text": "In Photosynthesis, a rotating 3D version of this celestial object determines which trees score light points."
+        },
+        "answer": {
+          "canonical": "The sun",
+          "accepted": []
+        },
+        "tags": ["games-gone-wild", "pool-b-8", "board", "round-1"],
+        "difficulty": 3,
+        "source": "blueorangegames.eu",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a93-7715-a4be-bbb608c1de97",
+        "type": "basic",
+        "prompt": {
+          "text": "Mathias Wigge's 2021 heavyweight Ark Nova has you building one of these institutions while funding conservation projects."
+        },
+        "answer": {
+          "canonical": "A zoo",
+          "accepted": []
+        },
+        "tags": ["games-gone-wild", "pool-b-10", "board", "round-1"],
+        "difficulty": 4,
+        "source": "BoardGameGeek / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a94-785c-9460-a3291a25933b",
+        "type": "basic",
+        "prompt": {
+          "text": "Terraforming Mars corporations raise Mars' temperature, oxygen and this third global parameter measured in ocean tiles."
+        },
+        "answer": {
+          "canonical": "Oceans (water)",
+          "accepted": ["water", "ocean coverage"]
+        },
+        "tags": ["games-gone-wild", "pool-b-12", "board", "round-1", "recheck"],
+        "difficulty": 5,
+        "source": "Terraforming Mars rules - confirm exact rulebook wording pre-event",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a95-7632-8707-93f237b60785",
+        "type": "basic",
+        "prompt": {
+          "text": "Keymaster Games' PARKS uses artwork licensed from this print series that commissioned poster artists for each US national park."
+        },
+        "answer": {
+          "canonical": "The Fifty-Nine Parks Print Series",
+          "accepted": []
+        },
+        "tags": ["games-gone-wild", "pool-b-9", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "59parks.net",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a96-76d7-b693-5f4ffa10b546",
+        "type": "basic",
+        "prompt": {
+          "text": "Living Forest, about protecting a forest from fire, won this award in 2022 - the same year Cascadia took the family prize."
+        },
+        "answer": {
+          "canonical": "The Kennerspiel des Jahres",
+          "accepted": ["Kennerspiel"]
+        },
+        "tags": ["games-gone-wild", "pool-b-11", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "BGG News (2022 awards)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a97-787a-ae9e-77f28b68d2a4",
+        "type": "basic",
+        "prompt": {
+          "text": "Established 1872, it's the first national park in the US (and by most accounts, the world)."
+        },
+        "answer": {
+          "canonical": "Yellowstone",
+          "accepted": []
+        },
+        "tags": ["park-rangers", "pool-g-39", "board", "round-1"],
+        "difficulty": 1,
+        "source": "NPS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a98-7ae5-b171-57db5228ff7d",
+        "type": "basic",
+        "prompt": {
+          "text": "With 12.2 million visits in 2024 - nearly triple #2 Zion - it's perennially America's most-visited national park."
+        },
+        "answer": {
+          "canonical": "Great Smoky Mountains",
+          "accepted": []
+        },
+        "tags": ["park-rangers", "pool-g-41", "board", "round-1", "recheck"],
+        "difficulty": 2,
+        "source": "NPS 2024 visitation data. RECHECK: 2025 numbers likely published by event night",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a99-75c6-9708-924cc15a1857",
+        "type": "basic",
+        "prompt": {
+          "text": "At 13.2 million acres - six Yellowstones - this Alaska park is America's largest."
+        },
+        "answer": {
+          "canonical": "Wrangell-St. Elias",
+          "accepted": ["Wrangell Saint Elias"]
+        },
+        "tags": ["park-rangers", "pool-g-40", "board", "round-1"],
+        "difficulty": 3,
+        "source": "nps.gov/wrst (\"America's Largest National Park\")",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9a-7c23-8211-797ac1a0581f",
+        "type": "basic",
+        "prompt": {
+          "text": "Kentucky's Mammoth Cave is the world's longest known cave system, with more than this many miles mapped (nearest hundred)."
+        },
+        "answer": {
+          "canonical": "400+ miles (426 mapped)",
+          "accepted": ["400", "400 miles"]
+        },
+        "tags": ["park-rangers", "pool-g-43", "board", "round-1", "recheck"],
+        "difficulty": 4,
+        "source": "NPS. RECHECK: survey teams add mapped miles every year",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9b-72fb-89c5-57326ad6c3d6",
+        "type": "basic",
+        "prompt": {
+          "text": "Old Faithful erupts about every 90 minutes; rangers predict eruptions within plus-or-minus 10 minutes with about this accuracy."
+        },
+        "answer": {
+          "canonical": "About 90 percent",
+          "accepted": ["90%", "ninety percent"]
+        },
+        "tags": ["park-rangers", "pool-g-44", "board", "round-1", "recheck"],
+        "difficulty": 5,
+        "source": "nps.gov. RECHECK: NPS occasionally revises the prediction stats",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9c-7d51-94fa-73bfe3740d2b",
+        "type": "basic",
+        "prompt": {
+          "text": "At 1,943 feet, this Oregon caldera lake is the deepest in the United States."
+        },
+        "answer": {
+          "canonical": "Crater Lake",
+          "accepted": []
+        },
+        "tags": ["park-rangers", "pool-g-42", "bench", "round-1"],
+        "difficulty": 3,
+        "source": "NPS. CONFLICT: answer duplicates picture cell img-04 - use only if that image is swapped out",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9d-76e8-8662-c8e9736ca000",
+        "type": "basic",
+        "prompt": {
+          "text": "Death Valley's Furnace Creek officially recorded Earth's hottest temperature, 134 degrees Fahrenheit, in this decade - though many meteorologists now dispute the reading."
+        },
+        "answer": {
+          "canonical": "The 1910s (1913)",
+          "accepted": ["1910s", "1913"]
+        },
+        "tags": ["park-rangers", "pool-g-45", "bench", "round-1", "recheck"],
+        "difficulty": 3,
+        "source": "WMO official record; disputed per 2026 BAMS study - host MUST say \"officially recorded\" (pool flag 7)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9e-759b-990b-3e3cc1e22147",
+        "type": "basic",
+        "prompt": {
+          "text": "The largest animal ever known to live - its tongue can weigh as much as an elephant."
+        },
+        "answer": {
+          "canonical": "The blue whale",
+          "accepted": []
+        },
+        "tags": ["animal-record-holders", "pool-h-46", "board", "round-1"],
+        "difficulty": 1,
+        "source": "NOAA Fisheries",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5a9f-7ea8-beec-d6f8d61fcc76",
+        "type": "basic",
+        "prompt": {
+          "text": "Fastest animal on Earth: this raptor's hunting dive has been measured at 242 mph."
+        },
+        "answer": {
+          "canonical": "The peregrine falcon",
+          "accepted": []
+        },
+        "tags": ["animal-record-holders", "pool-h-48", "board", "round-1"],
+        "difficulty": 2,
+        "source": "Guinness World Records / Britannica",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa0-7de1-8d12-84d5fdcf2a46",
+        "type": "basic",
+        "prompt": {
+          "text": "A blue whale's 400-lb heart pumps roughly this many gallons of blood per beat - a bathtub's worth."
+        },
+        "answer": {
+          "canonical": "About 60 gallons",
+          "accepted": ["60", "60 gallons"]
+        },
+        "tags": ["animal-record-holders", "pool-h-47", "board", "round-1"],
+        "difficulty": 3,
+        "source": "NOAA Fisheries",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa1-73e7-a591-2343411be16f",
+        "type": "basic",
+        "prompt": {
+          "text": "A 2016 Science study of eye-lens radiocarbon found this Arctic shark is the longest-lived vertebrate - at least 272 years."
+        },
+        "answer": {
+          "canonical": "The Greenland shark",
+          "accepted": []
+        },
+        "tags": ["animal-record-holders", "pool-h-49", "board", "round-1"],
+        "difficulty": 4,
+        "source": "Science (2016). CONFLICT: if Final alternate B is chosen, swap this cell to bench h-51",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa2-7b9f-ba07-5fafb446e50f",
+        "type": "basic",
+        "prompt": {
+          "text": "Monarch butterflies fly up to 3,000 miles to overwinter in Mexico's forests of this \"sacred fir\"."
+        },
+        "answer": {
+          "canonical": "The oyamel (fir)",
+          "accepted": ["oyamel", "oyamel fir"]
+        },
+        "tags": ["animal-record-holders", "pool-h-50", "board", "round-1"],
+        "difficulty": 5,
+        "source": "USFS / USFWS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa3-7b7a-aae9-5b5053af2294",
+        "type": "basic",
+        "prompt": {
+          "text": "The monarchs that reach Mexico have never been there - they're roughly this many generations removed from the ones that left."
+        },
+        "answer": {
+          "canonical": "Three to four generations (the great-/great-great-grandchildren)",
+          "accepted": ["3-4 generations", "three or four generations", "great-great-grandchildren"]
+        },
+        "tags": ["animal-record-holders", "pool-h-51", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "National Geographic / USFS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa4-7e98-a2b9-243f92e1eccd",
+        "type": "basic",
+        "prompt": {
+          "text": "Before Mario, this company was founded in Kyoto in 1889 to make hanafuda - Japanese \"flower cards\"."
+        },
+        "answer": {
+          "canonical": "Nintendo",
+          "accepted": []
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-71", "board", "round-1"],
+        "difficulty": 1,
+        "source": "Britannica. Host note: say \"Nintendo says 1889\" if challenged (pool flag 11)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa5-7a8a-8277-b7ff463f60f0",
+        "type": "basic",
+        "prompt": {
+          "text": "Found in 4,600-year-old Mesopotamian tombs, this 20-square racing game is often called the oldest playable board game."
+        },
+        "answer": {
+          "canonical": "The Royal Game of Ur",
+          "accepted": ["Game of Ur", "Ur"]
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-69", "board", "round-1"],
+        "difficulty": 2,
+        "source": "British Museum. Host note: phrase as \"oldest with surviving rules\" if challenged (pool flag 10)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa6-7cf5-8f0c-0a9b0d458b83",
+        "type": "basic",
+        "prompt": {
+          "text": "Boards for this Egyptian game of passing into the afterlife appear as far back as ~3100 BC and were buried with Tutankhamun."
+        },
+        "answer": {
+          "canonical": "Senet",
+          "accepted": []
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-70", "board", "round-1"],
+        "difficulty": 3,
+        "source": "British Museum",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa7-726a-b16d-b942db0268dc",
+        "type": "basic",
+        "prompt": {
+          "text": "In 1904, Lizzie Magie patented this anti-monopolist teaching game - three decades before Parker Brothers sold a suspiciously similar product."
+        },
+        "answer": {
+          "canonical": "The Landlord's Game",
+          "accepted": []
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-73", "board", "round-1"],
+        "difficulty": 4,
+        "source": "Smithsonian. Round 1 Double-Down: the story payoff cell",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa8-7c84-b50a-aaf004be106c",
+        "type": "basic",
+        "prompt": {
+          "text": "Magie sold her patent to Parker Brothers for just this much - no royalties - while Charles Darrow got rich on \"his\" invention."
+        },
+        "answer": {
+          "canonical": "$500",
+          "accepted": ["500", "500 dollars"]
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-74", "board", "round-1"],
+        "difficulty": 5,
+        "source": "history.com. CONFLICT: keep at most two of the Magie/Darrow trio (l-73, l-74, q-102) in one game",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aa9-764c-8e09-46ce53892cba",
+        "type": "basic",
+        "prompt": {
+          "text": "Hanafuda decks have 48 cards in 12 suits representing these."
+        },
+        "answer": {
+          "canonical": "Months of the year (flowers of each month)",
+          "accepted": ["months", "the twelve months"]
+        },
+        "tags": ["before-it-was-cardboard", "pool-l-72", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "Nintendo / Britannica",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aaa-7265-bdfc-80abd6335098",
+        "type": "basic",
+        "prompt": {
+          "text": "Hanafuda cards are still sold by Nintendo today, including a deck themed on this mustachioed mascot."
+        },
+        "answer": {
+          "canonical": "Mario",
+          "accepted": []
+        },
+        "tags": ["before-it-was-cardboard", "pool-r-104", "bench", "round-1"],
+        "difficulty": 3,
+        "source": "nintendo.com UK hanafuda page",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aab-7c98-b84d-65b684f2b8f3",
+        "type": "basic",
+        "prompt": {
+          "text": "Alan R. Moon's 2004 Spiel des Jahres winner about claiming railway routes."
+        },
+        "answer": {
+          "canonical": "Ticket to Ride",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-m-76", "board", "round-1"],
+        "difficulty": 1,
+        "source": "Days of Wonder / spiel-des-jahres.de",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aac-7565-acd6-e9606b131984",
+        "type": "basic",
+        "prompt": {
+          "text": "Working alone for four-plus years as \"ConcernedApe\", Eric Barone built this farming game - art, code and music included."
+        },
+        "answer": {
+          "canonical": "Stardew Valley",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-m-78", "board", "round-1"],
+        "difficulty": 2,
+        "source": "stardewvalley.net press kit",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aad-7731-9410-14ea9b68bdf5",
+        "type": "basic",
+        "prompt": {
+          "text": "This German dental technician designed Catan in his basement lab; it won the 1995 Spiel des Jahres."
+        },
+        "answer": {
+          "canonical": "Klaus Teuber",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-m-75", "board", "round-1"],
+        "difficulty": 3,
+        "source": "NPR obituary (2023) / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aae-7df5-add3-4a9bcd9ddb6b",
+        "type": "basic",
+        "prompt": {
+          "text": "Coined during a 2000 Carcassonne session as a mash-up of \"my\" and \"people\", it's now the generic word for wooden board game figures."
+        },
+        "answer": {
+          "canonical": "A meeple",
+          "accepted": ["meeple", "meeples"]
+        },
+        "tags": ["meet-the-makers", "pool-m-79", "board", "round-1"],
+        "difficulty": 4,
+        "source": "Carcassonne history (coined by Alison Hansel)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aaf-7055-8dbd-e6dc628041e2",
+        "type": "basic",
+        "prompt": {
+          "text": "Tetris creator who programmed the original in 1984 while working at the Soviet Academy of Sciences."
+        },
+        "answer": {
+          "canonical": "Alexey Pajitnov",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-m-80", "board", "round-1"],
+        "difficulty": 5,
+        "source": "CNN / Wikipedia. Mild thematic echo with Games in Spaaace - no duplicate answers, fine",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab0-7e52-8676-094d700364bd",
+        "type": "basic",
+        "prompt": {
+          "text": "She turned birding spreadsheets into 2019's Wingspan."
+        },
+        "answer": {
+          "canonical": "Elizabeth Hargrave",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-m-77", "bench", "round-1"],
+        "difficulty": 3,
+        "source": "meeplemountain.com. CONFLICT: only usable if the Birds, Meeples & Eggs category is cut",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab1-71c5-af50-42ffd48a2ba9",
+        "type": "basic",
+        "prompt": {
+          "text": "Alan Moon won the Spiel des Jahres twice: Ticket to Ride in 2004 and this fantasy travel game in 1998."
+        },
+        "answer": {
+          "canonical": "Elfenland",
+          "accepted": []
+        },
+        "tags": ["meet-the-makers", "pool-n-85", "bench", "round-1"],
+        "difficulty": 5,
+        "source": "Wikipedia (Alan R. Moon)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab2-7de9-b6ef-2ad5d2519c6c",
+        "type": "basic",
+        "prompt": {
+          "text": "Per Guinness, this puzzle game became the first video game in space when cosmonaut Aleksandr Serebrov packed a Game Boy for his 1993 Mir mission."
+        },
+        "answer": {
+          "canonical": "Tetris",
+          "accepted": []
+        },
+        "tags": ["games-in-spaaace", "pool-d-20", "board", "round-2"],
+        "difficulty": 1,
+        "source": "guinnessworldrecords.com (\"First videogame in space\")",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab3-7cd6-8a23-520953ffa29a",
+        "type": "basic",
+        "prompt": {
+          "text": "On June 9, 1970, Soyuz 9 cosmonauts played the first space-vs-Earth match of this classic game - a draw after ~6 hours and 4 orbits."
+        },
+        "answer": {
+          "canonical": "Chess",
+          "accepted": []
+        },
+        "tags": ["games-in-spaaace", "pool-d-23", "board", "round-2"],
+        "difficulty": 2,
+        "source": "FIDE / chess.com",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab4-71a6-844b-22018e65e306",
+        "type": "basic",
+        "prompt": {
+          "text": "Serebrov's space-flown Game Boy was later auctioned for about this much - famously modest - at a 1996 Sotheby's Russian space sale."
+        },
+        "answer": {
+          "canonical": "About $1,220",
+          "accepted": ["$1,220", "1220"]
+        },
+        "tags": ["games-in-spaaace", "pool-d-22", "board", "round-2"],
+        "difficulty": 3,
+        "source": "Sotheby's-related coverage. Round 2 Double-Down #1: the anti-climax is the joke",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab5-7ce3-84c3-f7c76462188a",
+        "type": "basic",
+        "prompt": {
+          "text": "The Soyuz 9 chess set was purpose-built for weightlessness with pieces that did this, to keep them from floating away."
+        },
+        "answer": {
+          "canonical": "Peg/attach into the board (secured pieces)",
+          "accepted": ["pegged into the board", "attached to the board", "slotted into the board"]
+        },
+        "tags": ["games-in-spaaace", "pool-d-24", "board", "round-2"],
+        "difficulty": 4,
+        "source": "Sotheby's zero-gravity chess set lot",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab6-7c9a-a85c-965bb85d0b89",
+        "type": "basic",
+        "prompt": {
+          "text": "Serebrov's Game Boy rode Soyuz TM-17 to Mir and spent this long aboard - just shy of 200 days."
+        },
+        "answer": {
+          "canonical": "About 197 days (196 days 17 hours)",
+          "accepted": ["197 days", "about 197 days"]
+        },
+        "tags": ["games-in-spaaace", "pool-d-21", "board", "round-2"],
+        "difficulty": 5,
+        "source": "Guinness World Records",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab7-7c5e-9c83-3353c6fa8f52",
+        "type": "basic",
+        "prompt": {
+          "text": "Tetris was born in 1984 at the Soviet Academy of Sciences, programmed by Alexey Pajitnov on this Soviet PDP-11 clone whose display drew pieces from bracket characters."
+        },
+        "answer": {
+          "canonical": "The Elektronika 60",
+          "accepted": []
+        },
+        "tags": ["games-in-spaaace", "pool-d-25", "bench", "round-2"],
+        "difficulty": 5,
+        "source": "CNN / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab8-7cfe-bd3d-ae99f94e6a9a",
+        "type": "basic",
+        "prompt": {
+          "text": "Guinness credits Tetris's space flight to this cosmonaut."
+        },
+        "answer": {
+          "canonical": "Aleksandr Serebrov",
+          "accepted": []
+        },
+        "tags": [
+          "games-in-spaaace",
+          "pool-o-90",
+          "bench",
+          "round-2",
+          "video-game-firsts",
+          "alternate-category"
+        ],
+        "difficulty": 5,
+        "source": "Guinness (\"First person to play a videogame in space\"). Doubles as row 5 of alternate category Video Game Firsts; unusable if Final alternate C is chosen",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ab9-791d-9f52-6ed8f72a3bd8",
+        "type": "basic",
+        "prompt": {
+          "text": "Released March 20, 2020 - days before lockdowns - this Nintendo island-life game sold 11.77 million copies in 12 days."
+        },
+        "answer": {
+          "canonical": "Animal Crossing: New Horizons",
+          "accepted": ["Animal Crossing"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-18", "board", "round-2"],
+        "difficulty": 1,
+        "source": "Nintendo Life / CNBC (historical figure - stable)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aba-736f-9bc2-5e42e0a62bc0",
+        "type": "basic",
+        "prompt": {
+          "text": "Free Lives' 2023 game Terra Nil is called a \"reverse\" one of these - you restore a wasteland to wilderness, then remove every trace of yourself."
+        },
+        "answer": {
+          "canonical": "A (reverse) city builder",
+          "accepted": ["city builder"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-13", "board", "round-2"],
+        "difficulty": 2,
+        "source": "PC Gamer / Steam",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5abb-799c-a046-7c3956464efc",
+        "type": "basic",
+        "prompt": {
+          "text": "In this 2022 survival game you play Earth's last mother fox protecting cubs; its subtitle is \"Extinction is Forever\"."
+        },
+        "answer": {
+          "canonical": "Endling",
+          "accepted": ["Endling: Extinction is Forever"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-15", "board", "round-2"],
+        "difficulty": 3,
+        "source": "Games for Change / publisher",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5abc-7954-b066-1477b7bb6943",
+        "type": "basic",
+        "prompt": {
+          "text": "E-Line Media's ocean game Beyond Blue was inspired by this BBC documentary series' second season."
+        },
+        "answer": {
+          "canonical": "Blue Planet (II)",
+          "accepted": ["Blue Planet", "Blue Planet II"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-16", "board", "round-2"],
+        "difficulty": 4,
+        "source": "BBC Studios Games & Interactive",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5abd-7b01-9e3b-b8014279490f",
+        "type": "basic",
+        "prompt": {
+          "text": "ustwo games planted one tree per download of this 2020 wildlife-photography adventure set on a Spanish island - topping 1 million trees by Dec 2021."
+        },
+        "answer": {
+          "canonical": "Alba: A Wildlife Adventure",
+          "accepted": ["Alba"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-14", "board", "round-2"],
+        "difficulty": 5,
+        "source": "ustwo / Ecologi (\"Alba's Forest\", 1,086,067 trees funded - historical, stable)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5abe-7ea4-a103-196d05130a9e",
+        "type": "basic",
+        "prompt": {
+          "text": "Never Alone (Kisima Ingitchuna), starring a girl and an arctic fox, was co-developed with the Cook Inlet Tribal Council to share the folklore of this Alaska Native people."
+        },
+        "answer": {
+          "canonical": "The Inupiat",
+          "accepted": ["Inupiat", "Inupiaq"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-17", "bench", "round-2"],
+        "difficulty": 5,
+        "source": "Games for Change / Peabody Awards",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5abf-7cbb-9c62-1fe87dfc6b8a",
+        "type": "basic",
+        "prompt": {
+          "text": "In Animal Crossing, donating fish, fossils and bugs to this owl curator builds your island's museum."
+        },
+        "answer": {
+          "canonical": "Blathers",
+          "accepted": []
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-c-19", "bench", "round-2"],
+        "difficulty": 1,
+        "source": "Nintendo (common knowledge; low risk)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac0-7202-9a19-da2715ec844d",
+        "type": "basic",
+        "prompt": {
+          "text": "Terra Nil's endgame twist: after restoring the ecosystem you must do this to your own buildings."
+        },
+        "answer": {
+          "canonical": "Remove/recycle them (leave no trace)",
+          "accepted": ["remove them", "recycle them"]
+        },
+        "tags": ["press-start-to-save-the-planet", "pool-r-105", "bench", "round-2"],
+        "difficulty": 3,
+        "source": "Steam / PC Gamer. CONFLICT: near-duplicate of the boarded Terra Nil clue (c-13) - use one or the other",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac1-7827-a19b-3d53b17680bf",
+        "type": "basic",
+        "prompt": {
+          "text": "At about 52,500 cubic feet of trunk, this Sequoia NP giant is the largest living tree on Earth by volume."
+        },
+        "answer": {
+          "canonical": "The General Sherman Tree",
+          "accepted": ["General Sherman"]
+        },
+        "tags": ["tree-mendous", "pool-f-32", "board", "round-2"],
+        "difficulty": 1,
+        "source": "nps.gov/seki. Host note: say \"largest TREE by volume\" - Pando and the humongous fungus are larger organisms (pool flag 9)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac2-7283-b39c-58c7561b4d5e",
+        "type": "basic",
+        "prompt": {
+          "text": "General Sherman is this species - Sequoiadendron giganteum."
+        },
+        "answer": {
+          "canonical": "The giant sequoia",
+          "accepted": ["giant sequoia", "sequoia"]
+        },
+        "tags": ["tree-mendous", "pool-f-33", "board", "round-2"],
+        "difficulty": 2,
+        "source": "NPS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac3-798f-924a-df4975033774",
+        "type": "basic",
+        "prompt": {
+          "text": "Scientists estimate General Sherman's age at roughly this many years - old enough to predate the Roman Empire's peak."
+        },
+        "answer": {
+          "canonical": "About 2,200 years",
+          "accepted": ["2200", "2,200"]
+        },
+        "tags": ["tree-mendous", "pool-f-34", "board", "round-2"],
+        "difficulty": 3,
+        "source": "NPS / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac4-7467-892e-02b82c2ccd4d",
+        "type": "basic",
+        "prompt": {
+          "text": "The world's TALLEST tree, this ~380-ft coast redwood in Redwood National Park, beats General Sherman's height by over 100 feet."
+        },
+        "answer": {
+          "canonical": "Hyperion",
+          "accepted": []
+        },
+        "tags": ["tree-mendous", "pool-f-35", "board", "round-2", "recheck"],
+        "difficulty": 4,
+        "source": "Guinness. RECHECK exact height (381.3 ft per recent measurement)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac5-7efe-a216-d625ec07ef71",
+        "type": "basic",
+        "prompt": {
+          "text": "Visit Hyperion and you risk 6 months in jail and a $5,000 fine - the park closed access in 2022 because visitors were damaging this part of the tree's ecosystem."
+        },
+        "answer": {
+          "canonical": "Its roots/surrounding vegetation",
+          "accepted": ["the roots", "its root system", "surrounding vegetation"]
+        },
+        "tags": ["tree-mendous", "pool-f-36", "board", "round-2", "recheck"],
+        "difficulty": 5,
+        "source": "NPR / CNN, Redwood NP statement. RECHECK closure still in force",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac6-7df4-bb97-6376caacd276",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park's namesake trees are the largest on Earth by volume; its neighbor Kings Canyon shares an entrance sign."
+        },
+        "answer": {
+          "canonical": "Sequoia National Park",
+          "accepted": ["Sequoia"]
+        },
+        "tags": ["tree-mendous", "pool-r-103", "bench", "round-2"],
+        "difficulty": 1,
+        "source": "NPS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac7-7262-b313-5461ac0c195e",
+        "type": "basic",
+        "prompt": {
+          "text": "Pando, ~47,000 genetically identical aspen trunks sharing one root system in Utah's Fishlake National Forest, is arguably Earth's heaviest single organism at about this many tons."
+        },
+        "answer": {
+          "canonical": "About 6,000 tons",
+          "accepted": ["6000", "6,000 tons"]
+        },
+        "tags": ["tree-mendous", "pool-f-37", "bench", "round-2"],
+        "difficulty": 5,
+        "source": "National Forest Foundation. RESERVED: do NOT board while Final A (Pando) is the final - it spoils the answer",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac8-7f2b-b1f5-fa6c51301a12",
+        "type": "basic",
+        "prompt": {
+          "text": "Pando is Latin for this - fitting for a clone that's covered 106 acres."
+        },
+        "answer": {
+          "canonical": "\"I spread\"",
+          "accepted": ["I spread"]
+        },
+        "tags": ["tree-mendous", "pool-f-38", "bench", "round-2"],
+        "difficulty": 5,
+        "source": "National Forest Foundation. RESERVED: do NOT board while Final A (Pando) is the final - it IS the final clue's hook",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ac9-72b7-839c-3205e7b94242",
+        "type": "basic",
+        "prompt": {
+          "text": "By preying on kelp-munching sea urchins, this marine mammal is the textbook \"keystone species\" of Pacific kelp forests."
+        },
+        "answer": {
+          "canonical": "The sea otter",
+          "accepted": []
+        },
+        "tags": ["back-from-the-brink", "pool-i-57", "board", "round-2"],
+        "difficulty": 1,
+        "source": "USFWS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aca-77cb-a177-feb59951b82b",
+        "type": "basic",
+        "prompt": {
+          "text": "Critically endangered in the wild since 2006, axolotls are everywhere in labs and pet stores - and in this Mojang game, where blue ones are ultra-rare."
+        },
+        "answer": {
+          "canonical": "Minecraft",
+          "accepted": []
+        },
+        "tags": ["back-from-the-brink", "pool-i-55", "board", "round-2", "recheck"],
+        "difficulty": 2,
+        "source": "IUCN; Minecraft wiki. RECHECK blue-variant odds (1/1200) if cited aloud - game updates can change spawn logic",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5acb-72b0-a603-aa6a03262303",
+        "type": "basic",
+        "prompt": {
+          "text": "The world's most endangered marine mammal: this tiny Gulf of California porpoise numbered only ~7-10 individuals in the 2025 survey."
+        },
+        "answer": {
+          "canonical": "The vaquita",
+          "accepted": []
+        },
+        "tags": ["back-from-the-brink", "pool-i-52", "board", "round-2", "recheck"],
+        "difficulty": 3,
+        "source": "NOAA / Sea Shepherd. RECHECK count week-of - the most volatile number on the board",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5acc-7e39-9878-fe0507bf7e07",
+        "type": "basic",
+        "prompt": {
+          "text": "This flightless, nocturnal New Zealand parrot fell to ~51 birds in 1995; intensive recovery has it back over 200."
+        },
+        "answer": {
+          "canonical": "The kakapo",
+          "accepted": ["kakapo", "kaakaapoo"]
+        },
+        "tags": ["back-from-the-brink", "pool-i-53", "board", "round-2", "recheck"],
+        "difficulty": 4,
+        "source": "NZ Department of Conservation. RECHECK count (~230-240) - updated after breeding seasons",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5acd-7dab-8e6d-18a94e784fcd",
+        "type": "basic",
+        "prompt": {
+          "text": "In 2025, scientists celebrated when 18 captive-bred axolotls did this in restored Xochimilco wetlands - a first hopeful sign for reintroduction."
+        },
+        "answer": {
+          "canonical": "Survive after release into the wild",
+          "accepted": ["survived in the wild", "survived release"]
+        },
+        "tags": ["back-from-the-brink", "pool-i-56", "board", "round-2"],
+        "difficulty": 5,
+        "source": "Mongabay 2025",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ace-722d-b01d-63542686df3d",
+        "type": "basic",
+        "prompt": {
+          "text": "Wild axolotls survive only in this Mexico City lake system, a UNESCO site of \"floating gardens\"."
+        },
+        "answer": {
+          "canonical": "Lake Xochimilco",
+          "accepted": ["Xochimilco"]
+        },
+        "tags": ["back-from-the-brink", "pool-i-54", "bench", "round-2"],
+        "difficulty": 3,
+        "source": "IUCN / CNN",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5acf-79d6-b8b6-db91f3ec6586",
+        "type": "basic",
+        "prompt": {
+          "text": "This bird is the world's only flightless parrot and can weigh 4 kilograms."
+        },
+        "answer": {
+          "canonical": "The kakapo",
+          "accepted": ["kakapo"]
+        },
+        "tags": ["back-from-the-brink", "pool-j-63", "bench", "round-2", "weird-nature"],
+        "difficulty": 3,
+        "source": "NZ DOC. CONFLICT: same answer as the boarded kakapo clue (i-53) - use only as its replacement. Also benches alternate category Weird Nature",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad0-746a-8572-a325ef5df906",
+        "type": "basic",
+        "prompt": {
+          "text": "In April 2014, excavators in Alamogordo, NM confirmed the legend: Atari really did bury hundreds of thousands of cartridges of this 1982 movie flop."
+        },
+        "answer": {
+          "canonical": "E.T. the Extra-Terrestrial",
+          "accepted": ["E.T."]
+        },
+        "tags": ["legends-and-landfills", "pool-q-97", "board", "round-2"],
+        "difficulty": 1,
+        "source": "Archaeology Magazine / Kotaku",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad1-7545-9a5f-59737016535b",
+        "type": "basic",
+        "prompt": {
+          "text": "In 2020, programmer Foone got Doom playable on the shell of this single-use medical device (with a replaced CPU and OLED screen)."
+        },
+        "answer": {
+          "canonical": "A (digital) pregnancy test",
+          "accepted": ["pregnancy test"]
+        },
+        "tags": ["legends-and-landfills", "pool-q-101", "board", "round-2"],
+        "difficulty": 2,
+        "source": "PC Gamer / Gizmodo. Host note: phrase honestly - only the shell was original",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad2-7d79-abf9-4dd6d08f723d",
+        "type": "basic",
+        "prompt": {
+          "text": "During WWII, Britain's MI9 smuggled silk escape maps, compasses and currency to POWs inside sets of this board game."
+        },
+        "answer": {
+          "canonical": "Monopoly",
+          "accepted": []
+        },
+        "tags": ["legends-and-landfills", "pool-q-99", "board", "round-2"],
+        "difficulty": 3,
+        "source": "Snopes-confirmed TRUE / UCSB Geography. Round 2 Double-Down #2: sounds fake, is not",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad3-7827-9a88-dff38761176b",
+        "type": "basic",
+        "prompt": {
+          "text": "Silk was used for the escape maps because paper maps fail in these two ways."
+        },
+        "answer": {
+          "canonical": "Noise and disintegrating when wet",
+          "accepted": ["they rustle and dissolve when wet", "noisy and fall apart wet"]
+        },
+        "tags": ["legends-and-landfills", "pool-q-100", "board", "round-2"],
+        "difficulty": 4,
+        "source": "WW2 Escape Lines Memorial Society",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad4-73f1-9509-a4cc0a4f7490",
+        "type": "basic",
+        "prompt": {
+          "text": "The 2014 Atari dig recovered about this many cartridges of the ~700,000+ buried."
+        },
+        "answer": {
+          "canonical": "About 1,300 (1,382)",
+          "accepted": ["1300", "1,300", "1382"]
+        },
+        "tags": ["legends-and-landfills", "pool-q-98", "board", "round-2"],
+        "difficulty": 5,
+        "source": "tDAR / Archaeology Magazine",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad5-727b-b0aa-f63fce5bb5cc",
+        "type": "basic",
+        "prompt": {
+          "text": "The 1935 \"rags-to-riches inventor\" story Parker Brothers told about this man is now considered myth - Lizzie Magie got there 30 years earlier."
+        },
+        "answer": {
+          "canonical": "Charles Darrow",
+          "accepted": ["Darrow"]
+        },
+        "tags": ["legends-and-landfills", "pool-q-102", "bench", "round-2"],
+        "difficulty": 3,
+        "source": "Smithsonian / history.com. CONFLICT: same story arc as the Round 1 Magie cells (l-73/l-74) - swap in only if those are cut",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad6-78cb-b074-ec53b086f2ff",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a81-74f4-b4af-f3c3514b0b15"
+          }
+        },
+        "answer": {
+          "canonical": "Yellowstone",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a81-74f4-b4af-f3c3514b0b15"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-01", "board", "round-2", "picture", "img-01"],
+        "difficulty": 1,
+        "source": "Old Faithful mid-eruption. Public domain (NPS / Yellowstone National Park). File page: https://commons.wikimedia.org/wiki/File:Spring_Old_Faithful_eruption_from_Observation_Point.jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad7-7430-a888-af96cec83b61",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a82-780a-afee-898bbee378c5"
+          }
+        },
+        "answer": {
+          "canonical": "Yosemite",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a82-780a-afee-898bbee378c5"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-02", "board", "round-2", "picture", "img-02"],
+        "difficulty": 2,
+        "source": "Half Dome above the valley. Public domain (Gentry George, USFWS). File page: https://commons.wikimedia.org/wiki/File:Half_dome_in_Yosemite_national_park.jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad8-7be4-913b-6a74ae80f89e",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a83-7df0-9e30-6ad611a6f3a7"
+          }
+        },
+        "answer": {
+          "canonical": "Arches",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a83-7df0-9e30-6ad611a6f3a7"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-03", "board", "round-2", "picture", "img-03"],
+        "difficulty": 3,
+        "source": "Delicate Arch. Public domain (NPS / Damon Joyce). File page: https://commons.wikimedia.org/wiki/File:Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_(18686376391).jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ad9-74e0-8f0e-9c7bdff67992",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a84-7884-925d-c18d6b2cb7ac"
+          }
+        },
+        "answer": {
+          "canonical": "Crater Lake",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a84-7884-925d-c18d6b2cb7ac"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-04", "board", "round-2", "picture", "img-04"],
+        "difficulty": 4,
+        "source": "Caldera lake with Wizard Island. Public domain (USGS / Lyn Topinka). File page: https://commons.wikimedia.org/wiki/File:Crater_Lake_from_rim-USGS.jpg. CONFLICT: bench clue g-42 shares this answer - keep it benched",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ada-734f-a1f3-aa0d74fa2d72",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a85-7cf9-9d73-5b8852a3b233"
+          }
+        },
+        "answer": {
+          "canonical": "White Sands",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a85-7cf9-9d73-5b8852a3b233"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-05", "board", "round-2", "picture", "img-05"],
+        "difficulty": 5,
+        "source": "White gypsum dunefield - reads as \"snow?\", hardest cell. Public domain (NPS Photo). File page: https://commons.wikimedia.org/wiki/File:Sunset_over_an_interdunal_area_(fc947575-155d-451f-67bd-cd7fbd10c9ce).JPG",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5adb-7456-bc28-1ef40742608a",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a86-7e1a-944b-bd648d780c1d"
+          }
+        },
+        "answer": {
+          "canonical": "Yellowstone",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a86-7e1a-944b-bd648d780c1d"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-06", "bench", "round-2", "picture", "img-06"],
+        "difficulty": 1,
+        "source": "Grand Prismatic Spring - swap for img-01 (same answer). CC BY-SA 4.0 (Carsten Steger) - credits slide mandatory if used. File page: https://commons.wikimedia.org/wiki/File:Aerial_image_of_Grand_Prismatic_Spring_(view_from_the_south).jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5adc-7a26-9782-6b257beb9f84",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a87-7fae-bc97-a922a14636e9"
+          }
+        },
+        "answer": {
+          "canonical": "Denali",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a87-7fae-bc97-a922a14636e9"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-07", "bench", "round-2", "picture", "img-07"],
+        "difficulty": 3,
+        "source": "Denali massif. Public domain (NPS / Emily Mesner). Draft phrasing - verify any superlative (e.g. \"North America's tallest peak\") before use. File page: https://commons.wikimedia.org/wiki/File:Denali,_Denali_National_Park_and_Preserve.jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5add-717a-a379-366a1cddfc60",
+        "type": "basic",
+        "prompt": {
+          "text": "This national park.",
+          "media": {
+            "mediaId": "01a00137-5a88-726d-b565-1dd8bd05d422"
+          }
+        },
+        "answer": {
+          "canonical": "Bryce Canyon",
+          "accepted": [],
+          "media": {
+            "mediaId": "01a00137-5a88-726d-b565-1dd8bd05d422"
+          }
+        },
+        "tags": ["name-that-park", "pool-img-08", "bench", "round-2", "picture", "img-08"],
+        "difficulty": 3,
+        "source": "Hoodoo amphitheater. CC BY-SA 3.0 (Jon Zander) - credits slide mandatory if used. File page: https://commons.wikimedia.org/wiki/File:Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ade-72c1-b43f-cdc63d8dea64",
+        "type": "basic",
+        "prompt": {
+          "text": "Named with the Latin for \"I spread\", this 106-acre Utah resident may be the heaviest single organism on Earth."
+        },
+        "answer": {
+          "canonical": "Pando",
+          "accepted": []
+        },
+        "tags": ["superlative-organisms", "pool-final-a", "final"],
+        "difficulty": 5,
+        "source": "National Forest Foundation. Final A (top pick): crossover-neutral, gasp-factor; f-37/f-38 stay benched so nothing on either board spoils it",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5adf-70bf-a41e-f7f067385791",
+        "type": "basic",
+        "prompt": {
+          "text": "A 2016 study of eye-lens proteins showed this Arctic fish species can live roughly 400 years - meaning some alive today predate the United States."
+        },
+        "answer": {
+          "canonical": "The Greenland shark",
+          "accepted": []
+        },
+        "tags": ["animal-longevity", "pool-final-b", "final-alternate"],
+        "difficulty": 5,
+        "source": "Science (2016). Final alternate B. CONFLICT: requires swapping h-49 off the Round 1 board (replace with bench h-51)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae0-7c21-93d1-2c3381b03d61",
+        "type": "basic",
+        "prompt": {
+          "text": "In 1993 this game became the first ever played in space; the Game Boy that carried it aboard Mir later sold at auction for just $1,220."
+        },
+        "answer": {
+          "canonical": "Tetris",
+          "accepted": []
+        },
+        "tags": ["games-in-space", "pool-final-c", "final-alternate"],
+        "difficulty": 5,
+        "source": "Guinness. Final alternate C (owner's sentimental favorite). CONFLICT: requires replacing all of Games in Spaaace with alternate category Video Game Firsts, minus its space clues",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae1-727f-b8cc-1511cffc4ad3",
+        "type": "basic",
+        "prompt": {
+          "text": "Pokemon creator Satoshi Tajiri was nicknamed \"Dr. Bug\" as a kid for this hobby, which inspired the whole franchise."
+        },
+        "answer": {
+          "canonical": "Insect collecting (bug catching)",
+          "accepted": ["bug catching", "collecting insects"]
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-26", "alternate-category"],
+        "difficulty": 1,
+        "source": "Wikipedia / Bulbapedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae2-79f7-ba03-2780d3103e47",
+        "type": "basic",
+        "prompt": {
+          "text": "This 2016 mobile game sent millions outdoors hunting virtual creatures; park agencies issued off-trail warnings."
+        },
+        "answer": {
+          "canonical": "Pokemon GO",
+          "accepted": []
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-31", "alternate-category"],
+        "difficulty": 2,
+        "source": "General knowledge - do not cite a specific-park anecdote without verifying",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae3-7cca-b54a-7d5540e8ccb4",
+        "type": "basic",
+        "prompt": {
+          "text": "Tajiri said watching two kids connect Game Boys with this accessory made him imagine insects crawling along it."
+        },
+        "answer": {
+          "canonical": "The (Game) Link Cable",
+          "accepted": ["Link Cable", "Game Link Cable"]
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-27", "alternate-category"],
+        "difficulty": 3,
+        "source": "Wikipedia (Tajiri)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae4-7532-9a08-869b71644f2a",
+        "type": "basic",
+        "prompt": {
+          "text": "In 2021, three rare Australian beetles in genus Binburrum were named articuno, zapdos and this - completing the trio."
+        },
+        "answer": {
+          "canonical": "Moltres",
+          "accepted": []
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-28", "alternate-category"],
+        "difficulty": 4,
+        "source": "Forbes / ENMU press release",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae5-71b8-b3f9-a16b58599e59",
+        "type": "basic",
+        "prompt": {
+          "text": "The beetle-naming researchers chose Legendary Pokemon names for this reason."
+        },
+        "answer": {
+          "canonical": "The beetles' rarity (like the Legendary birds)",
+          "accepted": ["they are rare", "rarity"]
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-29", "alternate-category"],
+        "difficulty": 5,
+        "source": "Forbes 2021",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae6-76cf-9396-36bb2c8b68d0",
+        "type": "basic",
+        "prompt": {
+          "text": "Twitch Plays Pokemon (Feb-Mar 2014) set a Guinness record when this many people - over a million - helped input commands to beat Pokemon Red."
+        },
+        "answer": {
+          "canonical": "About 1.16 million (1,165,140)",
+          "accepted": ["1.16 million", "over a million"]
+        },
+        "tags": ["gotta-catch-real-ones", "pool-e-30", "alternate-category", "bench"],
+        "difficulty": 3,
+        "source": "Guinness World Records",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae7-7921-ad62-24a076f4cab2",
+        "type": "basic",
+        "prompt": {
+          "text": "The 2019 Ig Nobel Physics Prize went to researchers who explained why this Australian marsupial's poop is cube-shaped."
+        },
+        "answer": {
+          "canonical": "The wombat",
+          "accepted": []
+        },
+        "tags": ["weird-nature", "pool-j-58", "alternate-category"],
+        "difficulty": 1,
+        "source": "Ig Nobel / UGA. Backup Double-Down candidate if boarded - move to a deeper row",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae8-73ad-922b-b6fc4e74b754",
+        "type": "basic",
+        "prompt": {
+          "text": "Turritopsis dohrnii is called \"the immortal\" one of these - it can revert from adult back to its polyp stage."
+        },
+        "answer": {
+          "canonical": "A jellyfish",
+          "accepted": ["jellyfish"]
+        },
+        "tags": ["weird-nature", "pool-j-60", "alternate-category"],
+        "difficulty": 2,
+        "source": "AMNH. Also borrowable as an Animal Record Holders bench if this category is unused",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5ae9-784b-a12d-89b9f7299f0d",
+        "type": "basic",
+        "prompt": {
+          "text": "The cubes come from varying stiffness in the wombat's ~10-meter-long version of this organ."
+        },
+        "answer": {
+          "canonical": "The intestine",
+          "accepted": ["intestines", "the gut"]
+        },
+        "tags": ["weird-nature", "pool-j-59", "alternate-category"],
+        "difficulty": 3,
+        "source": "University of Tasmania / Georgia Tech",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aea-7883-9f50-59117627ebad",
+        "type": "basic",
+        "prompt": {
+          "text": "Old Faithful blasts boiling water up to this height - taller than the Statue of Liberty's copper figure."
+        },
+        "answer": {
+          "canonical": "106-184 feet",
+          "accepted": ["about 150 feet", "over 100 feet"]
+        },
+        "tags": ["weird-nature", "pool-j-62", "alternate-category"],
+        "difficulty": 4,
+        "source": "nps.gov",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aeb-7d60-bfbf-bdd4d1fd449f",
+        "type": "basic",
+        "prompt": {
+          "text": "The jellyfish's cellular reset - mature cells transforming into other cell types - is called this."
+        },
+        "answer": {
+          "canonical": "Transdifferentiation",
+          "accepted": []
+        },
+        "tags": ["weird-nature", "pool-j-61", "alternate-category"],
+        "difficulty": 5,
+        "source": "AMNH / PNAS",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aec-794b-9a22-db01fc5683e3",
+        "type": "basic",
+        "prompt": {
+          "text": "Three Minnesota student teachers created this 1971 educational classic; generations have \"died of dysentery\" since."
+        },
+        "answer": {
+          "canonical": "The Oregon Trail",
+          "accepted": []
+        },
+        "tags": ["video-game-firsts", "pool-o-88", "alternate-category"],
+        "difficulty": 1,
+        "source": "the74million.org / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aed-75d8-9943-d994690fffb5",
+        "type": "basic",
+        "prompt": {
+          "text": "First game in space (1993, Game Boy, Mir)."
+        },
+        "answer": {
+          "canonical": "Tetris",
+          "accepted": []
+        },
+        "tags": ["video-game-firsts", "pool-o-89", "alternate-category"],
+        "difficulty": 2,
+        "source": "Guinness. CONFLICT: only usable if Games in Spaaace is cut AND Final alternate C is not used",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aee-74e9-afc6-42d904f92049",
+        "type": "basic",
+        "prompt": {
+          "text": "In October 1958 physicist William Higinbotham demoed \"Tennis for Two\" on an oscilloscope at this national laboratory."
+        },
+        "answer": {
+          "canonical": "Brookhaven",
+          "accepted": ["Brookhaven National Laboratory"]
+        },
+        "tags": ["video-game-firsts", "pool-o-86", "alternate-category"],
+        "difficulty": 3,
+        "source": "bnl.gov. Host note: never say \"first video game\" flatly (pool flag 1)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5aef-7810-98e4-e94ffbdca531",
+        "type": "basic",
+        "prompt": {
+          "text": "The first video game patent - 1948's \"Cathode-Ray Tube Amusement Device\" - was inspired by this WWII display technology."
+        },
+        "answer": {
+          "canonical": "Radar screens",
+          "accepted": ["radar"]
+        },
+        "tags": ["video-game-firsts", "pool-o-87", "alternate-category"],
+        "difficulty": 4,
+        "source": "Patent history via APS / Wikipedia",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af0-7e48-95b3-dbcafdf93d01",
+        "type": "basic",
+        "prompt": {
+          "text": "First single video game to sell 300 million copies (2023)."
+        },
+        "answer": {
+          "canonical": "Minecraft",
+          "accepted": []
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-91", "alternate-category", "recheck"],
+        "difficulty": 1,
+        "source": "BBC / Forbes. RECHECK + host must say \"single game\", not franchise (pool flag 8)",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af1-799b-a412-06a62190ad72",
+        "type": "basic",
+        "prompt": {
+          "text": "Minecraft's creator sold Mojang to Microsoft in 2014 for this amount."
+        },
+        "answer": {
+          "canonical": "$2.5 billion",
+          "accepted": ["2.5 billion"]
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-92", "alternate-category"],
+        "difficulty": 2,
+        "source": "BBC",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af2-7301-b5d5-e822b06d9449",
+        "type": "basic",
+        "prompt": {
+          "text": "Catan has sold over this many copies in ~40 languages (nearest 10 million)."
+        },
+        "answer": {
+          "canonical": "40 million",
+          "accepted": []
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-93", "alternate-category", "recheck"],
+        "difficulty": 3,
+        "source": "NPR / catan.com. RECHECK - volatile sales total",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af3-70d8-8874-d26750120f92",
+        "type": "basic",
+        "prompt": {
+          "text": "Games Done Quick's twice-yearly speedrun marathons have raised over $60 million total for these two main charities."
+        },
+        "answer": {
+          "canonical": "Prevent Cancer Foundation and Doctors Without Borders",
+          "accepted": ["Prevent Cancer Foundation and MSF"]
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-94", "alternate-category", "recheck"],
+        "difficulty": 4,
+        "source": "gamesdonequick.com. RECHECK total and current charity pair",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af4-72c3-8f50-7d5417afb48b",
+        "type": "basic",
+        "prompt": {
+          "text": "Animal Crossing: New Horizons' first-12-days sales figure that made it the fastest-selling Switch game ever."
+        },
+        "answer": {
+          "canonical": "About 11.8 million",
+          "accepted": ["11.77 million", "11.8 million"]
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-95", "alternate-category"],
+        "difficulty": 5,
+        "source": "Nintendo Life. CONFLICT: near-duplicate of the boarded ACNH clue (c-18) - do not run both cells live",
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "01a00137-5af5-71eb-8c3b-dc1535b53bc6",
+        "type": "basic",
+        "prompt": {
+          "text": "Xeno-canto, the citizen-science bird-sound archive, passed this recording milestone in 2024 - a nice round number."
+        },
+        "answer": {
+          "canonical": "1,000,000 recordings",
+          "accepted": ["one million", "a million recordings"]
+        },
+        "tags": ["gaming-by-the-numbers", "pool-p-96", "alternate-category", "bench"],
+        "difficulty": 5,
+        "source": "xeno-canto / GBIF",
+        "provenance": "ai-draft"
+      }
+    ],
+    "media": [
+      {
+        "id": "01a00137-5a81-74f4-b4af-f3c3514b0b15",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 37209547,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "A geyser erupting in a steaming basin, viewed from a hillside overlook",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/9/91/Spring_Old_Faithful_eruption_from_Observation_Point.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a82-780a-afee-898bbee378c5",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 659961,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "A sheer granite dome rising above a forested valley",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Half_dome_in_Yosemite_national_park.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a83-7df0-9e30-6ad611a6f3a7",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 1539033,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "A freestanding red sandstone arch on a slickrock rim",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/0/07/Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_%2818686376391%29.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a84-7884-925d-c18d6b2cb7ac",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 1157505,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "A deep blue lake filling a volcanic caldera, with a cone-shaped island",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Crater_Lake_from_rim-USGS.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a85-7cf9-9d73-5b8852a3b233",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 3492675,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "Rippled white gypsum dunes under an evening sky",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/7/78/Sunset_over_an_interdunal_area_%28fc947575-155d-451f-67bd-cd7fbd10c9ce%29.JPG"
+        }
+      },
+      {
+        "id": "01a00137-5a86-7e1a-944b-bd648d780c1d",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 5422003,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "Aerial view of a rainbow-colored hot spring ringed by orange bacterial mats",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Aerial_image_of_Grand_Prismatic_Spring_%28view_from_the_south%29.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a87-7fae-bc97-a922a14636e9",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 9657176,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "A vast snow-covered mountain massif under clear skies",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Denali%2C_Denali_National_Park_and_Preserve.jpg"
+        }
+      },
+      {
+        "id": "01a00137-5a88-726d-b565-1dd8bd05d422",
+        "kind": "image",
+        "mime": "image/jpeg",
+        "bytes": 5371554,
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "alt": "An amphitheater of orange rock spires seen from the rim",
+        "storage": {
+          "state": "remote",
+          "url": "https://upload.wikimedia.org/wikipedia/commons/f/f7/Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg"
+        }
+      }
+    ],
+    "description": "Every clue for the Board Game Club x Environmental Law Society night: both boards, the final with two alternates, the full bench, and four drop-in alternate categories. Environment + gaming only, nothing law-related. Assembled from docs/content/event-board-draft.md; per-clue source notes inline; volatile facts tagged recheck.",
+    "tags": ["environment", "gaming", "event-night", "board-game-club", "environmental-law-society"]
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "format": "game-definition",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Board Game Club x Environmental Law Society Night",
+    "author": "Jeopardy Machine content agents (owner curation pending)",
+    "created": "2026-08-14T17:00:00.000Z",
+    "modified": "2026-08-14T17:00:00.000Z"
+  },
+  "ext": {
+    "com.jeopardy-machine.event.pack-path": "event-pack.pack.json"
+  },
+  "body": {
+    "mode": "jeopardy",
+    "rounds": [
+      {
+        "name": "Round 1",
+        "valueMultiplier": 1,
+        "categories": [
+          {
+            "title": "Birds, Meeples & Eggs",
+            "cells": [
+              {
+                "itemId": "01a00137-5a89-79ef-9fd4-1ff9791b5b62"
+              },
+              {
+                "itemId": "01a00137-5a8a-7202-a476-a8bbbee9016b"
+              },
+              {
+                "itemId": "01a00137-5a8b-7508-8ab1-0cd9858429d0"
+              },
+              {
+                "itemId": "01a00137-5a8c-7797-8687-d2c5ee0ebfc5"
+              },
+              {
+                "itemId": "01a00137-5a8d-78a3-94b9-b07256f9cf78"
+              }
+            ]
+          },
+          {
+            "title": "Games Gone Wild",
+            "cells": [
+              {
+                "itemId": "01a00137-5a90-71ff-9f8b-da97770d2571"
+              },
+              {
+                "itemId": "01a00137-5a91-7f4d-9038-97960195a0a4"
+              },
+              {
+                "itemId": "01a00137-5a92-7769-be5f-f4dfc2cca0e0"
+              },
+              {
+                "itemId": "01a00137-5a93-7715-a4be-bbb608c1de97"
+              },
+              {
+                "itemId": "01a00137-5a94-785c-9460-a3291a25933b"
+              }
+            ]
+          },
+          {
+            "title": "Park Rangers",
+            "cells": [
+              {
+                "itemId": "01a00137-5a97-787a-ae9e-77f28b68d2a4"
+              },
+              {
+                "itemId": "01a00137-5a98-7ae5-b171-57db5228ff7d"
+              },
+              {
+                "itemId": "01a00137-5a99-75c6-9708-924cc15a1857"
+              },
+              {
+                "itemId": "01a00137-5a9a-7c23-8211-797ac1a0581f"
+              },
+              {
+                "itemId": "01a00137-5a9b-72fb-89c5-57326ad6c3d6"
+              }
+            ]
+          },
+          {
+            "title": "Animal Record Holders",
+            "cells": [
+              {
+                "itemId": "01a00137-5a9e-759b-990b-3e3cc1e22147"
+              },
+              {
+                "itemId": "01a00137-5a9f-7ea8-beec-d6f8d61fcc76"
+              },
+              {
+                "itemId": "01a00137-5aa0-7de1-8d12-84d5fdcf2a46"
+              },
+              {
+                "itemId": "01a00137-5aa1-73e7-a591-2343411be16f"
+              },
+              {
+                "itemId": "01a00137-5aa2-7b9f-ba07-5fafb446e50f"
+              }
+            ]
+          },
+          {
+            "title": "Before It Was Cardboard",
+            "cells": [
+              {
+                "itemId": "01a00137-5aa4-7e98-a2b9-243f92e1eccd"
+              },
+              {
+                "itemId": "01a00137-5aa5-7a8a-8277-b7ff463f60f0"
+              },
+              {
+                "itemId": "01a00137-5aa6-7cf5-8f0c-0a9b0d458b83"
+              },
+              {
+                "itemId": "01a00137-5aa7-726a-b16d-b942db0268dc",
+                "wager": true
+              },
+              {
+                "itemId": "01a00137-5aa8-7c84-b50a-aaf004be106c"
+              }
+            ]
+          },
+          {
+            "title": "Meet the Makers",
+            "cells": [
+              {
+                "itemId": "01a00137-5aab-7c98-b84d-65b684f2b8f3"
+              },
+              {
+                "itemId": "01a00137-5aac-7565-acd6-e9606b131984"
+              },
+              {
+                "itemId": "01a00137-5aad-7731-9410-14ea9b68bdf5"
+              },
+              {
+                "itemId": "01a00137-5aae-7df5-add3-4a9bcd9ddb6b"
+              },
+              {
+                "itemId": "01a00137-5aaf-7055-8dbd-e6dc628041e2"
+              }
+            ]
+          }
+        ],
+        "wagerPlacement": "manual"
+      },
+      {
+        "name": "Round 2",
+        "valueMultiplier": 2,
+        "categories": [
+          {
+            "title": "Games in Spaaace",
+            "cells": [
+              {
+                "itemId": "01a00137-5ab2-7de9-b6ef-2ad5d2519c6c"
+              },
+              {
+                "itemId": "01a00137-5ab3-7cd6-8a23-520953ffa29a"
+              },
+              {
+                "itemId": "01a00137-5ab4-71a6-844b-22018e65e306",
+                "wager": true
+              },
+              {
+                "itemId": "01a00137-5ab5-7ce3-84c3-f7c76462188a"
+              },
+              {
+                "itemId": "01a00137-5ab6-7c9a-a85c-965bb85d0b89"
+              }
+            ]
+          },
+          {
+            "title": "Press Start to Save the Planet",
+            "cells": [
+              {
+                "itemId": "01a00137-5ab9-791d-9f52-6ed8f72a3bd8"
+              },
+              {
+                "itemId": "01a00137-5aba-736f-9bc2-5e42e0a62bc0"
+              },
+              {
+                "itemId": "01a00137-5abb-799c-a046-7c3956464efc"
+              },
+              {
+                "itemId": "01a00137-5abc-7954-b066-1477b7bb6943"
+              },
+              {
+                "itemId": "01a00137-5abd-7b01-9e3b-b8014279490f"
+              }
+            ]
+          },
+          {
+            "title": "Tree-mendous",
+            "cells": [
+              {
+                "itemId": "01a00137-5ac1-7827-a19b-3d53b17680bf"
+              },
+              {
+                "itemId": "01a00137-5ac2-7283-b39c-58c7561b4d5e"
+              },
+              {
+                "itemId": "01a00137-5ac3-798f-924a-df4975033774"
+              },
+              {
+                "itemId": "01a00137-5ac4-7467-892e-02b82c2ccd4d"
+              },
+              {
+                "itemId": "01a00137-5ac5-7efe-a216-d625ec07ef71"
+              }
+            ]
+          },
+          {
+            "title": "Back from the Brink",
+            "cells": [
+              {
+                "itemId": "01a00137-5ac9-72b7-839c-3205e7b94242"
+              },
+              {
+                "itemId": "01a00137-5aca-77cb-a177-feb59951b82b"
+              },
+              {
+                "itemId": "01a00137-5acb-72b0-a603-aa6a03262303"
+              },
+              {
+                "itemId": "01a00137-5acc-7e39-9878-fe0507bf7e07"
+              },
+              {
+                "itemId": "01a00137-5acd-7dab-8e6d-18a94e784fcd"
+              }
+            ]
+          },
+          {
+            "title": "Legends & Landfills",
+            "cells": [
+              {
+                "itemId": "01a00137-5ad0-746a-8572-a325ef5df906"
+              },
+              {
+                "itemId": "01a00137-5ad1-7545-9a5f-59737016535b"
+              },
+              {
+                "itemId": "01a00137-5ad2-7d79-abf9-4dd6d08f723d",
+                "wager": true
+              },
+              {
+                "itemId": "01a00137-5ad3-7827-9a88-dff38761176b"
+              },
+              {
+                "itemId": "01a00137-5ad4-73f1-9509-a4cc0a4f7490"
+              }
+            ]
+          },
+          {
+            "title": "Name That Park",
+            "cells": [
+              {
+                "itemId": "01a00137-5ad6-78cb-b074-ec53b086f2ff"
+              },
+              {
+                "itemId": "01a00137-5ad7-7430-a888-af96cec83b61"
+              },
+              {
+                "itemId": "01a00137-5ad8-7be4-913b-6a74ae80f89e"
+              },
+              {
+                "itemId": "01a00137-5ad9-74e0-8f0e-9c7bdff67992"
+              },
+              {
+                "itemId": "01a00137-5ada-734f-a1f3-aa0d74fa2d72"
+              }
+            ]
+          }
+        ],
+        "wagerPlacement": "manual"
+      }
+    ],
+    "final": {
+      "category": "Superlative Organisms",
+      "itemId": "01a00137-5ade-72c1-b43f-cdc63d8dea64"
+    },
+    "valueScheme": {
+      "kind": "preset",
+      "preset": "tv"
+    },
+    "content": {
+      "kind": "external",
+      "packId": "01a00137-5af6-75a7-93ab-8588a672a078",
+      "sha256": "7e32dabc3df636489fe9f20f6bf01203fb25461806206e067327917bacdc5665"
+    },
+    "rules": {
+      "kind": "inline",
+      "ruleSet": {
+        "format": "rule-set",
+        "schemaVersion": "1.0.0",
+        "meta": {
+          "title": "Club Night House Rules",
+          "author": "Jeopardy Machine content agents (owner curation pending)",
+          "created": "2026-08-14T17:00:00.000Z",
+          "modified": "2026-08-14T17:00:00.000Z"
+        },
+        "body": {
+          "base": "casual-party",
+          "overrides": {
+            "scoring": {
+              "wrongAnswerPenalty": "floor-at-zero"
+            },
+            "teams": {
+              "playerMode": "teams",
+              "teamBuzzer": "any-member"
+            },
+            "final": {
+              "eligibility": "everyone"
+            }
+          },
+          "description": "Casual-party base for a mixed-club night: shared-score teams where any member may buzz, wrong answers deduct but never drop a team below zero, and every team plays the final. Everything else inherits the casual defaults (co-champions ties, highest-wins finish, no phrasing requirement, Double Down label). Decision log: events/board-game-club-x-els/event-README.md."
+        }
+      }
+    },
+    "theme": {
+      "kind": "preset",
+      "preset": "terra-verde"
+    }
+  }
+}
