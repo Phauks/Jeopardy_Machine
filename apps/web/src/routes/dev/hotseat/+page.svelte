@@ -7,6 +7,7 @@
   import { createInitialState, cellKey } from "@jeopardy/engine/state";
   import { transition } from "@jeopardy/engine/transition";
   import BoardDisplay from "#lib/board/board-display.svelte";
+  import ScoresStrip from "#lib/room/scores-strip.svelte";
   import { sampleBoard } from "#lib/board/sample-board.ts";
   import { clueTextAt, sampleFinalClue, sampleGameSetup } from "#lib/hotseat/sample-game.ts";
   import { themePresets } from "#lib/theme/theme-presets.ts";
@@ -14,6 +15,7 @@
   import type { GameAction } from "@jeopardy/engine/actions";
   import type { GameEvent } from "@jeopardy/engine/events";
   import type { BoardData } from "#lib/board/sample-board.ts";
+  import type { StandingRow } from "#lib/room/room-view.ts";
 
   const playerNames = ["Ada", "Ben", "Cleo", "Dot", "Eli", "Fay", "Gus", "Hana"] as const;
 
@@ -88,6 +90,18 @@
   function nameOf(entityId: string): string {
     return engineState.players[entityId]?.name ?? entityId;
   }
+
+  // The M4 shared score component replaces the page's own scorecards (same rows shape the
+  // room surfaces use; no roster here, so accents stay neutral).
+  const standingRows: StandingRow[] = $derived(
+    engineState.entityOrder.map((entityId) => ({
+      entityId,
+      name: nameOf(entityId),
+      score: engineState.scores[entityId] ?? 0,
+      hasControl: engineState.controlEntity === entityId,
+      colorId: null,
+    })),
+  );
 
   // One expiry key (E) resolves to whichever timer the current phase is waiting on - the
   // hotseat driver plays the role the DO's alarms play in production.
@@ -245,20 +259,12 @@
       </section>
     {:else}
       <section class="flex flex-wrap items-center gap-2 text-sm">
-        {#each engineState.entityOrder as entityId (entityId)}
-          {@const isControl = engineState.controlEntity === entityId}
-          {@const isWinner = clue?.buzzWinner?.entityId === entityId}
-          {@const lockedOut = clue?.lockedOutEntities.includes(entityId) ?? false}
-          <span class="scorecard" class:control={isControl} class:winner={isWinner}>
-            {nameOf(entityId)}
-            <strong class:negative={(engineState.scores[entityId] ?? 0) < 0}>
-              ${engineState.scores[entityId] ?? 0}
-            </strong>
-            {#if isControl}<span title="has board control">picks</span>{/if}
-            {#if isWinner}<span title="won the buzz">buzzed</span>{/if}
-            {#if lockedOut}<span title="locked out of this clue">locked</span>{/if}
+        <ScoresStrip rows={standingRows} highlightEntityId={clue?.buzzWinner?.entityId ?? null} />
+        {#if (clue?.lockedOutEntities.length ?? 0) > 0}
+          <span class="text-xs text-surface-text-muted">
+            locked out: {(clue?.lockedOutEntities ?? []).map(nameOf).join(", ")}
           </span>
-        {/each}
+        {/if}
         <button
           type="button"
           class="chip"
@@ -516,30 +522,6 @@
   .chip:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;
-  }
-
-  .scorecard {
-    display: inline-flex;
-    gap: 0.4rem;
-    align-items: baseline;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--board-radius);
-    padding: 0.2rem 0.6rem;
-    background: var(--surface-raised);
-  }
-
-  .scorecard.control {
-    border-color: var(--accent);
-  }
-
-  .scorecard.winner {
-    outline: 2px solid var(--accent);
-  }
-
-  /* No negative-score token exists yet (that treatment is an M4 display concern); a dev
-   * tool marks the debt with emphasis only and stays inside the token contract. */
-  .scorecard .negative {
-    font-style: italic;
   }
 
   .badge {
