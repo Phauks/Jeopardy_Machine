@@ -9,7 +9,7 @@ import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages"
 import { Bot } from "@jeopardy/bots/bot";
 import type { BotOptions } from "@jeopardy/bots/bot";
 import type { BotSocket } from "@jeopardy/bots/socket";
-import type { CreateRoomRequest } from "@jeopardy/protocol/room/create";
+import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
 import type { RoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import type { GameEvent } from "@jeopardy/engine/events";
 
@@ -21,7 +21,7 @@ export function uniqueCode(): string {
   return `T${String(codeCounter).padStart(4, "0")}`.slice(0, 5);
 }
 
-export const compactGame: CreateRoomRequest["game"] = {
+export const compactGame: CreateRoomRequestInput["game"] = {
   kind: "compact",
   rounds: [{ columns: 3, rows: 3 }],
   preset: "casual-party",
@@ -34,14 +34,18 @@ export function roomStub(code: string) {
   return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
 }
 
+// `listing` carries the M3.5 creation fields (visibility/title/hostLabel/password -
+// docs/decisions/2026-08-14-room-visibility-and-lobby.md); omitted = the default unlisted,
+// open room every pre-existing test in this suite assumes.
 export async function initializeRoom(
   code: string,
-  game: CreateRoomRequest["game"] = compactGame,
+  game: CreateRoomRequestInput["game"] = compactGame,
   seed = "workerd-suite-seed",
+  listing: Omit<CreateRoomRequestInput, "game" | "seed"> = {},
 ): Promise<{ hostToken: string; expiresAt: number }> {
   const response = await roomStub(code).fetch("https://do/initialize", {
     method: "POST",
-    body: JSON.stringify({ game, seed } satisfies CreateRoomRequest),
+    body: JSON.stringify({ game, seed, ...listing } satisfies CreateRoomRequestInput),
   });
   expect(response.status).toBe(201);
   return (await response.json()) as { hostToken: string; expiresAt: number };

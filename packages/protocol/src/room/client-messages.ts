@@ -7,7 +7,10 @@
 //
 // | Message         | Who may send                                                          |
 // | --------------- | --------------------------------------------------------------------- |
-// | join            | anyone (role=host additionally requires the creation-time hostToken)  |
+// | join            | anyone; a password room additionally requires `password` from every    |
+// |                 | role EXCEPT host (the creation-time hostToken already proves the       |
+// |                 | stronger claim). Wrong/missing password = a `refused` that KEEPS the   |
+// |                 | socket for a retry, rate-limited per connection (limits.room)          |
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
 // | team-create     | player, lobby only (creator becomes leader - user-flows A2)           |
@@ -33,6 +36,7 @@ import {
   sessionTokenSchema,
 } from "./identity.ts";
 import { teamIdSchema } from "./roster.ts";
+import { roomPasswordSchema } from "./visibility.ts";
 
 // Every concrete message is strict (unknown fields only in ext) and carries the envelope
 // fields itself, so one parse validates envelope + payload in a single pass.
@@ -74,6 +78,11 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     buzzSoundId: curatedAssetIdSchema.optional(),
     team: joinTeamIntentSchema.optional(),
     hostToken: hostTokenSchema.optional(),
+    // The shared room secret, when the room has one (docs/decisions/2026-08-14-room-
+    // visibility-and-lobby.md). It rides the join MESSAGE, never the URL or a query string:
+    // room links get pasted into group chats and printed on QR codes, and a secret in a URL
+    // ends up in browser history, referrers, and access logs.
+    password: roomPasswordSchema.optional(),
   }),
   z.strictObject({
     ...envelopeFields,

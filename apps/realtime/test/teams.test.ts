@@ -14,10 +14,10 @@ import {
   uniqueCode,
 } from "./helpers.ts";
 import type { AlarmSchedule } from "../src/room/storage.ts";
-import type { CreateRoomRequest } from "@jeopardy/protocol/room/create";
+import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
 import type { GameRoomDO } from "../src/index.ts";
 
-const teamsGame: CreateRoomRequest["game"] = {
+const teamsGame: CreateRoomRequestInput["game"] = {
   kind: "compact",
   rounds: [{ columns: 3, rows: 3 }],
   preset: "casual-party",

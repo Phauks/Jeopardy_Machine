@@ -15,6 +15,12 @@ import { settingsPresetIdSchema } from "../settings/presets.ts";
 import { gameDefinitionBodySchema } from "../modes/jeopardy/game-definition.ts";
 import { hostTokenSchema } from "./identity.ts";
 import { roomCodeSchema } from "./server-messages.ts";
+import {
+  hostLabelSchema,
+  roomPasswordSchema,
+  roomTitleSchema,
+  roomVisibilitySchema,
+} from "./visibility.ts";
 
 // Mirrors the board shape of @jeopardy/engine's scenario fixtures (packages/engine/src/
 // fixture.ts) - restated here because the engine depends on protocol, not the reverse; the
@@ -44,17 +50,37 @@ export type RoomGameSpec = z.infer<typeof roomGameSpecSchema>;
 // Body of both the web create route (POST /api/rooms) and the DO initialize RPC the route
 // forwards to. Seed optional: omitted = the server draws one (normal play); pinned = a
 // reproducible game for bug reports and simulations (owner directive on seeded randomness).
-export const createRoomRequestSchema = z.strictObject({
-  game: roomGameSpecSchema,
-  seed: z.string().min(1).max(120).optional(),
-});
+export const createRoomRequestSchema = z
+  .strictObject({
+    game: roomGameSpecSchema,
+    seed: z.string().min(1).max(120).optional(),
+    visibility: roomVisibilitySchema.default("unlisted"),
+    // Listing metadata. Optional for unlisted rooms (nobody ever reads them) and REQUIRED for
+    // public ones - an unnamed row in a server browser is noise, not an invitation.
+    title: roomTitleSchema.optional(),
+    hostLabel: hostLabelSchema.optional(),
+    password: roomPasswordSchema.optional(),
+  })
+  .refine((body) => body.visibility !== "public" || body.title !== undefined, {
+    error: "a public room needs a title - it is the row people read in the lobby",
+    path: ["title"],
+  });
+// Parsed shape (defaults applied - `visibility` is always present after a parse).
 export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
+// Wire shape: what a caller must actually SEND. Distinct from the parsed type since
+// `visibility` has a default - callers that build request bodies (the harness, the bots CLI,
+// the workerd suite) type against this one, or they would be forced to restate the default.
+export type CreateRoomRequestInput = z.input<typeof createRoomRequestSchema>;
 
 export const createRoomResponseSchema = z.strictObject({
   code: roomCodeSchema,
   hostToken: hostTokenSchema,
   // Unix ms when the room's idle-expiry alarm would fire if nothing ever connects.
   expiresAt: z.number().int().positive(),
+  // Echoed back so the creating surface can show the truth the server recorded (lock badge,
+  // "listed in the lobby" confirmation) without re-deriving it from its own request body.
+  visibility: roomVisibilitySchema,
+  hasPassword: z.boolean(),
 });
 export type CreateRoomResponse = z.infer<typeof createRoomResponseSchema>;
 

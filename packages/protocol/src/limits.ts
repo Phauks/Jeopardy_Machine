@@ -32,6 +32,34 @@ export const limits = {
     // lifecycle): the expiry alarm wipes the DO, frees the code, and later joins get no-such-room.
     // 2h idle covers a dinner break mid-game night without keeping dead rooms alive for days.
     idleExpiryMs: 2 * 60 * 60 * 1000,
+    // Listing metadata (docs/decisions/2026-08-14-room-visibility-and-lobby.md): the title is
+    // one line of a lobby row on a phone, the host label is a name or a club - never a bio.
+    // Both are host-supplied strings that strangers read, so they are capped, not trusted.
+    roomTitleMaxLength: 60,
+    hostLabelMaxLength: 32,
+    // A room password is a SHARED ROOM SECRET (same decision doc, "Room passwords are not
+    // accounts"): shouted across a hall or printed on a table tent, never an identity. Four
+    // characters is the floor that keeps it typeable on a phone without being a single letter;
+    // the ceiling only exists so a paste-bomb cannot reach the hash function.
+    roomPasswordMinLength: 4,
+    roomPasswordMaxLength: 64,
+    // Wrong-password join attempts one connection may spend inside the window before the room
+    // closes it. Low on purpose: a shared secret with a rate limit cannot be brute-forced, and
+    // reconnecting to reset the meter costs an attacker a full WebSocket handshake per try.
+    passwordAttemptBurstMax: 5,
+    passwordAttemptWindowMs: 60 * 1000,
+  },
+  lobby: {
+    // Rooms returned by one public-lobby query (GET /api/rooms), newest first. A browse
+    // surface, not a directory: pagination is deliberately deferred, so this cap IS the list.
+    listingMax: 40,
+    // Edge/browser cache lifetime of that response. Long enough that a refreshing lobby costs
+    // one D1 read per interval across all viewers, short enough that a room a host just
+    // created shows up while they are still looking at the screen.
+    listingCacheSeconds: 10,
+    // How often the lobby page re-queries. It is a browse surface, not a live room - no
+    // socket, no push (same decision doc).
+    listingRefreshMs: 15 * 1000,
   },
   player: {
     nicknameMinLength: 1,

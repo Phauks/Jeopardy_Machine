@@ -48,6 +48,13 @@ export const refusalReasonSchema = z.enum([
   "late-join-disabled",
   "team-locked",
   "unknown-team",
+  // Password rooms (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Both reasons
+  // KEEP the socket so the phone can prompt and retry on the same connection - the only
+  // difference between them is whether the client sent a password at all, which the client
+  // already knows. Attempts are rate-limited per connection (limits.room.passwordAttempt*);
+  // the connection that exhausts them is closed with joinRefused.
+  "password-required",
+  "bad-password",
 ]);
 export type RefusalReason = z.infer<typeof refusalReasonSchema>;
 
@@ -215,7 +222,9 @@ export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResu
 // share one table; 4xxx is the application range the runtime passes through untouched).
 // Room-level refusals (no-such-room, bad tokens, room-full, late-join-disabled) close the
 // socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
-// phone keeps its socket and retries the join with another team card.
+// phone keeps its socket and retries the join with another team card. PASSWORD refusals
+// (password-required, bad-password) behave like the team ones - retry on the same socket -
+// until the per-connection attempt budget runs out, which closes with joinRefused.
 export const roomCloseCodes = {
   roomClosed: 4000,
   badToken: 4401,

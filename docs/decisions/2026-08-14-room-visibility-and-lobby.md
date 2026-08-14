@@ -10,19 +10,19 @@ Also answers the prior question "can the harness list all available rooms?" - it
 
 Adopt the multiplayer server-browser model, with two INDEPENDENT axes - the mistake to avoid is conflating "listed" with "open":
 
-| Axis | Values | Meaning |
-|---|---|---|
+| Axis        | Values                | Meaning                                      |
+| ----------- | --------------------- | -------------------------------------------- |
 | **Listing** | `public` / `unlisted` | Does the room appear in the browsable lobby? |
-| **Entry** | `open` / `password` | Is a shared room password required to join? |
+| **Entry**   | `open` / `password`   | Is a shared room password required to join?  |
 
 All four combinations are legal and each maps to a real use case:
 
-| Combination | Game analogue | Our use case |
-|---|---|---|
-| public + open | open server browser | pub quiz night, drop-in trivia, demo rooms |
-| public + password | listed server with a lock icon | club night: everyone sees it, the password keeps randoms out (owner's "public but needs a password") |
-| unlisted + open | share-a-code lobby | the current behavior: QR/code is the entire flow (guiding principle 3) |
-| unlisted + password | private match | rehearsals, staff-only games |
+| Combination         | Game analogue                  | Our use case                                                                                         |
+| ------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| public + open       | open server browser            | pub quiz night, drop-in trivia, demo rooms                                                           |
+| public + password   | listed server with a lock icon | club night: everyone sees it, the password keeps randoms out (owner's "public but needs a password") |
+| unlisted + open     | share-a-code lobby             | the current behavior: QR/code is the entire flow (guiding principle 3)                               |
+| unlisted + password | private match                  | rehearsals, staff-only games                                                                         |
 
 **Default stays `unlisted` + `open`** - the QR-code flow is untouched and nothing a host does accidentally publishes their game.
 
@@ -36,7 +36,7 @@ A D1 table written by the room-creation route and updated over the room's life:
 
 `rooms(code PK, title, host_label, visibility, has_password, phase, player_count, player_cap, created_at, last_seen_at, expires_at, ended_at)`
 
-- **Written on create**, refreshed by the DO on meaningful transitions (lobby -> active, roster count changes, close/expiry). Registry rows are a *projection*: the DO stays the source of truth, the row is a cache for browsing. A stale row can never let someone into a dead room - the DO refuses on connect regardless.
+- **Written on create**, refreshed by the DO on meaningful transitions (lobby -> active, roster count changes, close/expiry). Registry rows are a _projection_: the DO stays the source of truth, the row is a cache for browsing. A stale row can never let someone into a dead room - the DO refuses on connect regardless.
 - **Password verification lives in the DO, never in the registry**: the row stores only `has_password` (for the lock icon); the DO stores a salted hash and checks it during join. Wrong password = a join refusal, with rate limiting per connection, so the lobby list can never be used as an oracle.
 - Rows are deleted/marked ended by the expiry alarm; the lobby query filters to live, non-ended rooms.
 

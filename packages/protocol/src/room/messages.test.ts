@@ -83,6 +83,38 @@ describe("room client messages", () => {
       }).success,
     ).toBe(false);
   });
+
+  // docs/decisions/2026-08-14-room-visibility-and-lobby.md: the shared room secret rides the
+  // join MESSAGE (never the URL), is optional (most rooms are open), and is length-bounded.
+  it("carries an optional room password on join, bounded by the limits module", () => {
+    const join = (password?: string) => ({
+      version: v,
+      type: "join",
+      role: "player",
+      nickname: "Lorax",
+      ...(password !== undefined && { password }),
+    });
+    expect(roomClientMessageSchema.safeParse(join()).success).toBe(true);
+    expect(roomClientMessageSchema.safeParse(join("hunter2!")).success).toBe(true);
+    expect(
+      roomClientMessageSchema.safeParse(join("x".repeat(limits.room.roomPasswordMinLength - 1)))
+        .success,
+    ).toBe(false);
+    expect(
+      roomClientMessageSchema.safeParse(join("x".repeat(limits.room.roomPasswordMaxLength + 1)))
+        .success,
+    ).toBe(false);
+    // Every role may present one - a display at the venue needs the room secret too; only the
+    // host is exempt, and it proves the stronger claim with the creation token.
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "join",
+        role: "display",
+        password: "hunter2!",
+      }).success,
+    ).toBe(true);
+  });
 });
 
 describe("room server messages", () => {
@@ -131,6 +163,18 @@ describe("room server messages", () => {
     expect(roomCloseCodes.badToken).toBeGreaterThanOrEqual(4400);
     expect(roomCloseCodes.roomFull).toBeGreaterThanOrEqual(4400);
     expect(roomCloseCodes.roomClosed).toBeLessThan(4400);
+  });
+
+  it("carries both password refusals, which are retryable on the same socket", () => {
+    for (const reason of ["password-required", "bad-password"]) {
+      expect(
+        roomServerMessageSchema.safeParse({ version: v, type: "refused", reason }).success,
+        reason,
+      ).toBe(true);
+    }
+    // The exhausted-attempts close reuses the existing join-refusal code - no new code, so
+    // clients written against the M3 catalog still know not to reconnect.
+    expect(roomCloseCodes.joinRefused).toBeGreaterThanOrEqual(4400);
   });
 
   it("refuses version skew symmetrically to the client parser", () => {
