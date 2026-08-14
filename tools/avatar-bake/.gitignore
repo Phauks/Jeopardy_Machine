@@ -1,0 +1,4 @@
+# Kenney source packs are downloaded (CC0, kenney.nl), never committed - see README.md.
+downloads/
+# --analyze scratch output (original-color renders + dominant-cell dumps for curation).
+analysis/
