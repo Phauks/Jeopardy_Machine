@@ -23,7 +23,7 @@ runs both dev servers in parallel:
 
 The realtime origin the web app uses comes from `REALTIME_ORIGIN` (declared in `apps/web/src/env.ts`, value in `apps/web/.env`, default `http://localhost:8787`).
 
-**Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and emblem set with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change.
+**Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and the avatar picker/chips with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change. The avatar sprites themselves are baked, not live-rendered - changing avatars/accents means re-running `tools/avatar-bake` (its README).
 
 **Engine smoke check (M2 exit criteria):** <http://localhost:5173/dev/hotseat> plays a complete game against `@jeopardy/engine` with no server - one keyboard drives host and players (S start, click cells, A arms, 1-8 buzz, C/W/N judge, E expires whichever timer the phase waits on, U undoes anything). Wager cells, the final round, and sudden-death ties are all reachable; the key legend is on the page.
 
@@ -47,7 +47,7 @@ pnpm -F @jeopardy/realtime test   # one package (same for web/protocol)
 - `packages/protocol` - plain vitest, co-located `*.test.ts` next to sources; `limits.gate.test.ts` is an invariant gate (cross-field sanity of the caps).
 - `packages/engine` - plain vitest, one test file per rules area (buzzing, judging, wagers, final, ...) with settings-matrix row numbers cited in describe/it names; `fixture.test.ts` replays every scenario JSON under `fixtures/` twice and diffs the runs (determinism gate); `undo-replay.test.ts` holds the undo-returns-exact-prior-state and log-replay invariants.
 - `apps/realtime` - vitest **inside workerd** via `@cloudflare/vitest-pool-workers` (the `cloudflareTest` plugin in vitest.config.ts reads wrangler.jsonc, so tests exercise the real DO with real hibernation APIs). `wrangler types` runs automatically first (pretest is part of the script).
-- `apps/web` - plain vitest for pure logic plus server-render component tests (`svelte/server` `render()` inside node vitest - see `src/lib/board/board-display.test.ts`); browser-mode interaction tests arrive with the M4 phase 2 surfaces. Invariant gates: `theme-contract.gate.test.ts` (every preset emits the full token contract), `emblem-set.gate.test.ts` (curated-set design rules).
+- `apps/web` - plain vitest for pure logic plus server-render component tests (`svelte/server` `render()` inside node vitest - see `src/lib/board/board-display.test.ts`); browser-mode interaction tests arrive with the M4 phase 2 surfaces. Invariant gates: `theme-contract.gate.test.ts` (every preset emits the full token contract), `avatar-manifest.gate.test.ts` (baked avatar set: manifest, sprite files on disk, and theme preset accents must agree).
 
 `pnpm check` runs svelte-check (web, plus a separate `tsc -p src/service-worker` for WebWorker libs) and `tsc --noEmit` elsewhere. `pnpm lint` / `pnpm fmt` are repo-wide via Vite+ (`vp`), configured in the root `vite.config.ts`.
 

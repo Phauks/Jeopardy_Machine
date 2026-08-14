@@ -4,10 +4,11 @@
   // (docs/research/00-user-directives.md "UI gallery feedback round 1"; contract:
   // docs/design/theming.md). Like /dev/echo, dev-routes convention applies: /dev/* pages are
   // developer surfaces, never linked from product UI, and carry no player-facing weight.
+  import AvatarChip from "#lib/avatars/avatar-chip.svelte";
+  import AvatarPicker from "#lib/avatars/avatar-picker.svelte";
+  import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import BoardDisplay from "#lib/board/board-display.svelte";
   import { sampleBoard } from "#lib/board/sample-board.ts";
-  import EmblemMark from "#lib/emblems/emblem-mark.svelte";
-  import { emblems } from "#lib/emblems/emblem-set.ts";
   import { themePresets } from "#lib/theme/theme-presets.ts";
   import type { ThemeEffectsLevel, ThemePresetId } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute, themeToTokens } from "#lib/theme/theme-to-css.ts";
@@ -58,12 +59,18 @@
         ),
   );
 
-  const emblemTints = [
-    { label: "accent", value: "var(--accent)" },
-    { label: "value", value: "var(--board-value-color)" },
-    { label: "text", value: "var(--clue-text-color)" },
-  ] as const;
-  let emblemTint = $state<string>("var(--accent)");
+  // Avatar picker state lives here because the picker component is deliberately
+  // presentational - the join screen (M4 phase 2) will own this state the same way.
+  let selectedAvatarId = $state<string>("dog");
+  let selectedAccentId = $state<string>(avatarManifest.accents[0]?.id ?? "gold");
+  const selectedAvatar = $derived(
+    avatarManifest.avatars.find((avatar) => avatar.id === selectedAvatarId) ??
+      avatarManifest.avatars[0],
+  );
+  const selectedAccent = $derived(
+    avatarManifest.accents.find((accent) => accent.id === selectedAccentId) ??
+      avatarManifest.accents[0],
+  );
 </script>
 
 <svelte:head>
@@ -183,41 +190,54 @@
     </section>
 
     <section class="flex flex-col gap-3">
-      <h2 class="chrome-title text-lg">Emblems</h2>
+      <h2 class="chrome-title text-lg">Avatars</h2>
       <p class="max-w-prose text-sm text-surface-text-muted">
-        Curated player-identity marks - single-color inline SVG, tinted purely by currentColor
-        from theme/team tokens (the designed replacement for free emoji). Working set for
-        review; the final set is owner-curated.
+        Full-color player avatars: Kenney Cube Pets + Mini Characters, baked to accent-recolored
+        sprites by tools/avatar-bake (licensing: static/avatars/LICENSES.md). The picker below is
+        the presentational join-screen component; the chip row is the 24px score-chip identity
+        story - at that size the accent backing carries identity, from 48px the avatar itself
+        reads. Picker chrome is un-themed like all gallery controls; only the chip-row panel
+        carries the selected theme.
       </p>
-      <div class="flex items-center gap-2" role="group" aria-label="Emblem tint">
-        <span class="text-sm text-surface-text-muted">Tint:</span>
-        {#each emblemTints as tint (tint.label)}
-          <button
-            type="button"
-            class="picker-chip"
-            class:active={emblemTint === tint.value}
-            onclick={() => {
-              emblemTint = tint.value;
-            }}
-          >
-            {tint.label}
-          </button>
-        {/each}
+      <div class="preview-panel bg-surface-raised text-surface-text">
+        <AvatarPicker
+          avatars={avatarManifest.avatars}
+          accents={avatarManifest.accents}
+          {selectedAvatarId}
+          {selectedAccentId}
+          onSelectAvatar={(avatarId) => {
+            selectedAvatarId = avatarId;
+          }}
+          onSelectAccent={(accentId) => {
+            selectedAccentId = accentId;
+          }}
+        />
       </div>
-      <div
-        class="preview-panel emblem-grid bg-surface-raised text-surface-text"
-        style={themeStyle}
-        data-effects={effectsLevel}
-      >
-        {#each emblems as emblem (emblem.id)}
-          <figure class="flex flex-col items-center gap-2">
-            <span class="emblem-tile" style="color: {emblemTint}">
-              <EmblemMark {emblem} />
+      {#if selectedAvatar && selectedAccent}
+        <div
+          class="preview-panel bg-surface-page text-surface-text"
+          style={themeStyle}
+          data-effects={effectsLevel}
+        >
+          <div class="flex flex-wrap items-center gap-6">
+            {#each ["24px", "48px", "96px"] as chipSize (chipSize)}
+              <div class="flex items-center gap-2">
+                <AvatarChip avatar={selectedAvatar} accent={selectedAccent} size={chipSize} />
+                <span class="text-xs text-surface-text-muted">{chipSize}</span>
+              </div>
+            {/each}
+            <span
+              class="roster-chip"
+              style="background: {selectedAccent.hex}"
+              data-effects={effectsLevel}
+            >
+              <AvatarChip avatar={selectedAvatar} accent={selectedAccent} size="24px" />
+              <b>{selectedAvatar.displayName}</b>
+              <em>$0</em>
             </span>
-            <figcaption class="text-xs text-surface-text-muted">{emblem.label}</figcaption>
-          </figure>
-        {/each}
-      </div>
+          </div>
+        </div>
+      {/if}
     </section>
   </div>
 </main>
@@ -278,14 +298,30 @@
     border: 1px solid var(--surface-border);
   }
 
-  .emblem-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(5.5rem, 1fr));
-    gap: 1.25rem;
+  /* Mock roster chip: the lobby/score-strip context a 24px avatar chip lives in. */
+  .roster-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    padding: 0.3rem 0.85rem 0.3rem 0.4rem;
+    border-radius: 999px;
+    color: #ffffff;
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.18),
+      0 2px 6px rgb(0 0 0 / 0.4);
   }
 
-  .emblem-tile {
-    font-size: 3rem;
-    line-height: 1;
+  .roster-chip b {
+    font-family: var(--font-chrome);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-size: 0.85rem;
+  }
+
+  .roster-chip em {
+    font-style: normal;
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-variant-numeric: tabular-nums;
   }
 </style>
