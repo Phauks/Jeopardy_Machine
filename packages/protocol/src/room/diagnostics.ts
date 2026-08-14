@@ -1,0 +1,116 @@
+// Room diagnostics: what a HOST may ask a live Durable Object about itself
+// (owner request 2026-08-14, "provide more information about the DO objects").
+//
+// This is an operator instrument, not a play surface: the harness renders it, the host
+// console may later, and nothing else should. Two rules shape the schema and are gated by
+// apps/realtime/test/diagnostics.test.ts:
+//
+// 1. NO SECRETS, EVER. The host token, the room's password hash and salt, every player's
+//    session token, and all authored clue text/answers are absent by construction - this
+//    schema is `strictObject` all the way down, so a field cannot be added by accident at a
+//    call site, only deliberately here.
+// 2. COUNTS, NOT PEOPLE. The lobby lists rooms, never players (registry.ts); the inspector
+//    keeps the same promise - roster size and connection counts, no nicknames, no ids.
+//
+// Everything here is a SNAPSHOT of DO memory at request time. It is diagnostic truth, not
+// wire state: nothing subscribes, nothing patches, and a stale reading is harmless.
+import { z } from "zod";
+import { registryStatusSchema } from "./registry.ts";
+import { roomCodeSchema, roomPhaseSchema } from "./server-messages.ts";
+import { roomVisibilitySchema } from "./visibility.ts";
+
+// How a host proves itself to the ops endpoints. A header, not a query parameter: room links
+// are pasted, logged and screenshotted, and the host token is the room's strongest secret -
+// it must never end up in an access log or a browser history entry.
+export const hostTokenHeader = "x-host-token";
+
+// Connections by the role they joined as. `unjoined` is a socket that upgraded but has sent
+// neither join nor resume - the state a refused or still-typing client sits in, and the one
+// worth seeing when a phone "connects" but nothing happens.
+export const connectionCensusSchema = z.strictObject({
+  total: z.int().nonnegative(),
+  host: z.int().nonnegative(),
+  player: z.int().nonnegative(),
+  display: z.int().nonnegative(),
+  spectator: z.int().nonnegative(),
+  unjoined: z.int().nonnegative(),
+});
+export type ConnectionCensus = z.infer<typeof connectionCensusSchema>;
+
+// One entry of the DO's multiplexed alarm book (apps/realtime/src/room/storage.ts). The ONE
+// runtime alarm always sits at the earliest `dueAt`; seeing the whole book is how a timer
+// that never fired stops being a mystery.
+export const alarmEntrySchema = z.strictObject({
+  source: z.enum(["engine-timer", "team-succession", "idle-expiry"]),
+  // Timer kind, team id, or "room" - a label, never an identity.
+  label: z.string().max(60),
+  dueAt: z.int().positive(),
+});
+
+export const roomDiagnosticsSchema = z.strictObject({
+  code: roomCodeSchema,
+  lifecycle: roomPhaseSchema,
+  visibility: roomVisibilitySchema,
+  title: z.string().max(120),
+  hostLabel: z.string().max(120),
+  // The one password fact that is ever public (registry.ts) - true/false, never the hash.
+  hasPassword: z.boolean(),
+  // Unix ms. `expiresAt` is derived (lastActivityAt + the idle-expiry limit), so the gap
+  // between "now" and it is exactly how long the room has left if nobody touches it.
+  createdAt: z.int().positive(),
+  lastActivityAt: z.int().positive(),
+  expiresAt: z.int().positive(),
+  paused: z.boolean(),
+  stateVersion: z.int().nonnegative(),
+  connections: connectionCensusSchema,
+  roster: z.strictObject({
+    players: z.int().nonnegative(),
+    connected: z.int().nonnegative(),
+    teams: z.int().nonnegative(),
+  }),
+  alarm: z.strictObject({
+    // What the runtime alarm is actually set to, i.e. the earliest entry below.
+    nextWakeAt: z.union([z.int().positive(), z.null()]),
+    entries: z.array(alarmEntrySchema).max(64),
+  }),
+  // Approximate size of each storage bundle key, measured as serialized JSON characters of
+  // what the DO holds in memory. Cheap (no extra storage reads) and precise enough for its
+  // only question: which key is growing.
+  storage: z.strictObject({
+    totalBytes: z.int().nonnegative(),
+    keys: z.array(z.strictObject({ key: z.string().max(40), bytes: z.int().nonnegative() })),
+  }),
+});
+export type RoomDiagnostics = z.infer<typeof roomDiagnosticsSchema>;
+
+// What the registry believes about this same room, so the two halves can be compared side by
+// side - the drift the decision doc calls "expected and visible, never fatal" becomes
+// literally visible here (row missing while the room is live = the lobby is lying by omission).
+export const registryRowStateSchema = z.strictObject({
+  listed: z.boolean(),
+  phase: roomPhaseSchema,
+  playerCount: z.int().nonnegative(),
+  expiresAt: z.int().positive(),
+  endedAt: z.union([z.int().positive(), z.null()]),
+});
+export type RegistryRowState = z.infer<typeof registryRowStateSchema>;
+
+// Body of GET /api/rooms/<CODE> (host-authenticated). `registryRow` is null when the room has
+// no row at all - which, with `registry.status === "ok"`, is real drift worth investigating,
+// and with `no-table` is simply the missing migration saying so again.
+export const roomInspectionSchema = z.strictObject({
+  room: roomDiagnosticsSchema,
+  registry: registryStatusSchema,
+  registryRow: z.union([registryRowStateSchema, z.null()]),
+});
+export type RoomInspection = z.infer<typeof roomInspectionSchema>;
+
+// Body of DELETE /api/rooms/<CODE> (host-authenticated): the room is closed, everyone got the
+// polite screen, and the lobby row is gone. `registry` reports the row deletion the same way
+// creation reports the row insert - loudly.
+export const closeRoomResponseSchema = z.strictObject({
+  code: roomCodeSchema,
+  closed: z.literal(true),
+  registry: registryStatusSchema,
+});
+export type CloseRoomResponse = z.infer<typeof closeRoomResponseSchema>;

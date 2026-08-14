@@ -44,6 +44,12 @@ export type RoomMeta = {
   // its companion buzz-won share one version). Clients gap-detect against it and re-sync.
   stateVersion: number;
   lifecycle: RoomLifecycle;
+  // Host-held freeze (client message set-pause). Unix ms when the room was paused, null when
+  // running. Room-level rather than engine-level: @jeopardy/engine has no pause concept, so
+  // the room parks the alarm book (each running timer keeps its remaining time in
+  // EngineTimerEntry.remainingMs) and every client is told - guiding principle 4, every
+  // automated step has a manual override.
+  pausedAt: number | null;
   // Monotonic counters for minted ids: seats are "p-<n>", teams "t-<n>". Session/host
   // TOKENS are crypto-random; ids are deliberately small and readable in logs.
   playerCounter: number;
@@ -57,6 +63,9 @@ export type StoredRosterEntry = RosterEntry & {
 
 export type EngineTimerEntry = {
   dueAt: number;
+  // Set only while the room is paused: what was left on this timer at the moment of the
+  // freeze. Resuming turns it back into a dueAt, so a pause never silently expires a clue.
+  remainingMs?: number;
   // The expiry action the engine asked for via its timer-set hint. Stale entries (phase
   // moved on, undo rewound) fire as harmless engine rejections and are dropped silently.
   actionType: GameActionType;
@@ -78,11 +87,18 @@ export type AlarmSchedule = {
 
 export const emptySchedule: AlarmSchedule = { engineTimers: {}, successions: {} };
 
-/** The next moment the DO must wake: earliest scheduled entry or the idle expiry. */
+/**
+ * The next moment the DO must wake: earliest scheduled entry or the idle expiry. A PAUSED
+ * room contributes no engine timers - that is what the freeze means; leadership succession
+ * and idle expiry keep running, because phones still drop and rooms still age while a host
+ * holds the room.
+ */
 export function nextWakeAt(schedule: AlarmSchedule, meta: RoomMeta, idleExpiryMs: number): number {
   let earliest = meta.lastActivityAt + idleExpiryMs;
-  for (const entry of Object.values(schedule.engineTimers)) {
-    earliest = Math.min(earliest, entry.dueAt);
+  if (meta.pausedAt === null) {
+    for (const entry of Object.values(schedule.engineTimers)) {
+      earliest = Math.min(earliest, entry.dueAt);
+    }
   }
   for (const entry of Object.values(schedule.successions)) {
     earliest = Math.min(earliest, entry.dueAt);

@@ -41,3 +41,13 @@ The week-1 risk resolved in favor of the plain route. A SvelteKit 3 `+server.ts`
 Proof, repeatable: `apps/web/scripts/prove-single-origin.mjs` against the built worker under multi-config `wrangler dev` (create room -> upgrade -> host join -> welcome/snapshot -> no-such-room refusal for an uncreated code, all through the web origin); the Playwright suite re-proves it with real browsers on every e2e run. Watch item: a kit/adapter pin bump that starts wrapping endpoint responses would break the passthrough - the proof script is the canary, run it after any such bump.
 
 Local-dev deltas from this addendum: vite dev CANNOT emulate the cross-script DO binding, so the single-origin loop runs under multi-config `wrangler dev` (docs/DEVELOPMENT.md); `/dev/echo` grew into the room harness (create/join/refusal probes) and keeps `REALTIME_ORIGIN` only as a deprecated direct-dial toggle for vite-dev sessions - the env var's deletion moves to the harness's retirement (M4) rather than M3.
+
+## Addendum 2026-08-14 (b): `REALTIME_ORIGIN` is DELETED - single origin is the only path
+
+The deletion the Consequences section promised, and the addendum above deferred, has happened. Owner direction: "remove direct realtime origin (http://localhost:8787) - deprecated."
+
+Gone in one commit: the `REALTIME_ORIGIN` declaration in `apps/web/src/env.ts` (which now declares nothing - the app reads no environment variables at all), the `apps/web/.env` file that supplied it, the harness's direct/same-origin toggle, and the origin parameter callers had to get right - `roomWebSocketUrl(code)` now builds the URL from the page's own origin, with an explicit origin accepted only so the function stays testable without a DOM.
+
+Why now rather than at "harness retirement": the harness did not retire, it grew into the room instrument panel (`/dev/rooms`), and keeping a deprecated second dial inside the tool people debug rooms with was the wrong thing to leave lying around. The toggle also re-created the exact misconfiguration class this decision was written to end - a build-time string that can point at localhost in production - inside the one page an owner opens when rooms already look broken.
+
+Consequence for local dev, stated plainly in docs/DEVELOPMENT.md: `pnpm dev` (vite) cannot serve rooms at all and never could without the deleted escape hatch. `pnpm dev:rooms` runs the single-origin loop in one command, and the routes answer 503 with an on-page explanation everywhere else.

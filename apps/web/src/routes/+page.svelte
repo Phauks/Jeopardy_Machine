@@ -11,13 +11,20 @@
   //    replaces the index; the Join half is already the landing it will sit beside.)
   import BuildBadge from "#lib/dev/build-badge.svelte";
   import PublicRoomsList from "#lib/lobby/public-rooms-list.svelte";
+  import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
   import { joinUrlForRoom, rememberRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 
   let typedCode = $state("");
   let password = $state("");
-  let listing = $state<LobbyListing>({ rooms: [], fetchedAt: Date.now() });
+  // The registry starts "unavailable/error" rather than "ok": until the first fetch answers,
+  // an empty list has no verdict behind it, and claiming one would be the old bug in reverse.
+  let listing = $state<LobbyListing>({
+    rooms: [],
+    fetchedAt: Date.now(),
+    registry: { status: "unavailable", reason: "error", detail: "not fetched yet" },
+  });
   let listingError = $state<string | null>(null);
 
   const normalizedCode = $derived(typedCode.trim().toUpperCase());
@@ -78,14 +85,34 @@
       note: "Four presets on the live token contract - board, type, swatches, emblems, effects toggle (M4 phase 1).",
     },
     {
-      href: "/dev/echo",
-      title: "Realtime room harness",
-      note: "Create a real room (public/unlisted, with or without a password), list the live public rooms, connect through the single origin, join as host/player/spectator, and probe refusals.",
+      href: "/dev/rooms",
+      title: "Room instrument panel",
+      note: "Three-column room console: create/delete rooms and see every one this tab made, connect and join through the single origin with a live DO inspector, watch the auto-refreshing public lobby with the registry's health stated out loud, and run the refusal probes in the test area.",
+    },
+    {
+      href: "/dev/diorama",
+      title: "Avatar diorama",
+      note: "The live 3D lobby scene with fake players: add avatars, switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
     },
     {
       href: "/api/rooms",
       title: "/api/rooms",
       note: "The public lobby listing as JSON: live public rooms, newest first, capped and briefly cached.",
+    },
+    {
+      href: "/room/DUMYX",
+      title: "Player room",
+      note: "A2 join, A3 lobby, A4 buzzer - open on a phone (M4 mock room seeded from the fixture dataset; ?theme=modern-flat previews presets).",
+    },
+    {
+      href: "/room/DUMYX/display",
+      title: "Display screen",
+      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the live 3D avatar diorama on lobby and winner phases.",
+    },
+    {
+      href: "/room/DUMYX/host",
+      title: "Host console",
+      note: "C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.",
     },
     {
       href: "/api/version",
@@ -147,6 +174,9 @@
         The public list is unavailable right now ({listingError}). A room code still works.
       </p>
     {/if}
+    <!-- Quiet while healthy (the Join section is not a status board), loud when the registry
+         cannot answer - an empty list must always be able to say why it is empty. -->
+    <RegistryStatusLine status={listing.registry} quiet />
     <PublicRoomsList
       rooms={listing.rooms}
       fetchedAt={listing.fetchedAt}
@@ -177,6 +207,7 @@
   <p class="text-sm opacity-70">
     Build {__BUILD_META__.sha} · {__BUILD_META__.builtAt.slice(0, 16).replace("T", " ")}Z ·
     <a class="underline" href="https://github.com/Phauks/Jeopardy_Machine">source</a>
+
   </p>
 </main>
 

@@ -19,13 +19,16 @@
   },
   "dependencies": {
     "@jeopardy/engine": "workspace:*",
-    "@jeopardy/protocol": "workspace:*"
+    "@jeopardy/protocol": "workspace:*",
+    "three": "catalog:",
+    "uqr": "catalog:"
   },
   "devDependencies": {
     "@sveltejs/adapter-cloudflare": "catalog:",
     "@sveltejs/kit": "catalog:",
     "@sveltejs/vite-plugin-svelte": "catalog:",
     "@tailwindcss/vite": "catalog:",
+    "@types/three": "catalog:",
     "playwright": "catalog:",
     "svelte": "catalog:",
     "svelte-check": "catalog:",

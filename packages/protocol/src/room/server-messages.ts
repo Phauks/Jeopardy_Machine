@@ -11,12 +11,16 @@
 // |              | directive "Only the winning buzz is heard"; sound resolution note below)    |
 // | buzz-rejected| to the losing/early phone only - silent local feedback, never room audio    |
 // | roster       | broadcast on any roster or team change                                      |
-// | room-closed  | broadcast, then all connections close                                       |
+// | clue-content | to each connection when a clue opens (and with a snapshot while one is      |
+// |              | open); role-redacted - see clueContentSchema                                |
+// | paused       | broadcast when the host freezes/resumes the room                            |
+// | room-closed  | broadcast (or to one connection, for a kick), then those connections close  |
 // | error        | to the offending connection only                                            |
 //
 // Close codes (WebSocket application range): 4404 no-such-room, 4401 bad token, 4409 room
 // full, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
 import { z } from "zod";
+import { mediaRefSchema } from "../content/media-ref.ts";
 import { extensionBagSchema } from "../ext.ts";
 import { protocolVersion } from "../envelope/wire.ts";
 import { limits } from "../limits.ts";
@@ -93,6 +97,51 @@ const gameViewSchema = z.unknown();
 export const roomPhaseSchema = z.enum(["lobby", "active", "ended"]);
 export type RoomPhase = z.infer<typeof roomPhaseSchema>;
 
+// CLUE CONTENT - the one channel carrying authored prompt/answer text to clients. The engine
+// deals in board coordinates and never sees a word of content (guiding principle 6), so this
+// rides beside the event stream rather than inside it, resolved by the DO from the room's
+// stored game definition.
+//
+// Redaction is the entire point (the DO's room/content.ts is the one implementation):
+//
+// | Role      | prompt                                        | answer |
+// | --------- | --------------------------------------------- | ------ |
+// | host      | always                                        | always |
+// | display   | always (it IS the big screen)                 | never  |
+// | player    | only when settings.join.clueTextOnPhones is on| never  |
+// | spectator | same as display                               | never  |
+//
+// A null field means "this role does not get it" - the message still arrives so a client can
+// render its layout without guessing whether more is coming.
+export const clueContentTargetSchema = z.discriminatedUnion("kind", [
+  z.strictObject({
+    kind: z.literal("cell"),
+    roundIndex: z.int().nonnegative(),
+    category: z.int().nonnegative(),
+    row: z.int().nonnegative(),
+  }),
+  z.strictObject({ kind: z.literal("final") }),
+]);
+export type ClueContentTarget = z.infer<typeof clueContentTargetSchema>;
+
+export const clueContentSchema = z.strictObject({
+  target: clueContentTargetSchema,
+  // Category title - chrome the display shows above the clue.
+  category: z.string().max(80),
+  prompt: z
+    .strictObject({ text: z.string().max(2000), media: mediaRefSchema.optional() })
+    .nullable(),
+  // Host only. `accepted` carries the authored equivalents so a host card can show them.
+  answer: z
+    .strictObject({
+      canonical: z.string().max(500),
+      accepted: z.array(z.string().max(500)).max(20),
+      media: mediaRefSchema.optional(),
+    })
+    .nullable(),
+});
+export type ClueContent = z.infer<typeof clueContentSchema>;
+
 export const roomServerMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelopeFields,
@@ -119,6 +168,12 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // Engine state (see gameViewSchema note); null until start-game creates it.
     game: gameViewSchema.nullable(),
     roster: rosterPayloadSchema,
+    // Host-held freeze (the console's pause button). Room-level, not engine-level: the
+    // engine has no pause concept, so the room parks its timers and says so.
+    paused: z.boolean(),
+    // Present while a clue is open, so a phone that reconnects mid-clue renders the same
+    // screen it left; null otherwise. Redacted exactly like the standalone message.
+    clueContent: clueContentSchema.nullable(),
   }),
   z.strictObject({
     ...envelopeFields,
@@ -164,8 +219,22 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({
     ...envelopeFields,
+    type: z.literal("clue-content"),
+    content: clueContentSchema,
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("paused"),
+    paused: z.boolean(),
+    at: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    ...envelopeFields,
     type: z.literal("room-closed"),
-    reason: z.enum(["expired", "host-closed"]),
+    // The polite screen a client shows keys off this alone (user-flows A5 "the host
+    // kicks/renames ... phone shows a polite screen"): expired = the room aged out,
+    // host-closed = the host ended it for everyone, kicked = this phone only.
+    reason: z.enum(["expired", "host-closed", "kicked"]),
   }),
   z.strictObject({
     ...envelopeFields,

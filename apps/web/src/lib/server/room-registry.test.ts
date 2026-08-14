@@ -11,8 +11,11 @@ import migrationSql from "../../../migrations/0001_create_rooms.sql?raw";
 import {
   forgetRoom,
   listPublicRooms,
+  probeRegistry,
+  readRegistryRow,
   registerRoom,
   registryStatements,
+  registryStatusFromError,
   sweepExpiredRooms,
 } from "./room-registry.ts";
 import type { RegistryDatabase, RegistryStatement } from "./room-registry.ts";
@@ -142,6 +145,71 @@ describe("sweeping and forgetting", () => {
     await forgetRoom(database, "BQKX7");
     expect(database.calls[0]?.sql).toContain("WHERE code = ?");
     expect(database.calls[0]?.values).toEqual(["BQKX7"]);
+  });
+});
+
+describe("reading one room's row (the inspector's second opinion)", () => {
+  it("restates the listing predicate for a single row", async () => {
+    const database = fakeDatabase([[{ ...liveRow, ended_at: null }]]);
+    const row = await readRegistryRow(database, "BQKX7", 1_760_000_100_000);
+    expect(row).toEqual({
+      listed: true,
+      phase: "active",
+      playerCount: 12,
+      expiresAt: 1_760_007_200_000,
+      endedAt: null,
+    });
+  });
+
+  it("calls an ended, expired, or unlisted room not-listed without hiding the row", async () => {
+    const database = fakeDatabase([
+      [{ ...liveRow, ended_at: 1_760_000_090_000 }],
+      [{ ...liveRow, ended_at: null, expires_at: 1 }],
+      [{ ...liveRow, ended_at: null, visibility: "unlisted" }],
+    ]);
+    // One pass per canned row above: ended, expired, unlisted.
+    for (const attempt of [0, 1, 2]) {
+      // oxlint-disable-next-line no-await-in-loop
+      const row = await readRegistryRow(database, "BQKX7", 1_760_000_100_000);
+      expect(row?.listed, `row ${String(attempt)} must not be listed`).toBe(false);
+    }
+  });
+
+  it("answers null when the room has no row at all (drift, or no table)", async () => {
+    expect(await readRegistryRow(fakeDatabase([[]]), "BQKX7", 1)).toBeNull();
+  });
+});
+
+// The classification that turns a swallowed console warning into something a surface can say
+// out loud. The owner's empty lobby was a `no-table` for hours with nothing on screen.
+describe("classifying a registry failure", () => {
+  it("recognizes the unapplied migration, including inside D1's wrapper", () => {
+    expect(registryStatusFromError(new Error("D1_ERROR: no such table: rooms"))).toMatchObject({
+      status: "unavailable",
+      reason: "no-table",
+    });
+    const wrapped = new Error("D1_ERROR", { cause: new Error("no such table: rooms") });
+    expect(registryStatusFromError(wrapped)).toMatchObject({ reason: "no-table" });
+  });
+
+  it("calls everything else an error and keeps a bounded detail", () => {
+    const status = registryStatusFromError(new Error("x".repeat(500)));
+    expect(status).toMatchObject({ reason: "error" });
+    expect(status.status === "unavailable" && status.detail?.length).toBe(300);
+  });
+});
+
+describe("probing the registry (what /api/version reports)", () => {
+  it("reports no-binding, ok, and no-table without creating a room to find out", async () => {
+    expect(await probeRegistry(undefined)).toEqual({ status: "unavailable", reason: "no-binding" });
+    expect(await probeRegistry(fakeDatabase([[]]))).toEqual({ status: "ok" });
+    const broken = {
+      prepare: () => {
+        throw new Error("no such table: rooms");
+      },
+      batch: () => Promise.resolve([]),
+    } as unknown as RegistryDatabase;
+    expect(await probeRegistry(broken)).toMatchObject({ reason: "no-table" });
   });
 });
 

@@ -23,6 +23,9 @@
 // | kick-player     | host only (removes from the room, not just the team)                  |
 // | sync            | anyone joined (asks for a fresh snapshot after a missed-event gap)    |
 // | leave           | anyone joined (explicit exit; a dropped socket is NOT a leave)        |
+// | set-pause       | host only (freezes the room and parks every running timer)            |
+// | expire-timer    | host only ("skip the wait": fires whichever timer the room is on)     |
+// | close-room      | host only (ends the room for everyone - the polite screen everywhere) |
 import { z } from "zod";
 import { extensionBagSchema } from "../ext.ts";
 import { limits } from "../limits.ts";
@@ -124,6 +127,17 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...envelopeFields, type: z.literal("kick-player"), playerId: playerIdSchema }),
   z.strictObject({ ...envelopeFields, type: z.literal("sync") }),
   z.strictObject({ ...envelopeFields, type: z.literal("leave") }),
+  // Host freeze. Room-level, NOT an engine action: the engine has no pause concept, so the
+  // room parks its alarm book (each running timer keeps its remaining time) and says so.
+  // Guiding principle 4 - every automated step has a manual override.
+  z.strictObject({ ...envelopeFields, type: z.literal("set-pause"), paused: z.boolean() }),
+  // "Skip the wait": fire the timer the room is currently waiting on, right now. Ordinary
+  // expiries are SERVER-driven (the DO's alarm book fires them; a client can never forge
+  // time), so this is a host convenience over the same path rather than a new authority -
+  // the host may already relay each *-timeout action by name (authority.ts).
+  z.strictObject({ ...envelopeFields, type: z.literal("expire-timer") }),
+  // End the room for everyone: every connection gets room-closed(host-closed) and closes.
+  z.strictObject({ ...envelopeFields, type: z.literal("close-room") }),
 ]);
 
 export type RoomClientMessage = z.infer<typeof roomClientMessageSchema>;

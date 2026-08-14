@@ -47,7 +47,19 @@ npx wrangler d1 migrations apply jeopardy-machine --remote -c apps/web/wrangler.
 
 Both Workers bind this database (web writes/reads, the room DO reports its own transitions - see the decision's addendum), but the migration is applied **once**, through the web config that owns the schema.
 
-If the migration is never applied, nothing breaks: `POST /api/rooms` still creates rooms and every join still works - `GET /api/rooms` just answers an empty lobby and the Worker logs a registry warning. Rooms are usable by code from day one; the lobby is the thing that switches on here.
+If the migration is never applied, nothing breaks: `POST /api/rooms` still creates rooms and every join still works - `GET /api/rooms` just answers an empty lobby. Rooms are usable by code from day one; the lobby is the thing that switches on here.
+
+**Empty lobby? Check `/api/rooms` (and `/api/version`) - they say why.** Both responses carry a `registry` field, and it is the difference between a quiet night and an unapplied migration:
+
+```sh
+curl -s https://<your-worker>/api/version | grep -o '"registry":[^}]*}'
+#   {"status":"ok"}                                   -> the lobby works; it really is empty
+#   {"status":"unavailable","reason":"no-table",...}  -> THIS section was never run. Run it.
+#   {"status":"unavailable","reason":"no-binding"}    -> no D1 bound to this Worker at all
+#   {"status":"unavailable","reason":"error",...}     -> D1's own message is in `detail`
+```
+
+Applying the migration switches the lobby on with **no redeploy** - the next `GET /api/rooms` lists rooms created before it, as long as they have not expired. This reporting exists because it once did not: a public room that never appeared in the lobby and an ordinary empty lobby looked identical on every surface (owner report 2026-08-14).
 
 ### 2b. Dashboard path (equivalent - owner prefers dash.cloudflare.com)
 

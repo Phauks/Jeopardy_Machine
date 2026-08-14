@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-14 (M3.5 room visibility/passwords/lobby landed on top of M3 realtime rooms: room protocol, real GameRoomDO, single-origin WS proven, bot players, workerd + Playwright suites. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-14 (lobby diagnostics + the room instrument panel: the registry now reports why a lobby is empty, rooms can be inspected and closed by their host, and `/dev/echo` became `/dev/rooms`. M3.5 room visibility/passwords/lobby sits on top of M3 realtime rooms. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -35,7 +35,7 @@ Progress 2026-08-13 - everything agent-verifiable is done; what remains is owner
 - [x] Monorepo + catalog-pinned toolchain (versions verified live; docs/decisions/2026-08-13-m0-version-pins.md)
 - [x] `packages/protocol`: versioned envelope + `ext` bag + limits module, tested
 - [x] `apps/realtime`: `GameRoomDO` stub on partyserver (verdict: use, transport-only - docs/decisions/2026-08-13-partyserver.md), tested inside workerd
-- [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + `/dev/echo` proof page
+- [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + the `/dev/echo` proof page (since grown into `/dev/rooms`, the room instrument panel)
 - [x] Local dev loop proven end to end (`pnpm dev`; cross-script DO binding `[connected]` under multi-config `wrangler dev`) - docs/DEVELOPMENT.md
 - [x] CI gate (PR-only: fmt, lint, typecheck, test, build), deploy denies, CLAUDE.md, STATUS.md, per-package READMEs
 - [ ] Owner: first manual hello-world deploy of both Workers (docs/cloudflare-setup.md) - closes M0
@@ -83,8 +83,8 @@ Progress 2026-08-14 - landed; both exit criteria green:
 - [x] Single-origin path live: `POST /api/rooms` + `/room/[code]/ws` through the uncommented `GAME_ROOM` binding; **upgrade passthrough PROVEN on the pinned kit/adapter - no fallback entry needed** (verdict + canary script in the decision doc's 2026-08-14 addendum)
 - [x] Bot players (`packages/bots`): seeded headless clients on the real protocol + CLI (`pnpm -F @jeopardy/bots bots`); the M4 sim panel builds on them
 - [x] workerd suite (33 tests): create/refuse/expiry incl. code reuse, full game incl. wager cell + final, forced eviction mid-game, token reconnect, concurrent buzz races, team lifecycle + succession, authority/redaction/limit guardrails
-- [x] Playwright multi-context e2e (`pnpm -F @jeopardy/web test:e2e`): real chromium phones + display + host through the single origin - roster sync, deterministic staggered buzz race, the /dev/echo harness flow
-- Scope amendment (recorded in the decision addendum): `/dev/echo` + `REALTIME_ORIGIN` were not deleted but repurposed - the page is now the owner's room harness (create/join/refusal probes) and the env var survives only as its deprecated vite-dev direct-dial fallback; both retire with the M4 surfaces
+- [x] Playwright multi-context e2e (`pnpm -F @jeopardy/web test:e2e`): real chromium phones + display + host through the single origin - roster sync, deterministic staggered buzz race, the /dev/rooms panel flow
+- [x] Scope amendment, resolved 2026-08-14: `REALTIME_ORIGIN` and the direct-realtime-origin toggle are **deleted** (owner: deprecated) - single origin is the only path, `apps/web/src/env.ts` now declares no variables at all, and `pnpm dev:rooms` runs the loop in one command (docs/decisions/2026-08-13-single-origin-binding.md addendum b). The harness did not retire; it became `/dev/rooms`, the room instrument panel
 
 ### M3.5 - Room visibility, passwords, and the public lobby
 
@@ -96,11 +96,30 @@ Progress 2026-08-14 - landed:
 - [x] D1's first real use: the `rooms` registry table (`apps/web/migrations/0001_create_rooms.sql`, applied by hand from the runbook) + a typed server-only repository; rows are a cache, the DO stays authority
 - [x] Registry updates from the room DO through a **shared D1 binding** (alternatives weighed and rejected in the decision's addendum), coalesced for roster churn, forced on phase change, row deleted with the room by the expiry alarm, sweep for drift
 - [x] Passwords verified in the DO: PBKDF2-SHA256 (100k, per-room salt, constant-time compare), per-connection attempt budget, host exempt via the creation token, `has_password` the only public fact
+- [x] Wire additions requested by the M4 surfaces (2026-08-14 reconcile): a role-redacted `clue-content` channel (authored prompt/answer - the engine never sees content, so it rides beside the event stream; answers reach the HOST only), host `set-pause`/`expire-timer`/`close-room`, `room-closed` reasons split into expired/host-closed/**kicked** for the polite screen, and the teams-mode seating policy agreed with M4 (an unteamed player is seated as a solo team of one instead of blocking start-game)
 - [x] Surfaces: the root page's real **Join** section (code box + password + polling public-rooms list, code-box-wins) and the harness's create/list controls - which answers the owner's "can the harness list all rooms?" (it can, for public rooms; unlisted rooms have no row by design)
+
+Follow-up 2026-08-14 (owner report: "creating a public room does not appear to have it appear in the lobby ... I cannot tell if the rooms are actually created") - landed:
+
+- [x] Root cause: the registry's D1 migration was never applied to the deployed environment, and every registry failure was swallowed into an empty list. Reproduced both ways in the single-origin loop (docs/decisions/2026-08-14-room-visibility-and-lobby.md addendum b)
+- [x] The wire now carries a discriminated `registry` status (`ok` / `no-binding` / `no-table` / `error`) on the lobby listing, the create response and `/api/version`; graceful degradation kept, silence removed. Broken registries are never cached
+- [x] Host-authenticated room ops: `DELETE /api/rooms/<CODE>` closes a room end to end and delists it; `GET /api/rooms/<CODE>` is a DO inspector (lifecycle, connection census, roster/team counts, state version, alarm book, storage sizes, the registry row beside it) with a redaction gate over tokens, password material and clue text
+- [x] `/dev/echo` -> `/dev/rooms` (old path redirects): three-column instrument panel - rooms this tab created (create ADDS, never replaces; per-room delete/connect/lobby-presence/expiry countdown), connection + join + actions + DO inspector, and a full-height filterable log; auto-refreshing lobby panel (60s, visible countdown, manual refresh, registry status) and a separate Test area for the refusal probes with expected-vs-actual PASS/FAIL chips
 
 ### M4 - Play surfaces (board, buzzer, host)
 
 The three UIs on the design-token foundation (docs/research/05-ui-design.md): tokens.css + fonts + theme mechanism first - the three "Three Boards" art directions all ship as built-in **theme presets** (retro-tv, modern-flat, event-poster) plus the Terra Verde event variant, proving the token contract covers real visual range - then primitives in a `/dev` gallery, then the board screen (fill-in stagger, FLIP clue zoom, DD splash, timer bars), the phone buzzer (fixed layout, wake lock, pointerdown + optimistic feedback, per-player buzz sounds from a curated pack), and the host console (arm button, correct/wrong/no-penalty, score override, undo, Final round wizard). Join flow: QR + room code + nickname + lobby. PWA: the precache manifest grows to fonts + sound pack, and the install affordance appears in editor chrome (only there - players are never prompted). **Exit criteria: a complete real game is playable end-to-end by phones in a room.** This is the "usable at an event" line.
+
+Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store seam (docs/design/surfaces.md):
+
+- [x] Room-store seam: one typed `RoomStore` interface + `RoomView` (field names mirror the M3 room protocol); local-sim implementation complete over engine + fixtures/, ws implementation stubbed with the full message-to-store mapping for the M3 reconcile
+- [x] Player route `/room/[code]`: A2 join (avatars, accents, the 14 buzz sounds with local preview, team cards), A3 lobby (leader overflow menu, post-join customization sheet), A4 buzzer with every state as a tested pure derivation (fixed layout, pointerdown + haptic, wake lock, reduced-motion)
+- [x] Display route `/room/[code]/display`: title screen with real QR (uqr, catalog-pinned) + room code, category-reveal, board + clue card, DD splash, scores strip, winner screen; room-audio module with the only-winner-heard exclusive slot (placeholder tones until the M5 sound bundling)
+- [x] Host route `/room/[code]/host`: C4 panel (minimap with host-only wager dots, spacebar ARM, arrow judging, answer visible, undo, score drawer, pause), DD + Final wizards, manual mode, C1b mirror mode (answers provably absent from mirrored markup), dev-gated sim panel driving fixture players
+- [x] Hotseat page reuses the shared scores strip; 75 new web tests (store contract full-game, every buzzer/console state, mirror invariant, preset x surface smoke, audio slot rules)
+- [x] **Avatars in motion** (docs/decisions/2026-08-14-avatars-in-motion.md, owner-approved 2026-08-14): the avatar set becomes three tiers by surface. The 27 Kenney GLBs ship trimmed (4.97 -> 2.33 MB) alongside the sprites; the bake gains a walk-cycle sheet mode (10 frames, 568 KB) that phones animate with CSS alone on the join preview and lobby card; and `src/lib/diorama/` puts the players' avatars in a live themed 3D room on the display's lobby, interstitial, and winner screens - wandering, reacting to arrivals, celebrating the winners. three.js is code-split behind a dynamic import so the phone's route grows 2.8 KB and downloads no renderer. Preview without a game: `/dev/diorama`. This is the M4-follow-on delight pass the decision doc scheduled, and the groundwork the M7 world kits attach to.
+- [ ] Reconcile with M3: flip `createRoomStore` to the ws store and wire the gap list in docs/design/surfaces.md (content channel, timers, pause, room-closed screens) - exit criteria (real phones in one room) blocks on this
+- [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups, bundled sound files, PWA precache growth (tracked in docs/design/surfaces.md "Known gaps")
 
 ### M5 - Event readiness (the club night)
 
@@ -114,7 +133,7 @@ Buzz latency compensation (arm-window + client-elapsed with RTT clamps), early-b
 
 **Theme customizer** (owner priority - pull earlier if appetite allows): a visual editor over the theme document - pick fonts per slot from the curated self-hosted set, full color control, background (solid/gradient/pattern/uploaded image via R2 with auto-dim overlay), effects level (flat vs bevel-and-glow), live board preview, WCAG-contrast warnings; themes export/import and share like content packs. Also: CSV/spreadsheet import (+ J-Archive-shaped and Quizlet/Anki TSV), zip bundle export with media, print stylesheet, board sizes beyond 6x5, everyone-answers mode for large crowds, cosmetics module (player colors/avatars; buzzer sounds stay curated-pack-only - owner cut uploads 2026-08-13, boundary 2.10), single-file offline HTML export.
 
-**3D lobby environments** (owner direction 2026-08-13, see directives log): Kenney world kits (CC0) + Cube Pets avatars as display-only three.js dioramas the players "live in" - lobby first (pets appear/dance in a forest/pirate/dungeon scene as players join), environment as a curated theme-document slot, phones and in-game surfaces stay 2D. The event may get a v0 forest lobby only if M4/M5 land early; otherwise this is the first post-event milestone.
+**3D lobby environments** (owner direction 2026-08-13, see directives log): Kenney world kits (CC0) + Cube Pets avatars as display-only three.js dioramas the players "live in" - lobby first, environment as a curated theme-document slot, phones and in-game surfaces stay 2D. **The diorama itself landed early, in M4** (above): avatars, wandering, reactions, theme-derived colors, and a `"none" | "studio"` environment enum. What remains here is the two halves it was deliberately built to receive - (a) the WORLD KITS: download + license-verify + budget a Kenney Nature/Pirate/Dungeon kit in `tools/avatar-bake`, and render it around the existing stage; (b) the THEME SLOT: one `environment` field on `themeBodySchema` in packages/protocol (the exact line is written out in `apps/web/src/lib/diorama/diorama-environment.ts`), after which the display passes `theme.environment` straight through and the local enum is deleted.
 
 ### M8 - Multi-user (only if wanted)
 

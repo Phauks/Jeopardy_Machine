@@ -15,7 +15,8 @@
 //   (apps/realtime/src/room/registry-writer.ts holds its three statements; the realtime
 //   workerd suite runs them against THIS migration so a column rename cannot drift silently).
 import { limits } from "@jeopardy/protocol/limits";
-import type { RoomSummary } from "@jeopardy/protocol/room/registry";
+import type { RegistryRowState } from "@jeopardy/protocol/room/diagnostics";
+import type { RegistryStatus, RoomSummary } from "@jeopardy/protocol/room/registry";
 import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
 
 // The sliver of D1 this module uses, typed structurally for the same reason App.Platform is
@@ -96,6 +97,16 @@ const sweepSql = `DELETE FROM rooms WHERE expires_at <= ?`;
 
 const deleteSql = `DELETE FROM rooms WHERE code = ?`;
 
+// One room's row as the inspector reads it (the DO's own belief is fetched separately, and
+// the point is comparing the two).
+const rowStateSql = `SELECT visibility, phase, player_count, expires_at, ended_at
+  FROM rooms
+  WHERE code = ?`;
+
+// Liveness probe for /api/version: touches the table, reads nothing, and costs one parse. Its
+// only job is to make "the migration was never applied" answerable without creating a room.
+const probeSql = `SELECT code FROM rooms LIMIT 0`;
+
 export function registerRoom(
   database: RegistryDatabase,
   registration: RoomRegistration,
@@ -138,6 +149,78 @@ export function forgetRoom(database: RegistryDatabase, code: string): Promise<un
   return database.prepare(deleteSql).bind(code).run();
 }
 
+/**
+ * What the registry believes about ONE room (the DO inspector's second opinion). Null = no
+ * row at all, which next to a live room is real drift and next to a `no-table` status is the
+ * missing migration saying so again.
+ */
+export async function readRegistryRow(
+  database: RegistryDatabase,
+  code: string,
+  now: number,
+): Promise<RegistryRowState | null> {
+  const { results } = await database.prepare(rowStateSql).bind(code).all<{
+    visibility: string;
+    phase: string;
+    player_count: number;
+    expires_at: number;
+    ended_at: number | null;
+  }>();
+  const row = results[0];
+  if (row === undefined) return null;
+  const phase = row.phase === "active" ? "active" : row.phase === "ended" ? "ended" : "lobby";
+  return {
+    // Exactly the listing query's predicate, restated against one row: "would the lobby show
+    // this?" is the question the harness asks, and it must not drift from listSql above.
+    listed:
+      row.visibility === "public" &&
+      row.ended_at === null &&
+      (phase === "lobby" || phase === "active") &&
+      row.expires_at > now,
+    phase,
+    playerCount: row.player_count,
+    expiresAt: row.expires_at,
+    endedAt: row.ended_at,
+  };
+}
+
+/**
+ * Turn a D1 failure into the wire's registry status. The SQLite message is the only signal
+ * that separates "this deployment never had its migration applied" - the overwhelmingly
+ * common cause of an empty lobby, and the one an owner can fix in one command - from a
+ * genuine database fault. Matched on the message text because that is what D1 gives us; a
+ * wording change downgrades a `no-table` to `error`, which stays loud either way.
+ */
+export function registryStatusFromError(error: unknown): RegistryStatus {
+  const detail = describeError(error);
+  return {
+    status: "unavailable",
+    reason: /no such table/i.test(detail) ? "no-table" : "error",
+    detail: detail.slice(0, 300),
+  };
+}
+
+/** Is the registry answering at all? The cheapest honest answer, for /api/version. */
+export async function probeRegistry(
+  database: RegistryDatabase | undefined,
+): Promise<RegistryStatus> {
+  if (database === undefined) return { status: "unavailable", reason: "no-binding" };
+  try {
+    await database.prepare(probeSql).bind().all();
+    return { status: "ok" };
+  } catch (error) {
+    return registryStatusFromError(error);
+  }
+}
+
+// D1 nests the real SQLite complaint in `cause`, and the outer message is often the generic
+// D1_ERROR wrapper - so both go into the string the reason is matched against and shown.
+function describeError(error: unknown): string {
+  if (!(error instanceof Error)) return String(error);
+  const cause = error.cause;
+  return cause instanceof Error ? `${error.message} (${cause.message})` : error.message;
+}
+
 // D1 has no booleans and stores our phases as text; the row shape is infrastructure and the
 // summary is the wire contract, so the conversion lives here and nowhere else.
 function toRoomSummary(row: RoomRow): RoomSummary {
@@ -162,4 +245,6 @@ export const registryStatements = {
   list: listSql,
   sweep: sweepSql,
   delete: deleteSql,
+  rowState: rowStateSql,
+  probe: probeSql,
 } as const;

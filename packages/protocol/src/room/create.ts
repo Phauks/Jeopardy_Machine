@@ -14,6 +14,7 @@ import { settingsOverridesSchema } from "../settings/derive.ts";
 import { settingsPresetIdSchema } from "../settings/presets.ts";
 import { gameDefinitionBodySchema } from "../modes/jeopardy/game-definition.ts";
 import { hostTokenSchema } from "./identity.ts";
+import { registryStatusSchema } from "./registry.ts";
 import { roomCodeSchema } from "./server-messages.ts";
 import {
   hostLabelSchema,
@@ -81,6 +82,11 @@ export const createRoomResponseSchema = z.strictObject({
   // "listed in the lobby" confirmation) without re-deriving it from its own request body.
   visibility: roomVisibilitySchema,
   hasPassword: z.boolean(),
+  // Did the lobby row get written? The room exists either way (the registry is a cache and a
+  // D1 failure may never cost anyone a game), but "created, and NOT listed because the
+  // migration is missing" is a sentence the creating surface must be able to say out loud -
+  // owner report 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md.
+  registry: registryStatusSchema,
 });
 export type CreateRoomResponse = z.infer<typeof createRoomResponseSchema>;
 
