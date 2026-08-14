@@ -3,6 +3,7 @@
   // chip opens post-join customization (identity sheet); team leaders get the same sheet's
   // team tier plus per-member overflow actions on their team card. Buzzer practice is a
   // disarmed demo button - LOCAL feedback only, never room sound (A3 rule).
+  import AvatarAnimated from "#lib/avatars/avatar-animated.svelte";
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
   import IdentitySheet from "#lib/room/identity-sheet.svelte";
   import TeamCard from "#lib/room/team-card.svelte";
@@ -63,7 +64,10 @@
               sheetOpen = true;
             }}
           >
-            <AvatarChip {avatar} {accent} size="44px" />
+            <!-- The only other place the animated sheet is allowed: your own card, your own
+                 phone (docs/decisions/2026-08-14-avatars-in-motion.md). The roster rows below
+                 stay on still chips - dozens of walking avatars would be noise, not identity. -->
+            <AvatarAnimated {avatar} {accent} size="56px" />
           </button>
         {/if}
       {/if}

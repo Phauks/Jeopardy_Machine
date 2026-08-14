@@ -3,10 +3,11 @@
   // (tap to preview locally), team cards in teams mode, Join. No accounts, no prompts,
   // nothing else (guiding principle 3). Validation is inline; duplicate nicknames get an
   // auto-suffix here rather than an error (A2: "duplicate names get an auto-suffix").
+  import AvatarAnimated from "#lib/avatars/avatar-animated.svelte";
   import AvatarPicker from "#lib/avatars/avatar-picker.svelte";
   import BuzzSoundPicker from "#lib/room/buzz-sound-picker.svelte";
   import TeamCard from "#lib/room/team-card.svelte";
-  import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
+  import { accentById, avatarById, avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import type { JoinRequest } from "#lib/room/room-store.ts";
   import type { RoomRosterView } from "#lib/room/room-view.ts";
 
@@ -25,6 +26,11 @@
   let buzzSoundId = $state<string | null>(null);
   let newTeamName = $state("");
   let validationMessage = $state<string | null>(null);
+
+  // The join preview: your pick, alive, at a size worth looking at. One of exactly two places
+  // the animated sheet is allowed (docs/decisions/2026-08-14-avatars-in-motion.md).
+  const previewAvatar = $derived(avatarById(avatarId));
+  const previewAccent = $derived(accentById(accentId));
 
   function uniqueNickname(candidate: string): string {
     const taken = new Set(roster.players.map((player) => player.nickname.toLowerCase()));
@@ -86,6 +92,12 @@
   {/if}
 
   <h2 class="section-label">Pick your look</h2>
+  {#if previewAvatar !== null}
+    <div class="look-preview">
+      <AvatarAnimated avatar={previewAvatar} accent={previewAccent} size="120px" />
+      <p class="preview-name">{previewAvatar.displayName}</p>
+    </div>
+  {/if}
   <AvatarPicker
     avatars={avatarManifest.avatars}
     accents={avatarManifest.accents}
@@ -210,6 +222,22 @@
     color: var(--score-negative);
     font-size: 0.85rem;
     margin: 0;
+  }
+
+  .look-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.35rem;
+  }
+
+  .preview-name {
+    margin: 0;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--surface-text-muted);
   }
 
   .team-grid {

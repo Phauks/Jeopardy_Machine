@@ -1,7 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
   "spriteSize": 192,
   "basePath": "/avatars/",
+  "modelPath": "/avatars/models/",
+  "sheet": {
+    "frames": 10,
+    "frameSize": 128
+  },
   "accents": [
     {
       "id": "gold",
@@ -50,6 +55,25 @@
         "teal": "bunny--teal.webp",
         "violet": "bunny--violet.webp",
         "blossom": "bunny--blossom.webp"
+      },
+      "sheet": {
+        "file": "bunny--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "bunny.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#cc7854",
+          "#d47f59"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -65,6 +89,25 @@
         "teal": "cat--teal.webp",
         "violet": "cat--violet.webp",
         "blossom": "cat--blossom.webp"
+      },
+      "sheet": {
+        "file": "cat--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "cat.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#717388",
+          "#76798e"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -80,6 +123,25 @@
         "teal": "caterpillar--teal.webp",
         "violet": "caterpillar--violet.webp",
         "blossom": "caterpillar--blossom.webp"
+      },
+      "sheet": {
+        "file": "caterpillar--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "caterpillar.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#38a177",
+          "#42ab7c"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -95,6 +157,25 @@
         "teal": "chick--teal.webp",
         "violet": "chick--violet.webp",
         "blossom": "chick--blossom.webp"
+      },
+      "sheet": {
+        "file": "chick--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "chick.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#ffc255",
+          "#ffc659"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -110,6 +191,25 @@
         "teal": "cow--teal.webp",
         "violet": "cow--violet.webp",
         "blossom": "cow--blossom.webp"
+      },
+      "sheet": {
+        "file": "cow--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "cow.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#d8d8e6",
+          "#e1e1ec"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -125,6 +225,25 @@
         "teal": "dog--teal.webp",
         "violet": "dog--violet.webp",
         "blossom": "dog--blossom.webp"
+      },
+      "sheet": {
+        "file": "dog--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "dog.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#cc7854",
+          "#d47f59"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -140,6 +259,25 @@
         "teal": "elephant--teal.webp",
         "violet": "elephant--violet.webp",
         "blossom": "elephant--blossom.webp"
+      },
+      "sheet": {
+        "file": "elephant--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "elephant.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#989fbe",
+          "#a2aacc"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -155,6 +293,25 @@
         "teal": "fish--teal.webp",
         "violet": "fish--violet.webp",
         "blossom": "fish--blossom.webp"
+      },
+      "sheet": {
+        "file": "fish--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "fish.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#e48846",
+          "#e78f48"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -170,6 +327,25 @@
         "teal": "giraffe--teal.webp",
         "violet": "giraffe--violet.webp",
         "blossom": "giraffe--blossom.webp"
+      },
+      "sheet": {
+        "file": "giraffe--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "giraffe.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#ffaf45",
+          "#ffb84d"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -185,6 +361,25 @@
         "teal": "hog--teal.webp",
         "violet": "hog--violet.webp",
         "blossom": "hog--blossom.webp"
+      },
+      "sheet": {
+        "file": "hog--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "hog.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#cc7854",
+          "#d47f59"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -200,6 +395,25 @@
         "teal": "lion--teal.webp",
         "violet": "lion--violet.webp",
         "blossom": "lion--blossom.webp"
+      },
+      "sheet": {
+        "file": "lion--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "lion.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#ffaf45",
+          "#ffb84d"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -215,6 +429,25 @@
         "teal": "monkey--teal.webp",
         "violet": "monkey--violet.webp",
         "blossom": "monkey--blossom.webp"
+      },
+      "sheet": {
+        "file": "monkey--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "monkey.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#cc7854",
+          "#d47f59"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -230,6 +463,25 @@
         "teal": "parrot--teal.webp",
         "violet": "parrot--violet.webp",
         "blossom": "parrot--blossom.webp"
+      },
+      "sheet": {
+        "file": "parrot--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "parrot.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#e45e48",
+          "#ea6246"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -245,6 +497,25 @@
         "teal": "pig--teal.webp",
         "violet": "pig--violet.webp",
         "blossom": "pig--blossom.webp"
+      },
+      "sheet": {
+        "file": "pig--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "pig.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#e28aae",
+          "#e58fb7"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -260,6 +531,25 @@
         "teal": "tiger--teal.webp",
         "violet": "tiger--violet.webp",
         "blossom": "tiger--blossom.webp"
+      },
+      "sheet": {
+        "file": "tiger--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "tiger.glb",
+        "colormap": "cube-pets-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "dance"
+        },
+        "recolorTargets": [
+          "#e48846",
+          "#e78f48"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -275,6 +565,26 @@
         "teal": "female-a--teal.webp",
         "violet": "female-a--violet.webp",
         "blossom": "female-a--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-a--walk.webp",
+        "clip": "wheelchair-move-forward"
+      },
+      "model": {
+        "file": "female-a.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [
+          "wheelchair.glb"
+        ],
+        "clips": {
+          "idle": "idle",
+          "walk": "wheelchair-move-forward",
+          "celebrate": "emote-yes"
+        },
+        "recolorTargets": [
+          "#8a5fd5"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -290,6 +600,24 @@
         "teal": "female-b--teal.webp",
         "violet": "female-b--violet.webp",
         "blossom": "female-b--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-b--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "female-b.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#ffd061"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -305,6 +633,24 @@
         "teal": "female-c--teal.webp",
         "violet": "female-c--violet.webp",
         "blossom": "female-c--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-c--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "female-c.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#6794d9"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -320,6 +666,24 @@
         "teal": "female-d--teal.webp",
         "violet": "female-d--violet.webp",
         "blossom": "female-d--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-d--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "female-d.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#71778e"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -335,6 +699,25 @@
         "teal": "female-e--teal.webp",
         "violet": "female-e--violet.webp",
         "blossom": "female-e--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-e--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "female-e.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#ffffff",
+          "#d0e8ff"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -350,6 +733,25 @@
         "teal": "female-f--teal.webp",
         "violet": "female-f--violet.webp",
         "blossom": "female-f--blossom.webp"
+      },
+      "sheet": {
+        "file": "female-f--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "female-f.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#5b66c4",
+          "#ffab42"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -365,6 +767,25 @@
         "teal": "male-a--teal.webp",
         "violet": "male-a--violet.webp",
         "blossom": "male-a--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-a--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-a.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#319a74",
+          "#5ac487"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -380,6 +801,24 @@
         "teal": "male-b--teal.webp",
         "violet": "male-b--violet.webp",
         "blossom": "male-b--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-b--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-b.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#6794d9"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -395,6 +834,24 @@
         "teal": "male-c--teal.webp",
         "violet": "male-c--violet.webp",
         "blossom": "male-c--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-c--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-c.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#6794d9"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -410,6 +867,24 @@
         "teal": "male-d--teal.webp",
         "violet": "male-d--violet.webp",
         "blossom": "male-d--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-d--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-d.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#cf534f"
+        ],
+        "tolerance": 28
       }
     },
     {
@@ -425,6 +900,25 @@
         "teal": "male-e--teal.webp",
         "violet": "male-e--violet.webp",
         "blossom": "male-e--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-e--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-e.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#ffab42",
+          "#ffc053"
+        ],
+        "tolerance": null
       }
     },
     {
@@ -440,6 +934,25 @@
         "teal": "male-f--teal.webp",
         "violet": "male-f--violet.webp",
         "blossom": "male-f--blossom.webp"
+      },
+      "sheet": {
+        "file": "male-f--walk.webp",
+        "clip": "walk"
+      },
+      "model": {
+        "file": "male-f.glb",
+        "colormap": "mini-characters-colormap.png",
+        "props": [],
+        "clips": {
+          "idle": "idle",
+          "walk": "walk",
+          "celebrate": "jump"
+        },
+        "recolorTargets": [
+          "#319a74",
+          "#61cb8b"
+        ],
+        "tolerance": null
       }
     }
   ]

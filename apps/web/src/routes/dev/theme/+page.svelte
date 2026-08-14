@@ -333,18 +333,6 @@
       0 2px 6px rgb(0 0 0 / 0.4);
   }
 
-  .emblem-tile {
-    font-size: 3rem;
-    line-height: 1;
-    /* Emblems sit on a cell-colored backing chip - their real home in the product (player
-       chips, roster cards) - so a light tint on a light panel can never vanish. */
-    display: grid;
-    place-items: center;
-    padding: 0.5rem;
-    border-radius: 6px;
-    background: var(--board-cell-bg);
-  }
-
   .roster-chip b {
     font-family: var(--font-chrome);
     font-weight: 600;
