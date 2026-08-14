@@ -119,8 +119,10 @@ describe("identity guardrails", () => {
 
     host.send({ type: "kick-player", playerId: bot.playerId ?? "" });
     await host.waitFor("roster", (message) => message.roster.players.length === 0);
+    // "kicked", not "host-closed": the kicked phone shows a polite screen about itself while
+    // the room plays on (reason vocabulary agreed with the M4 surfaces, 2026-08-14).
     const closed = await bot.waitFor((message) => message.type === "room-closed");
-    expect(closed).toMatchObject({ reason: "host-closed" });
+    expect(closed).toMatchObject({ reason: "kicked" });
 
     // The dead token cannot resume: the seat is gone, not just disconnected.
     const ghost = new TestClient(await upgradeToRoom(code));

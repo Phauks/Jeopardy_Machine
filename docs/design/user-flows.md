@@ -68,7 +68,8 @@ The buzzer screen is a single fixed layout (no scrolling, no zoom, no pull-to-re
 - **Wi-Fi blip**: thin "reconnecting..." banner; buzzing disabled while stale (never let a player _think_ they buzzed); auto-recover.
 - **Late joiner**: allowed by default (setting), enters at current state with score 0; host can gift a starting score (score override exists anyway).
 - **Player leaves / phone dies**: roster marks them away after missed heartbeats; game NEVER blocks on an absent phone (Final round: missing wager = auto 0 at deadline; host sees who's outstanding).
-- **The host kicks/renames**: takes effect immediately, phone shows a polite screen.
+- **The host kicks/renames**: takes effect immediately, phone shows a polite screen. The wire says which polite screen: `room-closed` carries `kicked` (this phone only), `host-closed` (the host ended the room for everyone), or `expired` (the room aged out) - the client shows copy per reason, never a generic disconnect.
+- **The host pauses**: `set-pause` freezes the room; every running timer keeps the time it had left and resumes with it, so a break never expires the clue somebody was mid-answer on. The display shows "one moment", phones show the same.
 
 ### A6. After
 

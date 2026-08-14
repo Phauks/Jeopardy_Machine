@@ -47,6 +47,11 @@ function welcomeAndSeat(serve: (payload: Record<string, unknown>) => void, playe
       ],
       teams: [],
     },
+    // Room-level fields added with the M4 surfaces (2026-08-14): the host freeze and the
+    // redacted clue text. A bot ignores both - it plays by events - but a snapshot without
+    // them is not a valid frame, and this fixture is a real frame on purpose.
+    paused: false,
+    clueContent: null,
   });
 }
 

@@ -65,6 +65,21 @@ describe("room client messages", () => {
     ).toBe(true);
   });
 
+  it("carries the host's room-level controls (pause, force-expire, close)", () => {
+    for (const message of [
+      { version: v, type: "set-pause", paused: true },
+      { version: v, type: "set-pause", paused: false },
+      { version: v, type: "expire-timer" },
+      { version: v, type: "close-room" },
+    ]) {
+      expect(parseRoomClientMessage(JSON.stringify(message)).ok, message.type).toBe(true);
+    }
+    // set-pause states its intent - a toggle would race two consoles into disagreement.
+    expect(roomClientMessageSchema.safeParse({ version: v, type: "set-pause" }).success).toBe(
+      false,
+    );
+  });
+
   it("bounds nickname and team-name lengths by the limits module", () => {
     const tooLong = "x".repeat(limits.player.nicknameMaxLength + 1);
     expect(
@@ -135,6 +150,8 @@ describe("room server messages", () => {
         phase: "active",
         game: { phase: "armed" },
         roster: { players: [], teams: [] },
+        paused: false,
+        clueContent: null,
       },
       { version: v, type: "event", stateVersion: 13, events: [{ type: "buzzers-armed" }] },
       {
@@ -163,6 +180,67 @@ describe("room server messages", () => {
     expect(roomCloseCodes.badToken).toBeGreaterThanOrEqual(4400);
     expect(roomCloseCodes.roomFull).toBeGreaterThanOrEqual(4400);
     expect(roomCloseCodes.roomClosed).toBeLessThan(4400);
+  });
+
+  // Added with the M4 surfaces (2026-08-14): authored text has no home in the engine, so it
+  // rides its own message; the redaction table lives in the DO (apps/realtime/src/room/content.ts).
+  it("round-trips clue content, including the roles that get nothing", () => {
+    const cellTarget = { kind: "cell", roundIndex: 0, category: 2, row: 4 };
+    for (const content of [
+      {
+        target: cellTarget,
+        category: "Renewable Energy",
+        prompt: { text: "A machine that converts wind to watts" },
+        answer: { canonical: "What is a turbine?", accepted: ["turbine"] },
+      },
+      // A phone in a room with clue text off: prompt AND answer withheld, message still sent.
+      { target: cellTarget, category: "Renewable Energy", prompt: null, answer: null },
+      {
+        target: { kind: "final" },
+        category: "The final category",
+        prompt: {
+          text: "The final prompt",
+          media: { mediaId: "0192f0a0-0000-7000-8000-000000000000" },
+        },
+        answer: null,
+      },
+    ]) {
+      expect(
+        roomServerMessageSchema.safeParse({ version: v, type: "clue-content", content }).success,
+        JSON.stringify(content.target),
+      ).toBe(true);
+    }
+  });
+
+  it("names the three ways a room can end, so the polite screen has copy to show", () => {
+    for (const reason of ["expired", "host-closed", "kicked"]) {
+      expect(
+        roomServerMessageSchema.safeParse({ version: v, type: "room-closed", reason }).success,
+        reason,
+      ).toBe(true);
+    }
+    expect(
+      roomServerMessageSchema.safeParse({ version: v, type: "room-closed", reason: "bored" })
+        .success,
+    ).toBe(false);
+  });
+
+  it("carries the pause state on its own message and on every snapshot", () => {
+    expect(
+      roomServerMessageSchema.safeParse({ version: v, type: "paused", paused: true, at: 1 })
+        .success,
+    ).toBe(true);
+    // Snapshot without the new fields is now incomplete - a client must always learn both.
+    expect(
+      roomServerMessageSchema.safeParse({
+        version: v,
+        type: "snapshot",
+        stateVersion: 1,
+        phase: "active",
+        game: null,
+        roster: { players: [], teams: [] },
+      }).success,
+    ).toBe(false);
   });
 
   it("carries both password refusals, which are retryable on the same socket", () => {

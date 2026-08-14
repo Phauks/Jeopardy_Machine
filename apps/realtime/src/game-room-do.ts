@@ -31,10 +31,11 @@ import { createRoomRequestSchema, generateSecretToken } from "@jeopardy/protocol
 import { parseRoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
+import { clueContentFor, resolveCellContent, resolveFinalContent } from "./room/content.ts";
 import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
 import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
-import { deleteRegistryRow, touchRegistryRow } from "./room/registry-writer.ts";
+import { deleteRegistryRow, endRegistryRow, touchRegistryRow } from "./room/registry-writer.ts";
 import { emptySchedule, nextWakeAt, toWireRosterEntry } from "./room/storage.ts";
 import type { GameAction } from "@jeopardy/engine/actions";
 import type { GameEvent } from "@jeopardy/engine/events";
@@ -235,7 +236,47 @@ export class GameRoomDO extends Server {
       phase: lifecycle,
       game: redactStateFor(attachment.role, room.state),
       roster: this.wireRoster(),
+      paused: room.meta.pausedAt !== null,
+      // A phone that reconnects mid-clue must land on the screen it left, so an open clue
+      // ships its (redacted) content with the snapshot rather than waiting for the next one.
+      clueContent: this.clueContentForRole(attachment.role),
     });
+  }
+
+  // ---- clue content ----------------------------------------------------------------------
+
+  // What the room's CURRENT clue says, cut to one role (room/content.ts owns the redaction
+  // table). Null when no clue is open, when the game shipped board material only (the
+  // compact spec used by bots/tests), or when the item cannot be resolved.
+  private clueContentForRole(role: RoomRole) {
+    const room = this.room;
+    if (room === null || room === undefined) return null;
+    const clue = room.state.clue;
+    const resolved =
+      clue === null
+        ? room.state.final === null
+          ? null
+          : resolveFinalContent(room.spec)
+        : resolveCellContent(room.spec, {
+            roundIndex: clue.roundIndex,
+            category: clue.category,
+            row: clue.row,
+          });
+    if (resolved === null) return null;
+    return clueContentFor(role, resolved, {
+      clueTextOnPhones: room.setup.settings.join.clueTextOnPhones,
+    });
+  }
+
+  // Push the open clue to every connection, each seeing only its role's share. Sent when a
+  // clue is presented and when the final round opens - the two moments a screen needs words.
+  private broadcastClueContent(): void {
+    for (const connection of this.getConnections<Attachment>()) {
+      const attachment = connection.state;
+      if (attachment === null) continue;
+      const content = this.clueContentForRole(attachment.role);
+      if (content !== null) this.send(connection, { type: "clue-content", content });
+    }
   }
 
   // ---- engine pipeline ------------------------------------------------------------------
@@ -327,6 +368,19 @@ export class GameRoomDO extends Server {
       }
     }
 
+    // Authored text rides its own channel (the engine never sees content), pushed at the two
+    // moments a screen needs words: a clue opening and the final round starting.
+    if (
+      events.some(
+        (event) =>
+          event.type === "clue-presented" ||
+          event.type === "final-wagers-open" ||
+          event.type === "final-writing-open",
+      )
+    ) {
+      this.broadcastClueContent();
+    }
+
     // Everything else flows as the ordered event stream, role-redacted per connection.
     // early-buzz additionally produces private buzz-rejected feedback for the offender.
     const stream = events.filter((event) => event.type !== "buzz-won");
@@ -380,6 +434,7 @@ export class GameRoomDO extends Server {
         lastActivityAt: now,
         stateVersion: 0,
         lifecycle: "lobby",
+        pausedAt: null,
         playerCounter: 0,
         teamCounter: 0,
       };
@@ -506,6 +561,12 @@ export class GameRoomDO extends Server {
         return this.handleTeamKick(connection, attachment, incoming);
       case "team-handoff":
         return this.handleTeamHandoff(connection, attachment, incoming);
+      case "set-pause":
+        return this.handleSetPause(connection, attachment, incoming.paused);
+      case "expire-timer":
+        return this.handleExpireTimer(connection, attachment);
+      case "close-room":
+        return this.handleCloseRoom(connection, attachment);
       default:
     }
   }
@@ -673,8 +734,19 @@ export class GameRoomDO extends Server {
     // for start-game, so the lobby can rearrange teams without engine actions.
     if (room.meta.lifecycle === "active") {
       if (teamsMode && teamId === null) {
-        this.sendError(connection, "rejected", "pick a team to join a running game");
-        return;
+        // Same policy as start-game: a straggler joins as a solo team rather than being
+        // bounced off a running game.
+        room.meta.teamCounter += 1;
+        createdTeam = {
+          teamId: `t-${String(room.meta.teamCounter)}`,
+          name: message.nickname.slice(0, limits.team.teamNameMaxLength),
+          colorId: null,
+          buzzSoundId: null,
+          leaderPlayerId: playerId,
+          locked: false,
+        };
+        teamId = createdTeam.teamId;
+        entry.teamId = teamId;
       }
       const joinAction: GameAction = {
         type: "player-join",
@@ -877,17 +949,17 @@ export class GameRoomDO extends Server {
     }
 
     // start-game seats the roster first: the lobby's team arrangement becomes engine truth
-    // in one arrival-ordered batch, then the game starts. Retry-safe (already-seated
-    // players are skipped), and in teams mode every player must have picked a team.
+    // in one arrival-ordered batch, then the game starts. Retry-safe (already-seated players
+    // are skipped).
+    //
+    // Unteamed players in a teams-mode room are seated as SOLO TEAMS OF ONE (policy agreed
+    // with the M4 surfaces 2026-08-14, replacing the earlier refusal). Refusing to start was
+    // the wrong instinct: it hands the host a blocking error at the worst possible moment -
+    // the room is full, the night has started, and one person did not tap a card. A solo team
+    // is a correct, undoable outcome, and the host can still merge or rename afterwards.
     if (stamped.action.type === "start-game") {
       const teamsMode = room.setup.settings.teams.playerMode === "teams";
-      const unseated = Object.values(room.roster).filter(
-        (entry) => room.state.players[entry.playerId] === undefined,
-      );
-      if (teamsMode && unseated.some((entry) => entry.teamId === null)) {
-        this.sendError(connection, "rejected", "every player needs a team before start");
-        return;
-      }
+      if (teamsMode && (await this.seatStragglersAsSoloTeams())) this.broadcastRoster();
       const seatActions: GameAction[] = Object.values(room.roster)
         .toSorted((a, b) => a.joinedAt - b.joinedAt)
         .filter((entry) => room.state.players[entry.playerId] === undefined)
@@ -909,6 +981,33 @@ export class GameRoomDO extends Server {
     }
 
     await this.applyEngineActions([stamped.action], { reporter: connection });
+  }
+
+  // Give every teamless player their own team, named after them - the teams-mode fallback
+  // used at start-game and on a teams-mode late join. Broadcasts nothing itself: both callers
+  // follow with a roster broadcast or an engine batch that carries the change.
+  private async seatStragglersAsSoloTeams(): Promise<boolean> {
+    const room = this.room;
+    if (room === null || room === undefined) return false;
+    let created = false;
+    for (const entry of Object.values(room.roster).toSorted((a, b) => a.joinedAt - b.joinedAt)) {
+      if (entry.teamId !== null) continue;
+      if (Object.keys(room.teams).length >= limits.team.teamMaxCount) break;
+      room.meta.teamCounter += 1;
+      const team: TeamDoc = {
+        teamId: `t-${String(room.meta.teamCounter)}`,
+        name: entry.identity.nickname.slice(0, limits.team.teamNameMaxLength),
+        colorId: null,
+        buzzSoundId: null,
+        leaderPlayerId: entry.playerId,
+        locked: false,
+      };
+      room.teams[team.teamId] = team;
+      entry.teamId = team.teamId;
+      created = true;
+    }
+    if (created) await this.persist("meta", "roster", "teams");
+    return created;
   }
 
   // ---- identity + roster administration ---------------------------------------------------
@@ -1011,7 +1110,9 @@ export class GameRoomDO extends Server {
     }
     for (const other of this.getConnections<Attachment>()) {
       if (other.state?.playerId === message.playerId) {
-        this.send(other, { type: "room-closed", reason: "host-closed" });
+        // Its own reason, not host-closed: the kicked phone shows "the host removed you",
+        // while everyone else's room continues (user-flows A5, the polite screen).
+        this.send(other, { type: "room-closed", reason: "kicked" });
         other.close(roomCloseCodes.roomClosed, "kicked by host");
       }
     }
@@ -1226,6 +1327,110 @@ export class GameRoomDO extends Server {
     this.broadcastRoster();
   }
 
+  // ---- host room controls -------------------------------------------------------------------
+
+  // Freeze/resume the room. Pausing converts every running engine timer into the time it had
+  // LEFT; resuming turns that back into a deadline, so a five-minute break never silently
+  // expires the clue somebody was mid-answer on. The engine is untouched throughout - it has
+  // no pause concept, and inventing one there would mean a new action in every replay log.
+  private async handleSetPause(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+    paused: boolean,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "pause is host-only");
+      return;
+    }
+    const alreadyPaused = room.meta.pausedAt !== null;
+    if (alreadyPaused === paused) return; // idempotent: a double-tap is not an error
+    const now = Date.now();
+    if (paused) {
+      room.meta.pausedAt = now;
+      for (const entry of Object.values(room.schedule.engineTimers)) {
+        entry.remainingMs = Math.max(entry.dueAt - now, 0);
+      }
+    } else {
+      room.meta.pausedAt = null;
+      for (const entry of Object.values(room.schedule.engineTimers)) {
+        if (entry.remainingMs !== undefined) {
+          entry.dueAt = now + entry.remainingMs;
+          delete entry.remainingMs;
+        }
+      }
+    }
+    await this.persist("meta", "schedule");
+    await this.rescheduleAlarm();
+    this.broadcastToJoined({ type: "paused", paused, at: now });
+  }
+
+  // "Skip the wait": fire whichever timer the room is currently waiting on. Ordinary expiries
+  // are server-driven through the alarm book - a client can never forge time - so this is the
+  // host reaching for the same lever early (guiding principle 4), not a new authority: the
+  // host may already relay each *-timeout action by name (authority.ts).
+  private async handleExpireTimer(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "forcing a timer is host-only");
+      return;
+    }
+    // The alarm book keeps STALE entries on purpose (a phase moved on, an undo rewound time)
+    // - they fire as harmless engine rejections. So "the timer the room is on" is the first
+    // entry the engine still accepts, not simply the earliest deadline: walk them in due
+    // order, dropping what the engine rejects, and stop at the one that actually does
+    // something. Rejections stay silent here; only "nothing to skip" reaches the host.
+    const pending = Object.entries(room.schedule.engineTimers).toSorted(
+      ([, left], [, right]) => left.dueAt - right.dueAt,
+    );
+    for (const [kind, entry] of pending) {
+      delete room.schedule.engineTimers[kind];
+      const candidate = gameActionSchema.safeParse({ type: entry.actionType, at: Date.now() });
+      if (!candidate.success) continue;
+      // oxlint-disable-next-line no-await-in-loop
+      const accepted = await this.applyEngineActions([candidate.data], {
+        silentRejections: true,
+      });
+      if (accepted.length > 0) return;
+    }
+    await this.persist("schedule");
+    this.sendError(connection, "rejected", "the room is not waiting on a timer");
+  }
+
+  // End the room deliberately. Everyone gets the polite screen with a reason they can show
+  // verbatim (user-flows A5); the room is marked ended so the lobby delists it, and the
+  // storage wipe waits for the ordinary expiry alarm - a host who closes by accident still
+  // has the state, and the code stays spent until it ages out.
+  private async handleCloseRoom(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "closing the room is host-only");
+      return;
+    }
+    room.meta.lifecycle = "ended";
+    await this.persist("meta");
+    await endRegistryRow(this.env.DB, room.meta.code, Date.now());
+    for (const other of this.getConnections<Attachment>()) {
+      this.send(other, { type: "room-closed", reason: "host-closed" });
+      other.close(roomCloseCodes.roomClosed, "host closed the room");
+    }
+  }
+
+  private broadcastToJoined(payload: Record<string, unknown>): void {
+    for (const connection of this.getConnections<Attachment>()) {
+      if (connection.state !== null) this.send(connection, payload);
+    }
+  }
+
   // ---- alarms -----------------------------------------------------------------------------
 
   override async onAlarm(): Promise<void> {
@@ -1253,8 +1458,11 @@ export class GameRoomDO extends Server {
 
     // Engine timers: dispatch every due expiry action. Stale ones (the phase moved on, an
     // undo rewound time) reject inside the engine and are dropped silently - by design.
+    // A PAUSED room dispatches none: its timers hold their remaining time until resume.
     const dueActions: GameAction[] = [];
-    for (const [kind, entry] of Object.entries(room.schedule.engineTimers)) {
+    for (const [kind, entry] of Object.entries(
+      room.meta.pausedAt === null ? room.schedule.engineTimers : {},
+    )) {
       if (entry.dueAt <= now) {
         delete room.schedule.engineTimers[kind];
         const candidate = gameActionSchema.safeParse({ type: entry.actionType, at: now });
