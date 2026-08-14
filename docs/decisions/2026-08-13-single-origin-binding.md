@@ -33,3 +33,11 @@ Connecting must never create a room. With `idFromName`, ANY code names a DO, so 
 - `/dev/echo` and `REALTIME_ORIGIN` are interim scaffolding; M3 replaces them with same-origin room routes (the env var and its dev-only localhost fallback get deleted).
 - The realtime Worker no longer needs a public route for players; consider disabling its workers.dev URL after M3.
 - The uncommented DO binding goes live in M3 (name already aligned: `jeopardy-machine-realtime`).
+
+## Addendum 2026-08-14 (M3 implementation): the passthrough WORKS - no fallback needed
+
+The week-1 risk resolved in favor of the plain route. A SvelteKit 3 `+server.ts` endpoint (`apps/web/src/routes/room/[code]/ws/+server.ts`) returns the DO's 101-with-socket response unmodified through the pinned kit 3.0.0-next.23 / adapter-cloudflare 8.0.0-next.6 path: Kit's endpoint renderer passes a handler's `Response` through untouched (no re-wrapping, no header mutation when `setHeaders`/cookies are unused), and once the runtime sees the 101 the Worker drops out of the socket path. The documented fallback (thin custom entry ahead of the Kit handler) was NOT implemented - nothing needs it.
+
+Proof, repeatable: `apps/web/scripts/prove-single-origin.mjs` against the built worker under multi-config `wrangler dev` (create room -> upgrade -> host join -> welcome/snapshot -> no-such-room refusal for an uncreated code, all through the web origin); the Playwright suite re-proves it with real browsers on every e2e run. Watch item: a kit/adapter pin bump that starts wrapping endpoint responses would break the passthrough - the proof script is the canary, run it after any such bump.
+
+Local-dev deltas from this addendum: vite dev CANNOT emulate the cross-script DO binding, so the single-origin loop runs under multi-config `wrangler dev` (docs/DEVELOPMENT.md); `/dev/echo` grew into the room harness (create/join/refusal probes) and keeps `REALTIME_ORIGIN` only as a deprecated direct-dial toggle for vite-dev sessions - the env var's deletion moves to the harness's retirement (M4) rather than M3.

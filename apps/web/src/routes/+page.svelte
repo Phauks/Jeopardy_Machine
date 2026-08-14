@@ -17,8 +17,8 @@
     },
     {
       href: "/dev/echo",
-      title: "Realtime harness",
-      note: "WebSocket lab against the GameRoomDO stub: latency, ordering bursts, hibernation probe, malformed input, reconnect tools.",
+      title: "Realtime room harness",
+      note: "Create a real room (sample game), connect through the single origin, join as host/player/spectator, and probe refusals: uncreated-room PASS check, hibernation ping, rate/size limits.",
     },
     {
       href: "/api/version",

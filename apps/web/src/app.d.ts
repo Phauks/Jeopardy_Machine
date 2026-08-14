@@ -12,7 +12,18 @@ declare global {
     // interface Locals {}
     // interface PageData {}
     // interface PageState {}
-    // interface Platform {}
+    interface Platform {
+      env: {
+        // Cross-script binding to the realtime Worker's GameRoomDO (wrangler.jsonc).
+        // Typed structurally on purpose: pulling @cloudflare/workers-types' globals into a
+        // DOM-lib SvelteKit app trades one line of shape for a world of lib conflicts.
+        // The shape is the sliver of DurableObjectNamespace the routes actually use.
+        GAME_ROOM: {
+          idFromName(name: string): unknown;
+          get(id: unknown): { fetch(request: Request): Promise<Response> };
+        };
+      };
+    }
   }
 }
 
