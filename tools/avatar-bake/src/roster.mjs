@@ -15,6 +15,20 @@
 //
 // displayName: picker label + sprite alt text. Pets go by species; humans get invented
 // friendly names (no real-person references) - freely renameable here, then re-bake.
+//
+// clips: the THREE animation roles the shipped models expose, mapped to each pack's own clip
+// names (docs/decisions/2026-08-14-avatars-in-motion.md). Shipped code - the sprite-sheet
+// bake and the display diorama - names roles, never Kenney clip names, so a pack that renames
+// its animations is a one-line change here. Only these clips survive the GLB repack, which is
+// most of why the models fit their budget.
+export const clipRoles = ["idle", "walk", "celebrate"];
+
+/** Per-kind defaults; a roster entry may override any role (female-a does - see below). */
+const defaultClips = {
+  pet: { idle: "idle", walk: "walk", celebrate: "dance" },
+  human: { idle: "idle", walk: "walk", celebrate: "jump" },
+};
+
 export const avatars = [
   // --- Cube Pets: body base + shade cells from the pets colormap ---
   { id: "bunny", kind: "pet", displayName: "Bunny", recolorTargets: ["#cc7854", "#d47f59"] },
@@ -50,6 +64,12 @@ export const avatars = [
     // Purple top; the composited wheelchair keeps its own pack colors.
     recolorTargets: ["#8a5fd5"],
     extraModelFiles: ["Models/GLB format/wheelchair.glb"],
+    // She is the pack's wheelchair user - so she gets the pack's own wheelchair locomotion
+    // rather than a standing walk cycle. Ada moves in her chair; making her model foot-walk
+    // in the diorama would be both wrong and worse-looking. Her `idle` stays the shared clip
+    // (the committed still sprite proves it reads correctly seated) and `celebrate` is a nod
+    // rather than the standing jump.
+    clips: { walk: "wheelchair-move-forward", celebrate: "emote-yes" },
   },
   {
     id: "female-b",
@@ -111,4 +131,9 @@ export const avatars = [
 /** Which pack a roster entry renders from. */
 export function packIdFor(avatar) {
   return avatar.kind === "pet" ? "cube-pets" : "mini-characters";
+}
+
+/** Resolved role -> pack clip name for one roster entry (per-kind defaults + entry override). */
+export function clipsFor(avatar) {
+  return { ...defaultClips[avatar.kind], ...avatar.clips };
 }

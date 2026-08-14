@@ -90,9 +90,29 @@
       note: "Three-column room console: create/delete rooms and see every one this tab made, connect and join through the single origin with a live DO inspector, watch the auto-refreshing public lobby with the registry's health stated out loud, and run the refusal probes in the test area.",
     },
     {
+      href: "/dev/diorama",
+      title: "Avatar diorama",
+      note: "The live 3D lobby scene with fake players: add avatars, switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
+    },
+    {
       href: "/api/rooms",
       title: "/api/rooms",
       note: "The public lobby listing as JSON: live public rooms, newest first, capped and briefly cached.",
+    },
+    {
+      href: "/room/DUMYX",
+      title: "Player room",
+      note: "A2 join, A3 lobby, A4 buzzer - open on a phone (M4 mock room seeded from the fixture dataset; ?theme=modern-flat previews presets).",
+    },
+    {
+      href: "/room/DUMYX/display",
+      title: "Display screen",
+      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the live 3D avatar diorama on lobby and winner phases.",
+    },
+    {
+      href: "/room/DUMYX/host",
+      title: "Host console",
+      note: "C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.",
     },
     {
       href: "/api/version",
@@ -187,6 +207,7 @@
   <p class="text-sm opacity-70">
     Build {__BUILD_META__.sha} · {__BUILD_META__.builtAt.slice(0, 16).replace("T", " ")}Z ·
     <a class="underline" href="https://github.com/Phauks/Jeopardy_Machine">source</a>
+<<<<<<< HEAD
   </p>
   <p>
     <a class="underline" href="/dev/hotseat">Dev: hotseat</a>
@@ -205,6 +226,8 @@
   <p>
     <a class="underline" href="/room/DUMYX/host">Host: /room/DUMYX/host</a>
     - C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.
+=======
+>>>>>>> worktree-agent-a196ede850854c061
   </p>
 </main>
 

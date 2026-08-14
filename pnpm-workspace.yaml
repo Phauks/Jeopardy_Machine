@@ -25,7 +25,15 @@ catalog:
   # Node 22 line to match .nvmrc/engines - NOT the latest major; bump alongside the runtime.
   "@types/node": 22.20.1
   # tools/avatar-bake only (offline sprite pipeline, never bundled into shipped Workers).
+  # Shared by tools/avatar-bake (offline) and apps/web (the display diorama). In the app it is
+  # reachable ONLY through the dynamic import in src/lib/diorama/avatar-diorama.svelte, so it
+  # is a code-split chunk the display route fetches and no other surface ever downloads
+  # (docs/decisions/2026-08-14-avatars-in-motion.md). Same pin both places on purpose: the
+  # baked sprites and the live models must come out of the same renderer.
   three: 0.185.1
+  # three ships no .d.ts of its own; DefinitelyTyped tracks it minor-for-minor, so this pin
+  # moves with the three pin above. Verified on npm 2026-08-14: 0.185.4 is the newest 0.185.x.
+  "@types/three": 0.185.4
   "@sveltejs/adapter-cloudflare": 8.0.0-next.6
   "@sveltejs/kit": 3.0.0-next.23
   "@sveltejs/vite-plugin-svelte": 7.3.0

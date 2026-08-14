@@ -8,10 +8,13 @@
   import { fade, scale } from "svelte/transition";
   import { prefersReducedMotion } from "svelte/motion";
   import { renderSVG } from "uqr";
+  import AvatarDiorama from "#lib/diorama/avatar-diorama.svelte";
   import BoardDisplay from "#lib/board/board-display.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
   import { cellKey } from "@jeopardy/engine/state";
   import { entityDisplayName, standingsFor } from "#lib/room/room-view.ts";
+  import type { DioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
+  import type { DioramaOccupant } from "#lib/diorama/diorama-scene.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
   import type { BoardData } from "#lib/board/sample-board.ts";
 
@@ -19,8 +22,15 @@
     store: RoomStore;
     /** Origin for the join URL under the QR; defaults to the current origin at runtime. */
     joinOrigin?: string | null;
+    /**
+     * The 3D scene the avatars inhabit. "none" is the clean 2D lobby this surface has always
+     * had. Local vocabulary until the theme document reserves an `environment` slot - the
+     * exact schema addition is written down in src/lib/diorama/diorama-environment.ts.
+     * Mirror mode passes "none": a host console must not spin up a second renderer.
+     */
+    environment?: DioramaEnvironment;
   };
-  let { store, joinOrigin = null }: Props = $props();
+  let { store, joinOrigin = null, environment = "studio" }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -115,9 +125,78 @@
   const winners = $derived(
     (game?.winners ?? []).map((entityId) => entityDisplayName(view, entityId)),
   );
+
+  // --- The avatar diorama (docs/decisions/2026-08-14-avatars-in-motion.md, tier 3) ----------
+  // Mounted on the screens that are ABOUT the people in the room - the lobby, the round and
+  // final interstitials, the winner scene - and on no other. Never behind a live clue: the
+  // clue screen has one job, and a projector rendering a crowd of skinned meshes behind the
+  // text is a frame-budget bill nobody agreed to pay (guardrail 4). Because the mount is a
+  // template branch rather than a hidden element, "not shown" also means "not rendering".
+  const dioramaPhases = ["round-break", "final-wagers", "final-writing", "final-reveal", "game-over"];
+  const showDiorama = $derived(
+    environment !== "none" &&
+      (game === null || view.phase === "lobby" || dioramaPhases.includes(game.phase)),
+  );
+
+  // One avatar per SCORING entity, so teams mode shows teams rather than a duplicate crowd -
+  // the same entity vocabulary buzz and winner events speak. A team borrows its avatar from
+  // its leader (the face the room already associates with it) and wears the team's color.
+  const dioramaOccupants: DioramaOccupant[] = $derived.by(() => {
+    if (!view.teamsMode) {
+      return view.roster.players.map((player) => ({
+        entityId: player.playerId,
+        avatarId: player.avatarId,
+        accentId: player.accentId,
+      }));
+    }
+    return view.roster.teams.map((team) => {
+      const leader = view.roster.players.find(
+        (player) => player.playerId === team.leaderPlayerId,
+      );
+      return {
+        entityId: team.teamId,
+        avatarId: leader?.avatarId ?? null,
+        accentId: team.colorId,
+      };
+    });
+  });
+
+  const celebratingEntityIds = $derived(game?.phase === "game-over" ? (game.winners ?? []) : []);
+
+  // The visible beat. In the lobby it is the arrival itself: the newest player's avatar turns
+  // to the room and celebrates as they walk on - the big-screen half of the identity moment.
+  // Room events that arrive while the diorama is up (a buzz in a phase that shows it) come in
+  // through the `beat` the display route passes down; during a live clue there is nothing
+  // mounted to react, which is the guardrail working, not a gap.
+  const newestPlayer = $derived.by(() => {
+    let newest: { playerId: string; joinedAt: number } | null = null;
+    for (const player of view.roster.players) {
+      if (newest === null || player.joinedAt > newest.joinedAt) newest = player;
+    }
+    return newest;
+  });
+  const dioramaBeat = $derived(
+    newestPlayer === null || view.phase !== "lobby"
+      ? null
+      : { entityId: newestPlayer.playerId, at: newestPlayer.joinedAt },
+  );
 </script>
 
-<div class="display-screen">
+<div class="display-screen" class:with-diorama={showDiorama}>
+  {#if showDiorama}
+    <!-- Behind the screen's own content, never over it: the QR, the scores, and the winner
+         names stay the readable foreground. Sits outside the phase branches below so a
+         lobby -> interstitial move does not tear the scene down and re-spawn the crowd. -->
+    <div class="diorama-layer">
+      <AvatarDiorama
+        occupants={dioramaOccupants}
+        {environment}
+        {celebratingEntityIds}
+        beat={dioramaBeat}
+      />
+    </div>
+  {/if}
+
   {#if view.paused}
     <div class="pause-veil" role="status" transition:fade={{ duration: transitionDuration }}>
       <p>One moment...</p>
@@ -251,6 +330,36 @@
     display: grid;
     background: var(--page-bg);
     color: var(--surface-text);
+  }
+
+  /* The diorama is the lower band of the screen - a stage the room's avatars walk along,
+     under whatever the screen is saying. Pointer events off: it is scenery, and a projector
+     display has nothing to click here anyway. */
+  .diorama-layer {
+    position: absolute;
+    inset: auto 0 0 0;
+    height: 46%;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Everything the screen actually says sits above the scenery. */
+  .title-screen,
+  .category-reveal,
+  .interstitial,
+  .winner-screen,
+  .board-holder {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ...and lifts clear of it, so a wandering avatar never walks across the join QR or the
+     winner's name. The screens are vertically centred, so bottom padding is what raises the
+     content block above the stage band. */
+  .display-screen.with-diorama .title-screen,
+  .display-screen.with-diorama .interstitial,
+  .display-screen.with-diorama .winner-screen {
+    padding-bottom: 34vh;
   }
 
   .pause-veil {
