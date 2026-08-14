@@ -1,0 +1,17 @@
+{
+  "name": "@jeopardy/avatar-bake",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline avatar sprite pipeline: renders Kenney Cube Pets + Mini Characters GLBs to accent-recolored webp sprites committed under apps/web/static/avatars/. Never bundled into shipped Workers.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "download": "node src/download.mjs",
+    "bake": "node src/bake.mjs",
+    "analyze": "node src/bake.mjs --analyze"
+  },
+  "devDependencies": {
+    "playwright": "catalog:",
+    "three": "catalog:"
+  }
+}
