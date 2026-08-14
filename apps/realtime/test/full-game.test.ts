@@ -8,9 +8,9 @@
 /* oxlint-disable no-await-in-loop */
 import { describe, expect, it } from "vitest";
 import { connectBot, connectHost, initializeRoom, instantBot, uniqueCode } from "./helpers.ts";
-import type { CreateRoomRequest } from "@jeopardy/protocol/room/create";
+import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
 
-const wagerAndFinalGame: CreateRoomRequest["game"] = {
+const wagerAndFinalGame: CreateRoomRequestInput["game"] = {
   kind: "compact",
   rounds: [
     {

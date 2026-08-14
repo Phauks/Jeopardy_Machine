@@ -16,7 +16,9 @@
     "./room/client-messages": "./src/room/client-messages.ts",
     "./room/server-messages": "./src/room/server-messages.ts",
     "./room/authority": "./src/room/authority.ts",
-    "./room/create": "./src/room/create.ts"
+    "./room/create": "./src/room/create.ts",
+    "./room/visibility": "./src/room/visibility.ts",
+    "./room/registry": "./src/room/registry.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

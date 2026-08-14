@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-13 (M2 engine landed: pure state machine + seeded rng + fixtures + /dev/hotseat exit-criteria page. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-14 (M3.5 room visibility/passwords/lobby landed on top of M3 realtime rooms: room protocol, real GameRoomDO, single-origin WS proven, bot players, workerd + Playwright suites. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -74,7 +74,29 @@ Progress 2026-08-13 - `packages/engine` (@jeopardy/engine) landed:
 
 ### M3 - Realtime rooms (DO + WebSockets)
 
-`GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, server-arrival buzz ordering (fairness compensation deferred to M6), alarms for room cleanup. **Single-origin connections** (owner decision, docs/decisions/2026-08-13-single-origin-binding.md): all clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to the DO via the cross-script binding - week-1 risk item is proving the upgrade passes through the SvelteKit-on-Workers path (fallback: thin custom entry ahead of the Kit handler); `/dev/echo` + `REALTIME_ORIGIN` are then deleted. **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones - all through the single origin.
+`GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, server-arrival buzz ordering (fairness compensation deferred to M6), alarms for room cleanup. **Single-origin connections** (owner decision, docs/decisions/2026-08-13-single-origin-binding.md): all clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to the DO via the cross-script binding - week-1 risk item is proving the upgrade passes through the SvelteKit-on-Workers path (fallback: thin custom entry ahead of the Kit handler). **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones - all through the single origin.
+
+Progress 2026-08-14 - landed; both exit criteria green:
+
+- [x] Room wire catalog in `packages/protocol/room/*`: join/resume/action-relay/team tier/identity edits client-side; welcome/refused/snapshot/event stream/buzz-won/roster/error server-side; role-authority matrix for relayed engine actions (gate-tested against the engine catalog); explicit-create RPC shapes
+- [x] `GameRoomDO` for real: explicit initialize via typed RPC (connecting never creates - uncreated/expired codes answer no-such-room), arrival-ordered engine feed with server timestamps, role-redacted snapshots/events (phones never see DD locations or secret final wagers), engine timer hints + leader-succession grace + 2h idle expiry multiplexed into the one DO alarm, session-token reconnect, team tier with rename rate limits and the armed-window identity lock, one room-level buzz-won per arming carrying the team-scoped sound
+- [x] Single-origin path live: `POST /api/rooms` + `/room/[code]/ws` through the uncommented `GAME_ROOM` binding; **upgrade passthrough PROVEN on the pinned kit/adapter - no fallback entry needed** (verdict + canary script in the decision doc's 2026-08-14 addendum)
+- [x] Bot players (`packages/bots`): seeded headless clients on the real protocol + CLI (`pnpm -F @jeopardy/bots bots`); the M4 sim panel builds on them
+- [x] workerd suite (33 tests): create/refuse/expiry incl. code reuse, full game incl. wager cell + final, forced eviction mid-game, token reconnect, concurrent buzz races, team lifecycle + succession, authority/redaction/limit guardrails
+- [x] Playwright multi-context e2e (`pnpm -F @jeopardy/web test:e2e`): real chromium phones + display + host through the single origin - roster sync, deterministic staggered buzz race, the /dev/echo harness flow
+- Scope amendment (recorded in the decision addendum): `/dev/echo` + `REALTIME_ORIGIN` were not deleted but repurposed - the page is now the owner's room harness (create/join/refusal probes) and the env var survives only as its deprecated vite-dev direct-dial fallback; both retire with the M4 surfaces
+
+### M3.5 - Room visibility, passwords, and the public lobby
+
+Owner direction 2026-08-14 (docs/decisions/2026-08-14-room-visibility-and-lobby.md): a room is public or unlisted, and independently open or password-protected - the multiplayer server-browser model, with the default (`unlisted` + open) leaving the QR/code flow exactly as it was.
+
+Progress 2026-08-14 - landed:
+
+- [x] Protocol: creation gains `visibility`/`title`/`hostLabel`/`password`, join gains the shared room password, `refused` gains `password-required`/`bad-password` (retryable on the same socket), and `roomSummary`/`lobbyListing` describe the registry projection; new caps in `limits.room`/`limits.lobby`
+- [x] D1's first real use: the `rooms` registry table (`apps/web/migrations/0001_create_rooms.sql`, applied by hand from the runbook) + a typed server-only repository; rows are a cache, the DO stays authority
+- [x] Registry updates from the room DO through a **shared D1 binding** (alternatives weighed and rejected in the decision's addendum), coalesced for roster churn, forced on phase change, row deleted with the room by the expiry alarm, sweep for drift
+- [x] Passwords verified in the DO: PBKDF2-SHA256 (100k, per-room salt, constant-time compare), per-connection attempt budget, host exempt via the creation token, `has_password` the only public fact
+- [x] Surfaces: the root page's real **Join** section (code box + password + polling public-rooms list, code-box-wins) and the harness's create/list controls - which answers the owner's "can the harness list all rooms?" (it can, for public rooms; unlisted rooms have no row by design)
 
 ### M4 - Play surfaces (board, buzzer, host)
 
@@ -113,10 +135,12 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 
 - [ ] M1 board format + editor core (protocol schemas landed 2026-08-13 - see the M1 progress list; visual editor remains)
 - [x] M2 game engine (landed 2026-08-13 - see the M2 progress list; everyone-answers is engine-complete but not yet driven by the hotseat page)
+- [x] M3 realtime rooms (landed 2026-08-14 - see the M3 progress list; fairness compensation stays M6)
+- [x] M3.5 room visibility, passwords, public lobby (landed 2026-08-14 - registry in D1, lobby on the root page)
 
 **Later**
 
-- M3 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
+- M4 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
 - M6 -> M8 as appetite allows
 
 ## Open decisions (owner input needed)

@@ -1,0 +1,864 @@
+{
+  "format": "content-pack",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Dummy Dataset Pack",
+    "author": "Jeopardy Machine fixtures",
+    "license": "CC0-1.0",
+    "created": "2026-08-14T00:00:00.000Z",
+    "modified": "2026-08-14T00:00:00.000Z"
+  },
+  "ext": {
+    "com.example.fixtures": {
+      "libraryId": "0198f00d-0000-7000-8000-00000000000f",
+      "role": "canonical-dummy-dataset",
+      "note": "Every item is deliberately fictional; nothing in this pack is a real-world trivia claim."
+    }
+  },
+  "body": {
+    "description": "The canonical dummy content pack for data-flow testing. 61 hand-written, obviously fictional items (environment + gaming flavor): two 6x5 boards plus a final, referenced by dummy-game.game.json. Contains zero real-world facts on purpose so it can never be mistaken for event content.",
+    "tags": ["dummy", "fixtures", "environment", "gaming"],
+    "items": [
+      {
+        "id": "0198f00d-0001-7000-8000-000000000111",
+        "type": "basic",
+        "prompt": {
+          "text": "This imaginary 'park' (pictured) protects the world's only upside-down waterfall, the Reverse Cascade.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000111" }
+        },
+        "answer": {
+          "canonical": "Topsy-Turvy National Park",
+          "accepted": ["Topsy-Turvy", "Topsy Turvy Park"],
+          "media": { "mediaId": "0198f00d-0003-7000-8000-000000000111" }
+        },
+        "tags": ["imaginary-parks", "picture-round", "environment"],
+        "difficulty": 1,
+        "source": "Invented for the dummy dataset; the photo is a placeholder.",
+        "provenance": "human",
+        "ext": {
+          "com.example.playtest": { "starred": true, "note": "first clue of the dummy game" }
+        }
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000112",
+        "type": "basic",
+        "prompt": {
+          "text": "Pictured: the glowing moss amphitheater at the heart of this imaginary reserve.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000112" }
+        },
+        "answer": { "canonical": "Lumen Hollow Preserve", "accepted": ["Lumen Hollow"] },
+        "tags": ["imaginary-parks", "picture-round", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000113",
+        "type": "basic",
+        "prompt": {
+          "text": "This fictional park issues each visitor exactly one regulation acorn on entry (pictured: the acorn desk).",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000113" }
+        },
+        "answer": { "canonical": "Acorn Allotment State Park", "accepted": ["Acorn Allotment"] },
+        "tags": ["imaginary-parks", "picture-round", "environment"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000114",
+        "type": "basic",
+        "prompt": {
+          "text": "The only imaginary park whose trail map is a playable maze level, shown here.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000114" }
+        },
+        "answer": { "canonical": "Warp Pipe Wetlands", "accepted": ["the Warp Pipe Wetlands"] },
+        "tags": ["imaginary-parks", "picture-round", "gaming"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000115",
+        "type": "basic",
+        "prompt": {
+          "text": "Rangers here rewind erosion nightly with the park's giant undo lever (pictured).",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000115" }
+        },
+        "answer": {
+          "canonical": "Ctrl-Z Canyon",
+          "accepted": ["Control-Z Canyon", "Control Z Canyon"],
+          "media": { "mediaId": "0198f00d-0003-7000-8000-000000000115" }
+        },
+        "tags": ["imaginary-parks", "picture-round", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000121",
+        "type": "basic",
+        "prompt": {
+          "text": "The any% record for the fictional 'Lawn Mowing Simulator: Meadow Edition' is 41 seconds thanks to this technique of skipping the grass entirely."
+        },
+        "answer": { "canonical": "the Grass Clip", "accepted": ["grass clipping", "clipping"] },
+        "tags": ["fake-speedruns", "gaming"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000122",
+        "type": "basic",
+        "prompt": {
+          "text": "Speedrunners of the invented game 'Snailbound' abuse this bug to roll faster than light."
+        },
+        "answer": { "canonical": "the Shell Roll glitch", "accepted": ["Shell Roll"] },
+        "tags": ["fake-speedruns", "gaming"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000123",
+        "type": "basic",
+        "prompt": {
+          "text": "In fake-speedrun circles, finishing 'Compost Quest' before the worm wakes up is called this category."
+        },
+        "answer": { "canonical": "Wormless%", "accepted": ["Wormless percent"] },
+        "tags": ["fake-speedruns", "gaming", "compost"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000124",
+        "type": "basic",
+        "prompt": {
+          "text": "The 'Paperwork RPG' world record is held by a runner who filed this form to skip the final boss."
+        },
+        "answer": { "canonical": "Form 1-UP", "accepted": ["a 1-UP form", "the 1-UP form"] },
+        "tags": ["fake-speedruns", "gaming"],
+        "difficulty": 4,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000125",
+        "type": "basic",
+        "prompt": {
+          "text": "The dummy dataset's hardest category: beating the fictional 'Ladder Simulator 2' without ever using this."
+        },
+        "answer": { "canonical": "the ladder", "accepted": ["a ladder", "ladders"] },
+        "tags": ["fake-speedruns", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000131",
+        "type": "basic",
+        "prompt": {
+          "text": "In the dummy universe, banana peels take exactly this many in-game days to become legendary soil."
+        },
+        "answer": { "canonical": "seven", "accepted": ["7"] },
+        "tags": ["compost-lore", "environment"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000132",
+        "type": "basic",
+        "prompt": { "text": "The patron spirit of the compost heap in our invented folklore." },
+        "answer": { "canonical": "the Great Decomposer" },
+        "tags": ["compost-lore", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000133",
+        "type": "basic",
+        "prompt": {
+          "text": "According to the made-up Compost Codex, shredded game manuals count as this color of material."
+        },
+        "answer": { "canonical": "brown", "accepted": ["browns"] },
+        "tags": ["compost-lore", "environment", "gaming"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000134",
+        "type": "basic",
+        "prompt": {
+          "text": "The forbidden compost ingredient that respawns endlessly, per the Codex's warning appendix."
+        },
+        "answer": { "canonical": "glitter", "accepted": ["plastic glitter"] },
+        "tags": ["compost-lore", "environment"],
+        "difficulty": 4,
+        "provenance": "human",
+        "ext": {
+          "com.example.playtest": { "note": "round-one wager cell in dummy-game", "starred": true }
+        }
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000135",
+        "type": "basic",
+        "prompt": {
+          "text": "Turning the pile on this fictional lunar holiday doubles your XP (experience points, not compost)."
+        },
+        "answer": { "canonical": "Worm Moon Eve" },
+        "tags": ["compost-lore", "environment"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000141",
+        "type": "basic",
+        "prompt": {
+          "text": "In the imaginary board game 'Queue', players compete to do this the longest."
+        },
+        "answer": { "canonical": "stand in line", "accepted": ["wait in line", "queue"] },
+        "tags": ["invented-board-games", "gaming"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000142",
+        "type": "basic",
+        "prompt": {
+          "text": "The card game 'Mulch!' ends immediately when a player collects five of these cards."
+        },
+        "answer": { "canonical": "leaf cards", "accepted": ["leaves"] },
+        "tags": ["invented-board-games", "gaming", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000143",
+        "type": "basic",
+        "prompt": {
+          "text": "The invented game 'Photosynthesis Panic' is lost instantly if any player turns off this."
+        },
+        "answer": { "canonical": "the light", "accepted": ["the lights", "the sun lamp"] },
+        "tags": ["invented-board-games", "gaming", "environment"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000144",
+        "type": "basic",
+        "prompt": { "text": "The number of dice included in the fictional dice game 'No Dice'." },
+        "answer": { "canonical": "zero", "accepted": ["0", "none"] },
+        "tags": ["invented-board-games", "gaming"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000145",
+        "type": "basic",
+        "prompt": {
+          "text": "'Meeple Creek' shipped with a rulebook erratum replacing every instance of 'river' with this word."
+        },
+        "answer": { "canonical": "brook" },
+        "tags": ["invented-board-games", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000151",
+        "type": "basic",
+        "prompt": {
+          "text": "Our invented bee species that only pollinates flowers in alphabetical order."
+        },
+        "answer": { "canonical": "the alphabee", "accepted": ["alphabee", "the alphabet bee"] },
+        "tags": ["pretend-pollinators", "environment"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000152",
+        "type": "basic",
+        "prompt": {
+          "text": "This pretend moth pollinates exclusively by moonlight, and only after noticeable lag."
+        },
+        "answer": { "canonical": "the latency moth" },
+        "tags": ["pretend-pollinators", "environment", "gaming"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000153",
+        "type": "basic",
+        "prompt": {
+          "text": "The fictional hummingbird that hovers at exactly 60 frames per second."
+        },
+        "answer": { "canonical": "the framebird", "accepted": ["framebird"] },
+        "tags": ["pretend-pollinators", "environment", "gaming"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000154",
+        "type": "basic",
+        "prompt": {
+          "text": "The pretend pollinator that carries pollen in tiny inventory slots, eight at a time."
+        },
+        "answer": { "canonical": "the hotbar hoverfly" },
+        "tags": ["pretend-pollinators", "environment", "gaming"],
+        "difficulty": 4,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000155",
+        "type": "basic",
+        "prompt": {
+          "text": "The dataset's rarest pollinator, observed only when two other fixtures reference it at once."
+        },
+        "answer": { "canonical": "the double-linked dragonfly" },
+        "tags": ["pretend-pollinators", "environment"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000161",
+        "type": "basic",
+        "prompt": {
+          "text": "This recycled power-up grants one extra turn and is crafted from three smaller expired power-ups."
+        },
+        "answer": { "canonical": "the re-up" },
+        "tags": ["recycled-power-ups", "gaming", "environment"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000162",
+        "type": "basic",
+        "prompt": {
+          "text": "In our fake arcade, empty bottles convert to exactly this many refill tokens."
+        },
+        "answer": { "canonical": "three", "accepted": ["3"] },
+        "tags": ["recycled-power-ups", "gaming", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000163",
+        "type": "basic",
+        "prompt": {
+          "text": "The compost-powered speed boost's only drawback, per its fictional patch notes."
+        },
+        "answer": { "canonical": "the smell", "accepted": ["it smells"] },
+        "tags": ["recycled-power-ups", "gaming", "compost"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000164",
+        "type": "basic",
+        "prompt": {
+          "text": "Recycled invincibility stars in the dummy universe flicker this color when nearly expired."
+        },
+        "answer": { "canonical": "beige" },
+        "tags": ["recycled-power-ups", "gaming"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000165",
+        "type": "basic",
+        "prompt": {
+          "text": "The legendary power-up crafted from 100% post-consumer boss fights."
+        },
+        "answer": { "canonical": "the Boss Recycler" },
+        "tags": ["recycled-power-ups", "gaming", "environment"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000211",
+        "type": "basic",
+        "prompt": {
+          "text": "This 8-bit call (listen) belongs to the dataset's fictional dawn singer, recorded at 44.1 kHz of pure make-believe.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000211" }
+        },
+        "answer": { "canonical": "the pixel wren", "accepted": ["pixel wren"] },
+        "tags": ["chiptune-birdsong", "audio-round", "environment", "gaming"],
+        "difficulty": 1,
+        "source": "Invented for the dummy dataset; the clip is a placeholder.",
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000212",
+        "type": "basic",
+        "prompt": {
+          "text": "The two-note chip call (listen) that fictional birders keep mistaking for a game-over jingle.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000212" }
+        },
+        "answer": {
+          "canonical": "the minor-key chickadee",
+          "accepted": ["minor-key chickadee"],
+          "media": { "mediaId": "0198f00d-0003-7000-8000-000000000212" }
+        },
+        "tags": ["chiptune-birdsong", "audio-round", "environment", "gaming"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000213",
+        "type": "basic",
+        "prompt": {
+          "text": "The looping bass call in this clip belongs to this invented wetland bird.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000213" }
+        },
+        "answer": { "canonical": "the bog booper", "accepted": ["bog booper"] },
+        "tags": ["chiptune-birdsong", "audio-round", "environment"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000214",
+        "type": "basic",
+        "prompt": {
+          "text": "An arpeggio that ascends one octave per breadcrumb (listen): the call of this park-plaza bird.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000214" }
+        },
+        "answer": { "canonical": "the chiptune pigeon" },
+        "tags": ["chiptune-birdsong", "audio-round", "environment", "gaming"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000215",
+        "type": "basic",
+        "prompt": {
+          "text": "The rarest track in the pack - total silence - is the call of this stealth owl.",
+          "media": { "mediaId": "0198f00d-0002-7000-8000-000000000215" }
+        },
+        "answer": { "canonical": "the mute owl", "accepted": ["the stealth owl"] },
+        "tags": ["chiptune-birdsong", "audio-round", "environment"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000221",
+        "type": "basic",
+        "prompt": {
+          "text": "'World of Wormcraft' players grind reputation with this underground faction."
+        },
+        "answer": { "canonical": "the Vermicompost Vanguard" },
+        "tags": ["made-up-mmos", "gaming", "compost"],
+        "difficulty": 1,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000222",
+        "type": "basic",
+        "prompt": {
+          "text": "The made-up MMO 'EverQueue' is famous for this endgame activity, which is also its login screen."
+        },
+        "answer": { "canonical": "waiting in a queue", "accepted": ["queueing", "the queue"] },
+        "tags": ["made-up-mmos", "gaming"],
+        "difficulty": 2,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000223",
+        "type": "basic",
+        "prompt": {
+          "text": "In 'Mycelium Online', the entire server is technically this one organism."
+        },
+        "answer": {
+          "canonical": "a fungus",
+          "accepted": ["one giant fungus", "a mushroom", "a mycelium"]
+        },
+        "tags": ["made-up-mmos", "gaming", "environment"],
+        "difficulty": 3,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000224",
+        "type": "basic",
+        "prompt": {
+          "text": "Guilds in 'Raid: Shadow Puppets' wipe nightly to this boss mechanic: someone turning on this."
+        },
+        "answer": { "canonical": "the ceiling light", "accepted": ["the light", "the lights"] },
+        "tags": ["made-up-mmos", "gaming"],
+        "difficulty": 4,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000225",
+        "type": "basic",
+        "prompt": { "text": "The subscription currency of the fictional MMO 'Barter Royale'." },
+        "answer": { "canonical": "turnips", "accepted": ["the turnip"] },
+        "tags": ["made-up-mmos", "gaming"],
+        "difficulty": 5,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000231",
+        "type": "basic",
+        "prompt": {
+          "text": "Conservation status of the invented Lesser Spotted Blockbeast: not endangered, merely this."
+        },
+        "answer": { "canonical": "unrendered" },
+        "tags": ["cryptid-conservation", "environment", "gaming"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000232",
+        "type": "basic",
+        "prompt": {
+          "text": "The dummy dataset's lake cryptid, protected because it may just be driftwood with ambitions."
+        },
+        "answer": { "canonical": "the Loch Mess Monster", "accepted": ["Loch Mess"] },
+        "tags": ["cryptid-conservation", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000233",
+        "type": "basic",
+        "prompt": {
+          "text": "Habitat restoration for the pixel yeti focuses on replanting these."
+        },
+        "answer": { "canonical": "snow tiles", "accepted": ["tiles"] },
+        "tags": ["cryptid-conservation", "environment", "gaming"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000234",
+        "type": "basic",
+        "prompt": {
+          "text": "Rangers tag the invisible forest gorilla using this humane method."
+        },
+        "answer": { "canonical": "the honor system" },
+        "tags": ["cryptid-conservation", "environment"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000235",
+        "type": "basic",
+        "prompt": {
+          "text": "The captive-breeding program for tutorial slimes keeps failing because the slimes keep doing this."
+        },
+        "answer": { "canonical": "splitting", "accepted": ["dividing", "multiplying"] },
+        "tags": ["cryptid-conservation", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000241",
+        "type": "basic",
+        "prompt": {
+          "text": "The dummy world's tallest mountain, which is also - due to a sign error - its deepest trench."
+        },
+        "answer": { "canonical": "Mount Negative", "accepted": ["Mt. Negative"] },
+        "tags": ["glitched-geography", "gaming"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000242",
+        "type": "basic",
+        "prompt": {
+          "text": "This fictional river flows in a perfect loop and therefore has neither of these two features."
+        },
+        "answer": {
+          "canonical": "a source nor a mouth",
+          "accepted": ["a source and a mouth", "source and mouth"]
+        },
+        "tags": ["glitched-geography", "environment", "gaming"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000243",
+        "type": "basic",
+        "prompt": {
+          "text": "The capital of the unloaded province renders as this placeholder texture."
+        },
+        "answer": {
+          "canonical": "missing-texture pink",
+          "accepted": ["magenta", "the pink-and-black checkerboard"]
+        },
+        "tags": ["glitched-geography", "gaming"],
+        "difficulty": 3,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000244",
+        "type": "basic",
+        "prompt": {
+          "text": "Crossing the dummy map's antimeridian teleports travelers straight back to this screen."
+        },
+        "answer": { "canonical": "the title screen" },
+        "tags": ["glitched-geography", "gaming"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000245",
+        "type": "basic",
+        "prompt": {
+          "text": "The four cardinal directions in glitched geography: north, south, east, and this."
+        },
+        "answer": { "canonical": "NaN", "accepted": ["not a number"] },
+        "tags": ["glitched-geography", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000251",
+        "type": "basic",
+        "prompt": {
+          "text": "'A Field Guide to Loading Screens' identifies this species by its endlessly rotating tail."
+        },
+        "answer": { "canonical": "the spinner" },
+        "tags": ["fictional-field-guides", "gaming"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000252",
+        "type": "basic",
+        "prompt": {
+          "text": "Per the invented 'Puddle Almanac', every puddle contains at least one of these reflections."
+        },
+        "answer": { "canonical": "a cloud", "accepted": ["clouds"] },
+        "tags": ["fictional-field-guides", "environment"],
+        "difficulty": 2,
+        "provenance": "ai-draft"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000253",
+        "type": "basic",
+        "prompt": {
+          "text": "The 'Guide to Suspicious Bushes' rules that a bush is officially suspicious once it does this."
+        },
+        "answer": { "canonical": "rustles", "accepted": ["it rustles", "rustling"] },
+        "tags": ["fictional-field-guides", "environment", "gaming"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000254",
+        "type": "basic",
+        "prompt": {
+          "text": "'Ferns of the Dummy Dataset, Vol. 2' is controversial for classifying this non-fern as a fern."
+        },
+        "answer": { "canonical": "a QR code", "accepted": ["the QR code"] },
+        "tags": ["fictional-field-guides", "environment"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000255",
+        "type": "basic",
+        "prompt": {
+          "text": "The rarest entry in every fictional field guide, always found on the very last page."
+        },
+        "answer": { "canonical": "you (the reader)", "accepted": ["the reader", "yourself"] },
+        "tags": ["fictional-field-guides", "environment"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000261",
+        "type": "basic",
+        "prompt": {
+          "text": "This fictional startup delivers shade on demand via subscription cloud."
+        },
+        "answer": { "canonical": "Nimbus-as-a-Service", "accepted": ["NaaS"] },
+        "tags": ["solar-punk-startups", "environment"],
+        "difficulty": 1,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000262",
+        "type": "basic",
+        "prompt": { "text": "'Photosynthecorp' pays its interns entirely in this currency." },
+        "answer": { "canonical": "sunlight", "accepted": ["sunbeams"] },
+        "tags": ["solar-punk-startups", "environment"],
+        "difficulty": 2,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000263",
+        "type": "basic",
+        "prompt": {
+          "text": "The made-up unicorn 'Turbine & Vine' pivoted from wind farms to farming these."
+        },
+        "answer": { "canonical": "wind chimes" },
+        "tags": ["solar-punk-startups", "environment"],
+        "difficulty": 3,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000264",
+        "type": "basic",
+        "prompt": {
+          "text": "Solar-punk accelerator 'Sprout Loop' rejects any pitch deck longer than this many leaves."
+        },
+        "answer": { "canonical": "five", "accepted": ["5"] },
+        "tags": ["solar-punk-startups", "environment"],
+        "difficulty": 4,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000265",
+        "type": "basic",
+        "prompt": {
+          "text": "The dataset's greenest IPO: this company that mines nothing, using entirely renewable nothing."
+        },
+        "answer": { "canonical": "Null Mines Ltd.", "accepted": ["Null Mines"] },
+        "tags": ["solar-punk-startups", "environment", "gaming"],
+        "difficulty": 5,
+        "provenance": "human"
+      },
+      {
+        "id": "0198f00d-0001-7000-8000-000000000999",
+        "type": "basic",
+        "prompt": {
+          "text": "The centerpiece exhibit of the Museum of Unshipped Games: this legendary sequel, announced in the dummy dataset and scheduled for release never."
+        },
+        "answer": {
+          "canonical": "Compost Quest II: The Re-Heapening",
+          "accepted": ["Compost Quest 2", "The Re-Heapening"]
+        },
+        "tags": ["final", "gaming", "compost"],
+        "difficulty": 5,
+        "provenance": "human",
+        "ext": { "com.example.playtest": { "rehearsed": false } }
+      }
+    ],
+    "media": [
+      {
+        "id": "0198f00d-0002-7000-8000-000000000111",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 184320,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0111",
+        "alt": "Placeholder photo of an upside-down waterfall in a fictional park",
+        "storage": { "state": "remote", "url": "https://media.example.com/fixtures/park-0111.webp" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000112",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 221184,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0112",
+        "alt": "Placeholder photo of a glowing moss amphitheater",
+        "storage": { "state": "remote", "url": "https://media.example.com/fixtures/park-0112.webp" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000113",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 198656,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0113",
+        "alt": "Placeholder photo of a ranger desk issuing a single acorn",
+        "storage": { "state": "remote", "url": "https://media.example.com/fixtures/park-0113.webp" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000114",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 262144,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0114",
+        "alt": "Placeholder trail map drawn as a playable maze level",
+        "storage": { "state": "pending-local" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000115",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 307200,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0115",
+        "alt": "Placeholder photo of a giant lever labeled undo at a canyon rim",
+        "storage": { "state": "pending-local" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000211",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 98304,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0211",
+        "alt": "Placeholder 8-bit birdsong clip, bright and fast",
+        "storage": {
+          "state": "remote",
+          "url": "https://media.example.com/fixtures/birdsong-0211.ogg"
+        }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000212",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 87040,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0212",
+        "alt": "Placeholder two-note descending chip call",
+        "storage": { "state": "pending-local" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000213",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 122880,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0213",
+        "alt": "Placeholder looping bass call clip",
+        "storage": {
+          "state": "remote",
+          "url": "https://media.example.com/fixtures/birdsong-0213.ogg"
+        }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000214",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 110592,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0214",
+        "alt": "Placeholder ascending arpeggio clip",
+        "storage": { "state": "pending-local" }
+      },
+      {
+        "id": "0198f00d-0002-7000-8000-000000000215",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 65536,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeed0215",
+        "alt": "Placeholder near-silent clip with a single soft click",
+        "storage": {
+          "state": "remote",
+          "url": "https://media.example.com/fixtures/birdsong-0215.ogg"
+        }
+      },
+      {
+        "id": "0198f00d-0003-7000-8000-000000000111",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 174080,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedf111",
+        "alt": "Labeled reveal photo of the fictional Topsy-Turvy National Park",
+        "storage": {
+          "state": "remote",
+          "url": "https://media.example.com/fixtures/park-0111-answer.webp"
+        }
+      },
+      {
+        "id": "0198f00d-0003-7000-8000-000000000115",
+        "kind": "image",
+        "mime": "image/webp",
+        "bytes": 190464,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedf115",
+        "alt": "Labeled reveal photo of the fictional Ctrl-Z Canyon",
+        "storage": { "state": "pending-local" }
+      },
+      {
+        "id": "0198f00d-0003-7000-8000-000000000212",
+        "kind": "audio",
+        "mime": "audio/ogg",
+        "bytes": 143360,
+        "sha256": "feedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedfeedf212",
+        "alt": "Placeholder full song of the minor-key chickadee for the reveal",
+        "storage": {
+          "state": "remote",
+          "url": "https://media.example.com/fixtures/birdsong-0212-answer.ogg"
+        }
+      }
+    ]
+  }
+}

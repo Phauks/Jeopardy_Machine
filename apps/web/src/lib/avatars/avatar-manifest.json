@@ -1,0 +1,446 @@
+{
+  "version": 1,
+  "spriteSize": 192,
+  "basePath": "/avatars/",
+  "accents": [
+    {
+      "id": "gold",
+      "hex": "#ffcc00"
+    },
+    {
+      "id": "amber",
+      "hex": "#f2b705"
+    },
+    {
+      "id": "brick",
+      "hex": "#b0472e"
+    },
+    {
+      "id": "moss",
+      "hex": "#a3c968"
+    },
+    {
+      "id": "azure",
+      "hex": "#2d6cdf"
+    },
+    {
+      "id": "teal",
+      "hex": "#2a9d8f"
+    },
+    {
+      "id": "violet",
+      "hex": "#8a5fc8"
+    },
+    {
+      "id": "blossom",
+      "hex": "#d9679f"
+    }
+  ],
+  "avatars": [
+    {
+      "id": "bunny",
+      "kind": "pet",
+      "displayName": "Bunny",
+      "sprites": {
+        "gold": "bunny--gold.webp",
+        "amber": "bunny--amber.webp",
+        "brick": "bunny--brick.webp",
+        "moss": "bunny--moss.webp",
+        "azure": "bunny--azure.webp",
+        "teal": "bunny--teal.webp",
+        "violet": "bunny--violet.webp",
+        "blossom": "bunny--blossom.webp"
+      }
+    },
+    {
+      "id": "cat",
+      "kind": "pet",
+      "displayName": "Cat",
+      "sprites": {
+        "gold": "cat--gold.webp",
+        "amber": "cat--amber.webp",
+        "brick": "cat--brick.webp",
+        "moss": "cat--moss.webp",
+        "azure": "cat--azure.webp",
+        "teal": "cat--teal.webp",
+        "violet": "cat--violet.webp",
+        "blossom": "cat--blossom.webp"
+      }
+    },
+    {
+      "id": "caterpillar",
+      "kind": "pet",
+      "displayName": "Caterpillar",
+      "sprites": {
+        "gold": "caterpillar--gold.webp",
+        "amber": "caterpillar--amber.webp",
+        "brick": "caterpillar--brick.webp",
+        "moss": "caterpillar--moss.webp",
+        "azure": "caterpillar--azure.webp",
+        "teal": "caterpillar--teal.webp",
+        "violet": "caterpillar--violet.webp",
+        "blossom": "caterpillar--blossom.webp"
+      }
+    },
+    {
+      "id": "chick",
+      "kind": "pet",
+      "displayName": "Chick",
+      "sprites": {
+        "gold": "chick--gold.webp",
+        "amber": "chick--amber.webp",
+        "brick": "chick--brick.webp",
+        "moss": "chick--moss.webp",
+        "azure": "chick--azure.webp",
+        "teal": "chick--teal.webp",
+        "violet": "chick--violet.webp",
+        "blossom": "chick--blossom.webp"
+      }
+    },
+    {
+      "id": "cow",
+      "kind": "pet",
+      "displayName": "Cow",
+      "sprites": {
+        "gold": "cow--gold.webp",
+        "amber": "cow--amber.webp",
+        "brick": "cow--brick.webp",
+        "moss": "cow--moss.webp",
+        "azure": "cow--azure.webp",
+        "teal": "cow--teal.webp",
+        "violet": "cow--violet.webp",
+        "blossom": "cow--blossom.webp"
+      }
+    },
+    {
+      "id": "dog",
+      "kind": "pet",
+      "displayName": "Dog",
+      "sprites": {
+        "gold": "dog--gold.webp",
+        "amber": "dog--amber.webp",
+        "brick": "dog--brick.webp",
+        "moss": "dog--moss.webp",
+        "azure": "dog--azure.webp",
+        "teal": "dog--teal.webp",
+        "violet": "dog--violet.webp",
+        "blossom": "dog--blossom.webp"
+      }
+    },
+    {
+      "id": "elephant",
+      "kind": "pet",
+      "displayName": "Elephant",
+      "sprites": {
+        "gold": "elephant--gold.webp",
+        "amber": "elephant--amber.webp",
+        "brick": "elephant--brick.webp",
+        "moss": "elephant--moss.webp",
+        "azure": "elephant--azure.webp",
+        "teal": "elephant--teal.webp",
+        "violet": "elephant--violet.webp",
+        "blossom": "elephant--blossom.webp"
+      }
+    },
+    {
+      "id": "fish",
+      "kind": "pet",
+      "displayName": "Fish",
+      "sprites": {
+        "gold": "fish--gold.webp",
+        "amber": "fish--amber.webp",
+        "brick": "fish--brick.webp",
+        "moss": "fish--moss.webp",
+        "azure": "fish--azure.webp",
+        "teal": "fish--teal.webp",
+        "violet": "fish--violet.webp",
+        "blossom": "fish--blossom.webp"
+      }
+    },
+    {
+      "id": "giraffe",
+      "kind": "pet",
+      "displayName": "Giraffe",
+      "sprites": {
+        "gold": "giraffe--gold.webp",
+        "amber": "giraffe--amber.webp",
+        "brick": "giraffe--brick.webp",
+        "moss": "giraffe--moss.webp",
+        "azure": "giraffe--azure.webp",
+        "teal": "giraffe--teal.webp",
+        "violet": "giraffe--violet.webp",
+        "blossom": "giraffe--blossom.webp"
+      }
+    },
+    {
+      "id": "hog",
+      "kind": "pet",
+      "displayName": "Boar",
+      "sprites": {
+        "gold": "hog--gold.webp",
+        "amber": "hog--amber.webp",
+        "brick": "hog--brick.webp",
+        "moss": "hog--moss.webp",
+        "azure": "hog--azure.webp",
+        "teal": "hog--teal.webp",
+        "violet": "hog--violet.webp",
+        "blossom": "hog--blossom.webp"
+      }
+    },
+    {
+      "id": "lion",
+      "kind": "pet",
+      "displayName": "Lion",
+      "sprites": {
+        "gold": "lion--gold.webp",
+        "amber": "lion--amber.webp",
+        "brick": "lion--brick.webp",
+        "moss": "lion--moss.webp",
+        "azure": "lion--azure.webp",
+        "teal": "lion--teal.webp",
+        "violet": "lion--violet.webp",
+        "blossom": "lion--blossom.webp"
+      }
+    },
+    {
+      "id": "monkey",
+      "kind": "pet",
+      "displayName": "Monkey",
+      "sprites": {
+        "gold": "monkey--gold.webp",
+        "amber": "monkey--amber.webp",
+        "brick": "monkey--brick.webp",
+        "moss": "monkey--moss.webp",
+        "azure": "monkey--azure.webp",
+        "teal": "monkey--teal.webp",
+        "violet": "monkey--violet.webp",
+        "blossom": "monkey--blossom.webp"
+      }
+    },
+    {
+      "id": "parrot",
+      "kind": "pet",
+      "displayName": "Parrot",
+      "sprites": {
+        "gold": "parrot--gold.webp",
+        "amber": "parrot--amber.webp",
+        "brick": "parrot--brick.webp",
+        "moss": "parrot--moss.webp",
+        "azure": "parrot--azure.webp",
+        "teal": "parrot--teal.webp",
+        "violet": "parrot--violet.webp",
+        "blossom": "parrot--blossom.webp"
+      }
+    },
+    {
+      "id": "pig",
+      "kind": "pet",
+      "displayName": "Pig",
+      "sprites": {
+        "gold": "pig--gold.webp",
+        "amber": "pig--amber.webp",
+        "brick": "pig--brick.webp",
+        "moss": "pig--moss.webp",
+        "azure": "pig--azure.webp",
+        "teal": "pig--teal.webp",
+        "violet": "pig--violet.webp",
+        "blossom": "pig--blossom.webp"
+      }
+    },
+    {
+      "id": "tiger",
+      "kind": "pet",
+      "displayName": "Tiger",
+      "sprites": {
+        "gold": "tiger--gold.webp",
+        "amber": "tiger--amber.webp",
+        "brick": "tiger--brick.webp",
+        "moss": "tiger--moss.webp",
+        "azure": "tiger--azure.webp",
+        "teal": "tiger--teal.webp",
+        "violet": "tiger--violet.webp",
+        "blossom": "tiger--blossom.webp"
+      }
+    },
+    {
+      "id": "female-a",
+      "kind": "human",
+      "displayName": "Ada",
+      "sprites": {
+        "gold": "female-a--gold.webp",
+        "amber": "female-a--amber.webp",
+        "brick": "female-a--brick.webp",
+        "moss": "female-a--moss.webp",
+        "azure": "female-a--azure.webp",
+        "teal": "female-a--teal.webp",
+        "violet": "female-a--violet.webp",
+        "blossom": "female-a--blossom.webp"
+      }
+    },
+    {
+      "id": "female-b",
+      "kind": "human",
+      "displayName": "Poppy",
+      "sprites": {
+        "gold": "female-b--gold.webp",
+        "amber": "female-b--amber.webp",
+        "brick": "female-b--brick.webp",
+        "moss": "female-b--moss.webp",
+        "azure": "female-b--azure.webp",
+        "teal": "female-b--teal.webp",
+        "violet": "female-b--violet.webp",
+        "blossom": "female-b--blossom.webp"
+      }
+    },
+    {
+      "id": "female-c",
+      "kind": "human",
+      "displayName": "Nova",
+      "sprites": {
+        "gold": "female-c--gold.webp",
+        "amber": "female-c--amber.webp",
+        "brick": "female-c--brick.webp",
+        "moss": "female-c--moss.webp",
+        "azure": "female-c--azure.webp",
+        "teal": "female-c--teal.webp",
+        "violet": "female-c--violet.webp",
+        "blossom": "female-c--blossom.webp"
+      }
+    },
+    {
+      "id": "female-d",
+      "kind": "human",
+      "displayName": "Wren",
+      "sprites": {
+        "gold": "female-d--gold.webp",
+        "amber": "female-d--amber.webp",
+        "brick": "female-d--brick.webp",
+        "moss": "female-d--moss.webp",
+        "azure": "female-d--azure.webp",
+        "teal": "female-d--teal.webp",
+        "violet": "female-d--violet.webp",
+        "blossom": "female-d--blossom.webp"
+      }
+    },
+    {
+      "id": "female-e",
+      "kind": "human",
+      "displayName": "Vera",
+      "sprites": {
+        "gold": "female-e--gold.webp",
+        "amber": "female-e--amber.webp",
+        "brick": "female-e--brick.webp",
+        "moss": "female-e--moss.webp",
+        "azure": "female-e--azure.webp",
+        "teal": "female-e--teal.webp",
+        "violet": "female-e--violet.webp",
+        "blossom": "female-e--blossom.webp"
+      }
+    },
+    {
+      "id": "female-f",
+      "kind": "human",
+      "displayName": "Juno",
+      "sprites": {
+        "gold": "female-f--gold.webp",
+        "amber": "female-f--amber.webp",
+        "brick": "female-f--brick.webp",
+        "moss": "female-f--moss.webp",
+        "azure": "female-f--azure.webp",
+        "teal": "female-f--teal.webp",
+        "violet": "female-f--violet.webp",
+        "blossom": "female-f--blossom.webp"
+      }
+    },
+    {
+      "id": "male-a",
+      "kind": "human",
+      "displayName": "Theo",
+      "sprites": {
+        "gold": "male-a--gold.webp",
+        "amber": "male-a--amber.webp",
+        "brick": "male-a--brick.webp",
+        "moss": "male-a--moss.webp",
+        "azure": "male-a--azure.webp",
+        "teal": "male-a--teal.webp",
+        "violet": "male-a--violet.webp",
+        "blossom": "male-a--blossom.webp"
+      }
+    },
+    {
+      "id": "male-b",
+      "kind": "human",
+      "displayName": "Otis",
+      "sprites": {
+        "gold": "male-b--gold.webp",
+        "amber": "male-b--amber.webp",
+        "brick": "male-b--brick.webp",
+        "moss": "male-b--moss.webp",
+        "azure": "male-b--azure.webp",
+        "teal": "male-b--teal.webp",
+        "violet": "male-b--violet.webp",
+        "blossom": "male-b--blossom.webp"
+      }
+    },
+    {
+      "id": "male-c",
+      "kind": "human",
+      "displayName": "Sarge",
+      "sprites": {
+        "gold": "male-c--gold.webp",
+        "amber": "male-c--amber.webp",
+        "brick": "male-c--brick.webp",
+        "moss": "male-c--moss.webp",
+        "azure": "male-c--azure.webp",
+        "teal": "male-c--teal.webp",
+        "violet": "male-c--violet.webp",
+        "blossom": "male-c--blossom.webp"
+      }
+    },
+    {
+      "id": "male-d",
+      "kind": "human",
+      "displayName": "Preston",
+      "sprites": {
+        "gold": "male-d--gold.webp",
+        "amber": "male-d--amber.webp",
+        "brick": "male-d--brick.webp",
+        "moss": "male-d--moss.webp",
+        "azure": "male-d--azure.webp",
+        "teal": "male-d--teal.webp",
+        "violet": "male-d--violet.webp",
+        "blossom": "male-d--blossom.webp"
+      }
+    },
+    {
+      "id": "male-e",
+      "kind": "human",
+      "displayName": "Milo",
+      "sprites": {
+        "gold": "male-e--gold.webp",
+        "amber": "male-e--amber.webp",
+        "brick": "male-e--brick.webp",
+        "moss": "male-e--moss.webp",
+        "azure": "male-e--azure.webp",
+        "teal": "male-e--teal.webp",
+        "violet": "male-e--violet.webp",
+        "blossom": "male-e--blossom.webp"
+      }
+    },
+    {
+      "id": "male-f",
+      "kind": "human",
+      "displayName": "Bruno",
+      "sprites": {
+        "gold": "male-f--gold.webp",
+        "amber": "male-f--amber.webp",
+        "brick": "male-f--brick.webp",
+        "moss": "male-f--moss.webp",
+        "azure": "male-f--azure.webp",
+        "teal": "male-f--teal.webp",
+        "violet": "male-f--violet.webp",
+        "blossom": "male-f--blossom.webp"
+      }
+    }
+  ]
+}

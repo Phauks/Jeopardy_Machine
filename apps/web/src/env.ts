@@ -5,16 +5,17 @@ import { defineEnvVars } from "@sveltejs/kit/env";
 
 export const variables = defineEnvVars({
   REALTIME_ORIGIN: {
-    // Public + static: inlined into the client bundle at build time. This is where the
-    // browser reaches the realtime Worker - local wrangler dev by default, the deployed
-    // rt host in a production build (set in .env or the build environment).
+    // DEPRECATED since M3 (docs/decisions/2026-08-13-single-origin-binding.md): rooms
+    // connect through the SAME origin (/room/<CODE>/ws forwarded over the DO binding), so
+    // nothing player-facing reads this anymore. It survives only as the /dev/echo
+    // harness's direct-worker escape hatch: vite dev cannot emulate the cross-script
+    // binding, so the harness dials the realtime Worker directly there. Delete once the
+    // harness retires (M4 surfaces make it redundant).
     public: true,
     static: true,
-    // Dev falls back to local wrangler; a production build with the var unset gets "" so
-    // the UI can refuse to connect instead of dialing localhost from a public origin -
-    // that misdial is what triggers Chrome's Local Network Access permission popup.
+    // vite dev falls back to local wrangler; anywhere else "" = use the page origin.
     schema: (value) => value ?? (import.meta.env.DEV ? "http://localhost:8787" : ""),
     description:
-      "http(s) origin of the realtime Worker (WebSockets ride the matching ws(s) scheme)",
+      "dev-only direct origin of the realtime Worker for the /dev/echo harness; empty = same-origin (the M3 default)",
   },
 });

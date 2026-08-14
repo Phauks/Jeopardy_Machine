@@ -20,6 +20,13 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
 - Room full / game over / bad code -> clear friendly error, not a spinner.
 
+**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md). The site root carries a **Join** section - room-code box, password field, and the list of live **public** rooms (title, host label, players/capacity, lock, phase badge, age). Rooms are unlisted by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
+
+- **The code box always wins**: a complete typed code bypasses the list entirely (someone holding a code came to use it, not to browse). The list dims while a code is typed.
+- **Password rooms** show a lock. The password is a shared room secret shouted across the hall or printed on a table tent - never an account (boundary 2.2 stands). It travels in the join message, never in the URL, and a wrong one is refused _on the same socket_ so the phone can just try again; too many wrong tries close the connection.
+- **A room in progress** shows "Playing" and is dimmed - whether it actually accepts an arrival is the late-join setting's business, answered by the room itself, not by the list.
+- The list is a **browse surface, not a live room**: it polls, it is briefly cached, and it is capped (pagination deliberately deferred). A stale row can never open a dead room - the room refuses.
+
 ### A2. Join (one screen, <15 seconds)
 
 Single screen: nickname field + (if enabled) pick-your-buzzer-sound (tap to preview locally) + color/emoji pick + **Join**.
@@ -160,10 +167,10 @@ Winner screen (podium + per-team totals). Console: export results (JSON/CSV: fin
 
 Two customization tiers that never collide:
 
-| Tier         | Who controls | What it covers                                                                                                                                                                                                                       |
-| ------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Team**     | Team leader  | Team name, team color/emblem (picked from a theme-safe palette), **the team's room-audible buzz sound**, team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation)                                     |
-| **Personal** | Each player  | Own nickname, personal avatar/accent, personal buzzer sound - always visible _within_ the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal emblem) |
+| Tier         | Who controls | What it covers                                                                                                                                                                                                                                       |
+| ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Team**     | Team leader  | Team name, team color (picked from the player-accent palette - docs/design/theming.md "Player accents and avatars"), **the team's room-audible buzz sound**, team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation) |
+| **Personal** | Each player  | Own nickname, personal avatar/accent, personal buzzer sound - always visible _within_ the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal avatar chip)            |
 
 **Buzz sounds are team-scoped in team mode (owner-specified 2026-08-13).** The room-audible buzz-in sound belongs to the team tier: the leader picks it, and when any member wins the buzz the room hears the _team's_ sound while the display shows the team name/color - a **double confirmation** (audio + visual) of who has been selected. One sound per team is learnable by the host and crowd; per-player sounds at 20 teams x 5 members would be noise. Personal buzzer sounds still exist: in individuals mode they ARE the room sound; in team mode they play **locally on the buzzing player's own phone only** as private feedback. The display may additionally show _which member_ buzzed, small, under the team name - identification without audio clutter.
 
@@ -172,7 +179,7 @@ Two customization tiers that never collide:
 **Leadership mechanics:**
 
 - Creating a team makes you its leader (crown affordance on your card). Host-premade teams: leader = first joiner, until changed.
-- Leader powers, all from the phone lobby screen: rename team, pick team color/emblem + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly). **Kick and hand-off live behind a per-member "..." overflow menu** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name.
+- Leader powers, all from the phone lobby screen: rename team, pick team color + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly). **Kick and hand-off live behind a per-member "..." overflow menu** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name.
 - Kicked players return to team selection (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list).
 - **Leader disconnect**: after a grace period (missed heartbeats), leadership auto-passes to the longest-tenured connected member; if the original leader returns they rejoin as a regular member.
 - **Host supremacy is unchanged** (guiding principle 4): the host console can rename/kick/merge/reassign leaders over any team decision, and sees a feed entry for kicks (abuse visibility). Team self-governance reduces host workload; it never gates the host.

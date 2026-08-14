@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p src/service-worker",
     "test": "vitest run",
+    "test:e2e": "pnpm run build && vitest run -c vitest.e2e.config.ts",
     "deploy": "wrangler deploy"
   },
   "dependencies": {
@@ -25,6 +26,7 @@
     "@sveltejs/kit": "catalog:",
     "@sveltejs/vite-plugin-svelte": "catalog:",
     "@tailwindcss/vite": "catalog:",
+    "playwright": "catalog:",
     "svelte": "catalog:",
     "svelte-check": "catalog:",
     "tailwindcss": "catalog:",

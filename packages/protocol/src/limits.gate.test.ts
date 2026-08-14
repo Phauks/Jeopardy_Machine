@@ -35,6 +35,32 @@ describe("limits invariants", () => {
     expect(limits.room.idleExpiryMs).toBeGreaterThanOrEqual(30 * 60 * 1000);
   });
 
+  it("keeps room-password bounds typeable-but-not-trivial and ordered", () => {
+    expect(limits.room.roomPasswordMinLength).toBeGreaterThanOrEqual(4);
+    expect(limits.room.roomPasswordMinLength).toBeLessThan(limits.room.roomPasswordMaxLength);
+    // A shared secret people type on a phone at a bar: a 128-char ceiling would only ever be
+    // a paste bomb aimed at the hash function.
+    expect(limits.room.roomPasswordMaxLength).toBeLessThanOrEqual(128);
+    // The attempt budget must be small (a shared secret survives only behind a rate limit)
+    // and its window must be far shorter than a room's life, or one wrong guess at the door
+    // would lock a phone out for the night.
+    expect(limits.room.passwordAttemptBurstMax).toBeLessThanOrEqual(10);
+    expect(limits.room.passwordAttemptWindowMs).toBeLessThan(limits.room.idleExpiryMs);
+  });
+
+  it("keeps lobby listing text short enough to read and the query cap honest", () => {
+    expect(limits.room.roomTitleMaxLength).toBeLessThanOrEqual(80);
+    expect(limits.room.hostLabelMaxLength).toBeLessThanOrEqual(limits.room.roomTitleMaxLength);
+    expect(limits.lobby.listingMax).toBeGreaterThan(0);
+    // Pagination is deferred, so the cap IS the list: it must stay scrollable on a phone.
+    expect(limits.lobby.listingMax).toBeLessThanOrEqual(100);
+    // The cached response must not outlive the refresh interval, or the lobby would re-fetch
+    // its own cache and never move.
+    expect(limits.lobby.listingCacheSeconds * 1000).toBeLessThanOrEqual(
+      limits.lobby.listingRefreshMs,
+    );
+  });
+
   it("keeps team capacity able to seat the player hard cap", () => {
     // 20 teams x 5 players is the canonical 100-player shape (user-flows); the team cap must
     // never be the thing that makes a legal player count unseatable (4 players per team floor).

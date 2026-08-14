@@ -1,0 +1,31 @@
+{
+  "format": "theme",
+  "schemaVersion": "1.0.0",
+  "meta": {
+    "title": "Neon Compost",
+    "author": "Jeopardy Machine fixtures",
+    "license": "CC0-1.0",
+    "created": "2026-08-14T00:00:00.000Z",
+    "modified": "2026-08-14T00:00:00.000Z"
+  },
+  "ext": {
+    "com.example.fixtures": { "role": "canonical-dummy-dataset" }
+  },
+  "body": {
+    "tokens": {
+      "boardBackground": { "kind": "solid", "color": "#101418" },
+      "cellBackground": { "kind": "gradient", "from": "#1b5e20", "to": "#33691e", "angleDeg": 160 },
+      "categoryBackground": { "kind": "solid", "color": "#0d2b12" },
+      "valueColor": "#c6ff00",
+      "clueTextColor": "#f1f8e9",
+      "accentColor": "#76ff03",
+      "usedCellTreatment": "outline"
+    },
+    "background": {
+      "kind": "pattern",
+      "patternId": "dots",
+      "foreground": "#1b3320",
+      "background": "#0c1410"
+    }
+  }
+}
