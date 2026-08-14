@@ -1,0 +1,357 @@
+{
+  "version": 1,
+  "modelPath": "/avatars/models/",
+  "avatars": [
+    {
+      "id": "bunny",
+      "file": "bunny.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
+    },
+    {
+      "id": "cat",
+      "file": "cat.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#717388", "#76798e"],
+      "tolerance": null
+    },
+    {
+      "id": "caterpillar",
+      "file": "caterpillar.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#38a177", "#42ab7c"],
+      "tolerance": null
+    },
+    {
+      "id": "chick",
+      "file": "chick.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#ffc255", "#ffc659"],
+      "tolerance": null
+    },
+    {
+      "id": "cow",
+      "file": "cow.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#d8d8e6", "#e1e1ec"],
+      "tolerance": null
+    },
+    {
+      "id": "dog",
+      "file": "dog.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
+    },
+    {
+      "id": "elephant",
+      "file": "elephant.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#989fbe", "#a2aacc"],
+      "tolerance": null
+    },
+    {
+      "id": "fish",
+      "file": "fish.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#e48846", "#e78f48"],
+      "tolerance": null
+    },
+    {
+      "id": "giraffe",
+      "file": "giraffe.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#ffaf45", "#ffb84d"],
+      "tolerance": null
+    },
+    {
+      "id": "hog",
+      "file": "hog.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
+    },
+    {
+      "id": "lion",
+      "file": "lion.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#ffaf45", "#ffb84d"],
+      "tolerance": null
+    },
+    {
+      "id": "monkey",
+      "file": "monkey.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
+    },
+    {
+      "id": "parrot",
+      "file": "parrot.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#e45e48", "#ea6246"],
+      "tolerance": null
+    },
+    {
+      "id": "pig",
+      "file": "pig.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#e28aae", "#e58fb7"],
+      "tolerance": null
+    },
+    {
+      "id": "tiger",
+      "file": "tiger.glb",
+      "colormap": "cube-pets-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "dance"
+      },
+      "recolorTargets": ["#e48846", "#e78f48"],
+      "tolerance": null
+    },
+    {
+      "id": "female-a",
+      "file": "female-a.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": ["wheelchair.glb"],
+      "clips": {
+        "idle": "idle",
+        "walk": "wheelchair-move-forward",
+        "celebrate": "emote-yes"
+      },
+      "recolorTargets": ["#8a5fd5"],
+      "tolerance": null
+    },
+    {
+      "id": "female-b",
+      "file": "female-b.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#ffd061"],
+      "tolerance": null
+    },
+    {
+      "id": "female-c",
+      "file": "female-c.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
+    },
+    {
+      "id": "female-d",
+      "file": "female-d.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#71778e"],
+      "tolerance": null
+    },
+    {
+      "id": "female-e",
+      "file": "female-e.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#ffffff", "#d0e8ff"],
+      "tolerance": null
+    },
+    {
+      "id": "female-f",
+      "file": "female-f.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#5b66c4", "#ffab42"],
+      "tolerance": null
+    },
+    {
+      "id": "male-a",
+      "file": "male-a.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#319a74", "#5ac487"],
+      "tolerance": null
+    },
+    {
+      "id": "male-b",
+      "file": "male-b.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
+    },
+    {
+      "id": "male-c",
+      "file": "male-c.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
+    },
+    {
+      "id": "male-d",
+      "file": "male-d.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#cf534f"],
+      "tolerance": 28
+    },
+    {
+      "id": "male-e",
+      "file": "male-e.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#ffab42", "#ffc053"],
+      "tolerance": null
+    },
+    {
+      "id": "male-f",
+      "file": "male-f.glb",
+      "colormap": "mini-characters-colormap.png",
+      "props": [],
+      "clips": {
+        "idle": "idle",
+        "walk": "walk",
+        "celebrate": "jump"
+      },
+      "recolorTargets": ["#319a74", "#61cb8b"],
+      "tolerance": null
+    }
+  ]
+}

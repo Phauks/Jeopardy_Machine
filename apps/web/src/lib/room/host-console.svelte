@@ -127,7 +127,10 @@
        live in the host companion view or the print pack), and the slim dock is acceptable
        on a projector. -->
   <div class="mirror-layout">
-    <DisplayScreen {store} />
+    <!-- environment="none": mirror mode is a HOST device driving the projector's layout, and
+         a second WebGL context on the machine running the console buys nothing. The real
+         display route at /room/CODE/display is where the diorama lives. -->
+    <DisplayScreen {store} environment="none" />
     <div class="mirror-dock">
       <button type="button" class="dock-button arm" disabled={!canArm} onclick={() => store.armBuzzers()}>
         Arm

@@ -6,12 +6,12 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { avatarManifest, avatarSheetUrl, avatarSpriteUrl } from "#lib/avatars/avatar-manifest.ts";
 import {
-  avatarManifest,
+  avatarModelById,
+  avatarModelManifest,
   avatarModelUrl,
-  avatarSheetUrl,
-  avatarSpriteUrl,
-} from "#lib/avatars/avatar-manifest.ts";
+} from "#lib/avatars/avatar-models.ts";
 import { themePresets } from "#lib/theme/theme-presets.ts";
 
 const spritesDirectory = fileURLToPath(new URL("../../../static/avatars/", import.meta.url));
@@ -111,9 +111,9 @@ describe("avatar walk sheets (the animated tier)", () => {
       // Either the avatar's own walk clip, or the documented idle fallback for a pack lacking
       // one - never an empty string, which would mean the bake silently found nothing.
       expect(avatar.sheet.clip.length, avatar.id).toBeGreaterThan(0);
-      expect([avatar.model.clips.walk, avatar.model.clips.idle], avatar.id).toContain(
-        avatar.sheet.clip,
-      );
+      const model = avatarModelById(avatar.id);
+      expect(model, avatar.id).not.toBeNull();
+      expect([model?.clips.walk, model?.clips.idle], avatar.id).toContain(avatar.sheet.clip);
     }
   });
 
@@ -130,15 +130,20 @@ describe("avatar walk sheets (the animated tier)", () => {
 });
 
 describe("avatar models (the display-diorama tier)", () => {
+  it("covers exactly the manifest roster - no avatar without a model, no model without one", () => {
+    expect(avatarModelManifest.avatars.map((model) => model.id)).toEqual(
+      avatarManifest.avatars.map((avatar) => avatar.id),
+    );
+  });
+
   it("gives every avatar a model, a colormap, and the three clip roles", () => {
-    for (const avatar of avatarManifest.avatars) {
-      const model = avatar.model;
-      expect(model.file, avatar.id).toBe(`${avatar.id}.glb`);
+    for (const model of avatarModelManifest.avatars) {
+      expect(model.file, model.id).toBe(`${model.id}.glb`);
       expect(modelFilesOnDisk, model.file).toContain(model.file);
       expect(modelFilesOnDisk, model.colormap).toContain(model.colormap);
-      expect(avatarModelUrl(model.file)).toBe(`${avatarManifest.modelPath}${model.file}`);
+      expect(avatarModelUrl(model.file)).toBe(`${avatarModelManifest.modelPath}${model.file}`);
       for (const role of ["idle", "walk", "celebrate"] as const) {
-        expect(model.clips[role].length, `${avatar.id}/${role}`).toBeGreaterThan(0);
+        expect(model.clips[role].length, `${model.id}/${role}`).toBeGreaterThan(0);
       }
       for (const prop of model.props) {
         expect(modelFilesOnDisk, prop).toContain(prop);
@@ -147,24 +152,20 @@ describe("avatar models (the display-diorama tier)", () => {
   });
 
   it("carries the recolor inputs the runtime needs (same targets the sprites were baked from)", () => {
-    for (const avatar of avatarManifest.avatars) {
-      expect(avatar.model.recolorTargets.length, avatar.id).toBeGreaterThan(0);
-      for (const target of avatar.model.recolorTargets) {
-        expect(target, avatar.id).toMatch(/^#[0-9a-f]{6}$/);
+    for (const model of avatarModelManifest.avatars) {
+      expect(model.recolorTargets.length, model.id).toBeGreaterThan(0);
+      for (const target of model.recolorTargets) {
+        expect(target, model.id).toMatch(/^#[0-9a-f]{6}$/);
       }
-      if (avatar.model.tolerance !== null) {
-        expect(avatar.model.tolerance).toBeGreaterThan(0);
+      if (model.tolerance !== null) {
+        expect(model.tolerance).toBeGreaterThan(0);
       }
     }
   });
 
   it("has no orphan model files and stays inside the model budget", () => {
     const referenced = new Set(
-      avatarManifest.avatars.flatMap((avatar) => [
-        avatar.model.file,
-        avatar.model.colormap,
-        ...avatar.model.props,
-      ]),
+      avatarModelManifest.avatars.flatMap((model) => [model.file, model.colormap, ...model.props]),
     );
     for (const fileName of modelFilesOnDisk) {
       expect(referenced, fileName).toContain(fileName);
@@ -175,7 +176,7 @@ describe("avatar models (the display-diorama tier)", () => {
   });
 
   it("declares the model path only the display route ever resolves", () => {
-    expect(avatarManifest.modelPath).toBe("/avatars/models/");
+    expect(avatarModelManifest.modelPath).toBe("/avatars/models/");
   });
 
   it("throws on unknown accent lookups instead of emitting a 404 url", () => {

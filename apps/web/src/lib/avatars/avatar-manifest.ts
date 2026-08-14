@@ -6,6 +6,11 @@
 // The accent list IS the player-accent palette: defined once in
 // tools/avatar-bake/src/accent-palette.mjs, copied verbatim into the manifest at bake time.
 // Components never hard-code accent hexes.
+//
+// The DIORAMA's model data (GLB filenames, clip names, recolor targets) is deliberately NOT
+// here - it lives in the sibling avatar-models.ts. This module is a static import on the join
+// screen, the lobby, the roster, the score strip: everything a phone loads. Folding ~7.5 KB
+// of display-only JSON in would have every phone in the room download it.
 import manifestJson from "#lib/avatars/avatar-manifest.json";
 
 export type AvatarKind = "pet" | "human";
@@ -17,29 +22,11 @@ export type AvatarAccent = {
   hex: string;
 };
 
-/** The three animation roles every shipped model exposes (tools/avatar-bake/src/roster.mjs). */
-export type AvatarClipRole = "idle" | "walk" | "celebrate";
-
 export type AvatarSheet = {
   /** Horizontal filmstrip under `basePath`: manifest.sheet.frames square frames, left to right. */
   file: string;
   /** Which pack clip was rendered - "walk" normally, an idle clip where a pack lacks one. */
   clip: string;
-};
-
-export type AvatarModel = {
-  /** Trimmed GLB filename under `modelPath`. */
-  file: string;
-  /** The pack's shared palette texture (also under `modelPath`) - the recolor's input image. */
-  colormap: string;
-  /** Extra models composited at the same origin (Ada's wheelchair), also under `modelPath`. */
-  props: readonly string[];
-  /** Role -> the pack's own clip name. Shipped code names roles, never Kenney clip names. */
-  clips: Record<AvatarClipRole, string>;
-  /** Colormap cells the player accent replaces - the runtime recolor's targets. */
-  recolorTargets: readonly string[];
-  /** Per-avatar RGB match distance; null means palette-recolor.ts's default. */
-  tolerance: number | null;
 };
 
 export type AvatarEntry = {
@@ -51,8 +38,6 @@ export type AvatarEntry = {
   sprites: Record<string, string>;
   /** The animated tier (join preview, lobby card) - one sheet per avatar, its own colors. */
   sheet: AvatarSheet;
-  /** The live tier (display diorama only) - everything needed to instance and recolor a model. */
-  model: AvatarModel;
 };
 
 export type AvatarManifest = {
@@ -61,8 +46,6 @@ export type AvatarManifest = {
   spriteSize: number;
   /** Public URL prefix the sprite and sheet filenames resolve against. */
   basePath: string;
-  /** Public URL prefix for GLBs and colormaps. Only the display route ever fetches these. */
-  modelPath: string;
   /** Sheet geometry, shared by every avatar: N square frames of frameSize px, horizontal. */
   sheet: { frames: number; frameSize: number };
   accents: readonly AvatarAccent[];
@@ -91,14 +74,6 @@ export function avatarSpriteUrl(avatar: AvatarEntry, accentId: string): string {
 /** Public URL of one avatar's walk-cycle filmstrip. */
 export function avatarSheetUrl(avatar: AvatarEntry): string {
   return avatarManifest.basePath + avatar.sheet.file;
-}
-
-/**
- * Public URL of a file under the model path (a GLB or a colormap PNG). Display-route only:
- * every caller sits behind the diorama's dynamic import, so no phone ever resolves one.
- */
-export function avatarModelUrl(fileName: string): string {
-  return avatarManifest.modelPath + fileName;
 }
 
 /** Look up an avatar by id - the roster carries ids, the manifest carries everything else. */

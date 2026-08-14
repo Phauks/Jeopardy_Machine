@@ -16,6 +16,11 @@
       note: "Four presets on the live token contract - board, type, swatches, emblems, effects toggle (M4 phase 1).",
     },
     {
+      href: "/dev/diorama",
+      title: "Avatar diorama",
+      note: "The live 3D lobby scene with fake players: add avatars, switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
+    },
+    {
       href: "/dev/echo",
       title: "Realtime harness",
       note: "WebSocket lab against the GameRoomDO stub: latency, ordering bursts, hibernation probe, malformed input, reconnect tools.",

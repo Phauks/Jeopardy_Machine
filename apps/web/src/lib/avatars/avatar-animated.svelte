@@ -9,9 +9,11 @@
   // guardrail). avatar-chip.svelte remains the representation for roster rows, score strips,
   // and every list where more than one avatar is on screen.
   //
-  // The sheet is baked in the avatar's own pack colors, not per accent (measured: 8x the
-  // committed bytes for a difference nobody sees - tools/avatar-bake/src/bake.mjs). The accent
-  // is carried by the backing, exactly as at 24px chip size.
+  // The sheet is baked in the avatar's own pack colors, NOT per accent - the numbers behind
+  // that are in tools/avatar-bake/src/bake.mjs (per-accent is 4.6 MB committed, or 2.4 MB and
+  // visibly soft). The accent is carried by the backing, exactly as at 24px chip size. The
+  // known consequence: on the join screen this preview sits above an accent-tinted picker
+  // grid, so the same avatar shows in two colors at once. That is the trade, not a bug.
   import { prefersReducedMotion } from "svelte/motion";
   import { avatarManifest, avatarSheetUrl } from "#lib/avatars/avatar-manifest.ts";
   import type { AvatarAccent, AvatarEntry } from "#lib/avatars/avatar-manifest.ts";

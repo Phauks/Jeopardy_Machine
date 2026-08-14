@@ -19,6 +19,7 @@
   "dependencies": {
     "@jeopardy/engine": "workspace:*",
     "@jeopardy/protocol": "workspace:*",
+    "three": "catalog:",
     "uqr": "catalog:"
   },
   "devDependencies": {
@@ -26,6 +27,7 @@
     "@sveltejs/kit": "catalog:",
     "@sveltejs/vite-plugin-svelte": "catalog:",
     "@tailwindcss/vite": "catalog:",
+    "@types/three": "catalog:",
     "svelte": "catalog:",
     "svelte-check": "catalog:",
     "tailwindcss": "catalog:",

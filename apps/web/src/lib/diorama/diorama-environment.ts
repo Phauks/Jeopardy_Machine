@@ -1,0 +1,89 @@
+// What the avatars stand in, and where its colors come from.
+//
+// ENVIRONMENT SLOT - the state of play. docs/research/00-user-directives.md ("3D environments")
+// asks for a curated `environment` field on the THEME document, exactly like `soundSet`:
+// forest / pirate / dungeon / none, presentation-layer only, zero game-logic coupling. The
+// theme schema in packages/protocol/src/theme/theme.ts does NOT have that field yet, and this
+// milestone does not edit the protocol. So the vocabulary lives here as a local enum, kept
+// deliberately in the shape the schema will take, and the display resolves it locally.
+//
+// WHAT THE PROTOCOL NEEDS (one line in themeBodySchema, mirroring soundSet's precedent):
+//   environment: z.enum(["none", "studio", "forest", "pirate", "dungeon"]).optional(),
+// Optional keeps it a minor-bump-free reservation, the same trick soundSet uses. Once it
+// lands: delete DioramaEnvironment below, import the protocol enum, and have the display pass
+// theme.environment straight through - nothing else here changes, because everything past
+// this file already speaks in terms of the enum value. "none" must keep meaning "render the
+// clean 2D lobby", which is why avatar-diorama.svelte treats it as "do not mount" rather than
+// as an empty scene.
+//
+// The kits themselves (Kenney Nature Kit for the forest, Pirate Kit, Dungeon Kit - all CC0,
+// same visual universe as the avatars) are a later pass: they need their own download +
+// license verification + budget in tools/avatar-bake, and "studio" exists so the diorama is
+// shippable and reviewable before any of that.
+
+/** The environment vocabulary. Only "none" and "studio" are implemented today. */
+export type DioramaEnvironment = "none" | "studio";
+
+/** Colors the scene paints itself with, all derived from the active theme's tokens. */
+export type DioramaPalette = {
+  /** The floor the avatars walk on. */
+  ground: string;
+  /** The backdrop wall and the fog color - the page behind the diorama. */
+  backdrop: string;
+  /** Rim/accent light, so the theme's accent shows up in the lighting, not just the chips. */
+  accent: string;
+};
+
+/**
+ * Resolve a themed color from a CSS custom property.
+ *
+ * getComputedStyle returns custom properties RAW - `--surface-raised` really is the string
+ * "color-mix(in srgb, #0a0b33 90%, #ffffff)", which three.js cannot parse. Assigning the
+ * token to a real color property and reading THAT back makes the browser do the resolving,
+ * and hands back a plain rgb() every time. The probe is a detached element, so it never
+ * reflows the display.
+ */
+export function resolveThemeColor(source: Element, token: string, fallback: string): string {
+  const ownerDocument = source.ownerDocument;
+  const probe = ownerDocument.createElement("span");
+  probe.style.display = "none";
+  probe.style.color = `var(${token}, ${fallback})`;
+  source.append(probe);
+  const resolved = ownerDocument.defaultView?.getComputedStyle(probe).color ?? fallback;
+  probe.remove();
+  // A browser that could not resolve the token leaves the property empty rather than throwing.
+  return resolved.length > 0 ? resolved : fallback;
+}
+
+/**
+ * The diorama's palette for whatever theme `source` sits inside. Deliberately built from the
+ * SAME semantic tokens the 2D surfaces use (docs/design/theming.md: components consume only
+ * semantic tokens, never raw colors), so a new theme themes the 3D scene for free.
+ */
+export function readDioramaPalette(source: Element): DioramaPalette {
+  return {
+    // The board's cell color is the theme's most saturated "surface you look at" - it reads
+    // as a stage floor far better than the near-black page background does.
+    ground: resolveThemeColor(source, "--board-cell-bg", "#060ce9"),
+    backdrop: resolveThemeColor(source, "--surface-page", "#0a0b33"),
+    accent: resolveThemeColor(source, "--accent", "#ffcc00"),
+  };
+}
+
+/**
+ * Is live 3D available here at all? A projector laptop with a blocked or missing GL context,
+ * a locked-down browser, or a headless test runner all answer no - and the display falls back
+ * to the 2D lobby it has always had. The diorama is decoration, never a dependency of play
+ * (guardrail 3 of docs/decisions/2026-08-14-avatars-in-motion.md).
+ */
+export function supportsWebGl(): boolean {
+  if (typeof document === "undefined") return false;
+  try {
+    const canvas = document.createElement("canvas");
+    const context = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
+    return context !== null;
+  } catch {
+    // Some privacy modes throw rather than return null.
+    return false;
+  }
+}

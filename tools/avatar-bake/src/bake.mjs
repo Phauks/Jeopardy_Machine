@@ -27,6 +27,13 @@ const spritesDir = path.join(repoRoot, "apps", "web", "static", "avatars");
 const modelsDir = path.join(spritesDir, "models");
 const webLibDir = path.join(repoRoot, "apps", "web", "src", "lib");
 const manifestPath = path.join(webLibDir, "avatars", "avatar-manifest.json");
+// A SEPARATE document from the manifest, on purpose. The model tier's data (per-avatar
+// recolor targets, clip names, prop lists) is ~7.5 KB of JSON that only the display's diorama
+// reads - and the manifest is a static import on every avatar surface, so folding it in put
+// that 7.5 KB in the bundle of every phone that joins a room. Split, it rides the diorama's
+// dynamically-imported chunk instead, and the phone's bundle is unchanged (the size check in
+// docs/design/surfaces.md).
+const modelsManifestPath = path.join(webLibDir, "avatars", "avatar-models.json");
 // The ONE recolor implementation, shared with the shipped diorama; served type-stripped to
 // the render page so this tool and apps/web can never hold two versions of the palette math.
 const sharedRecolorPath = path.join(webLibDir, "avatars", "palette-recolor.ts");
@@ -48,15 +55,19 @@ const SHEET_FRAMES = 10;
 // preview and the lobby "you're in" card - both well under 160 px on a phone.
 const SHEET_FRAME_SIZE = 128;
 const SHEET_QUALITY = 0.82;
-// ONE sheet per avatar, in the pack's own colors - not one per accent. Measured both ways on
-// 2026-08-14: per-accent (216 sheets) is 4648 KB, accent-neutral (27 sheets) is 582 KB. Eight
-// times the committed bytes buys a difference nobody sees, because the sheet's two surfaces
-// (join preview, lobby "you're in" card) show ONE avatar on its accent-colored backing chip -
-// the same "the backing says which player, the sprite says which avatar" split the 24px chip
-// has always used (src/lib/avatars/avatar-chip.svelte). Reversing this is one constant plus a
-// re-bake if the owner ever wants it; the price is recorded above so that is a decision with
-// a number on it. Matches docs/decisions/2026-08-14-avatars-in-motion.md ("accent-neutral
-// base").
+// ONE sheet per avatar, in the pack's own colors - not one per accent, per
+// docs/decisions/2026-08-14-avatars-in-motion.md ("accent-neutral base"). Both options were
+// actually baked and weighed on 2026-08-14, so this is a decision with numbers on it:
+//   accent-neutral, 27 sheets, 10 frames @ 128px, q0.82  ->   568 KB   (shipped)
+//   per-accent,    216 sheets, 10 frames @ 128px, q0.82  ->  4648 KB
+//   per-accent,    216 sheets,  8 frames @ 112px, q0.72  -> ~2370 KB, and visibly soft at the
+//                                                           120px the join preview shows
+// Per-accent only pays off within a 2 MB budget by degrading the one surface whose whole point
+// is looking good. The accent is carried instead by the backing chip - the same "the backing
+// says which player, the sprite says which avatar" split the 24px chip has always used
+// (src/lib/avatars/avatar-chip.svelte). The visible consequence is real and worth knowing:
+// on the join screen the natural-colored preview sits above an accent-tinted picker grid, so
+// the same avatar appears in two colors at once. Flipping this is one constant plus a re-bake.
 const SHEET_BUDGET_BYTES = 1024 * 1024;
 
 // --- Models --------------------------------------------------------------------------------
@@ -299,6 +310,7 @@ const expectedFiles = new Set();
 let totalBytes = 0;
 let sheetBytes = 0;
 const manifestAvatars = [];
+const modelEntries = [];
 for (const avatar of avatars) {
   const spriteFiles = {};
   for (const accent of accentPalette) {
@@ -324,16 +336,18 @@ for (const avatar of avatars) {
     // actually got rendered, so an avatar that fell back to idle for want of a walk cycle is
     // visible in the manifest rather than a silent surprise.
     sheet: { file: sheetFileName, clip: result.sheetClips[avatar.id] },
-    // The live tier: the trimmed GLB plus everything the diorama needs to instance and
-    // recolor it without hard-coding pack knowledge in shipped code.
-    model: {
-      file: `${avatar.id}.glb`,
-      colormap: colormapFileNameFor(packIdFor(avatar)),
-      props: (avatar.extraModelFiles ?? []).map((file) => path.basename(file)),
-      clips: clipsFor(avatar),
-      recolorTargets: avatar.recolorTargets,
-      tolerance: avatar.tolerance ?? null,
-    },
+  });
+  // The live tier, into its own document (see modelsManifestPath above): the trimmed GLB plus
+  // everything the diorama needs to instance and recolor it without hard-coding pack
+  // knowledge in shipped code.
+  modelEntries.push({
+    id: avatar.id,
+    file: `${avatar.id}.glb`,
+    colormap: colormapFileNameFor(packIdFor(avatar)),
+    props: (avatar.extraModelFiles ?? []).map((file) => path.basename(file)),
+    clips: clipsFor(avatar),
+    recolorTargets: avatar.recolorTargets,
+    tolerance: avatar.tolerance ?? null,
   });
 }
 for (const existing of readdirSync(spritesDir)) {
@@ -345,17 +359,22 @@ for (const existing of readdirSync(spritesDir)) {
 
 const manifest = {
   // Bump when the manifest shape changes; the loader in apps/web asserts on it. v2 added the
-  // sprite-sheet and model tiers (docs/decisions/2026-08-14-avatars-in-motion.md).
+  // sprite-sheet tier (docs/decisions/2026-08-14-avatars-in-motion.md).
   version: 2,
   spriteSize: SPRITE_SIZE,
   basePath: "/avatars/",
-  modelPath: "/avatars/models/",
   sheet: { frames: SHEET_FRAMES, frameSize: SHEET_FRAME_SIZE },
   accents: accentPalette,
   avatars: manifestAvatars,
 };
+const modelsManifest = {
+  version: 1,
+  modelPath: "/avatars/models/",
+  avatars: modelEntries,
+};
 mkdirSync(path.dirname(manifestPath), { recursive: true });
 writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+writeFileSync(modelsManifestPath, JSON.stringify(modelsManifest, null, 2) + "\n");
 
 console.log(
   `baked ${avatars.length} avatars x ${accentPalette.length} accents:\n` +
