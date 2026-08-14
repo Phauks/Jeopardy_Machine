@@ -13,6 +13,7 @@ Built with SvelteKit 3 + Svelte 5 on Cloudflare Workers; one Durable Object per 
 - **The host is always in control** - every automated step has an override and an undo.
 - **Theming as a feature** - the board's look (fonts, colors, background) is a portable theme document, with built-in presets.
 - **Players never log in** - room code is the entire join flow, forever.
+- **Public lobby or private code** - a room is listed or unlisted, and independently open or password-protected; the password is a shared room secret, never an account.
 
 ## Quick start (development)
 
@@ -21,18 +22,18 @@ pnpm install
 pnpm dev        # SvelteKit app on :5173 + realtime Worker on :8787
 ```
 
-Then open <http://localhost:5173/dev/echo> to see a WebSocket round-trip through a local game-room Durable Object. Details, testing, and the deploy story: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Then open <http://localhost:5173/> - the landing page carries the Join section (room code, password, and the public-rooms lobby) above the index of everything that exists so far. The real room path (create, connect, join) runs under the single-origin loop documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), which also covers testing and the deploy story.
 
 ## Repo map
 
-| Path                 | What                                                                                 |
-| -------------------- | ------------------------------------------------------------------------------------ |
-| `apps/web/`          | SvelteKit 3 app Worker - all UI, later REST API + D1/R2                              |
-| `apps/realtime/`     | Plain Worker - `GameRoomDO`, WebSocket-only                                          |
-| `packages/protocol/` | Shared contracts: wire envelope, `ext` bag, operational limits                       |
-| `tools/avatar-bake/` | Offline pipeline that bakes the committed avatar sprites from Kenney CC0 3D packs    |
-| `docs/`              | Development guide, stamped status, dated decisions, proposals, design docs, research |
-| `CLAUDE.md`          | Conventions + hard rules (the repo's operating manual)                               |
+| Path                 | What                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------- |
+| `apps/web/`          | SvelteKit 3 app Worker - all UI, later REST API + D1/R2                               |
+| `apps/realtime/`     | Plain Worker - `GameRoomDO`, WebSocket-only                                           |
+| `packages/protocol/` | Shared contracts: wire envelope, `ext` bag, operational limits, room + document layer |
+| `tools/avatar-bake/` | Offline pipeline that bakes the committed avatar sprites from Kenney CC0 3D packs     |
+| `docs/`              | Development guide, stamped status, dated decisions, proposals, design docs, research  |
+| `CLAUDE.md`          | Conventions + hard rules (the repo's operating manual)                                |
 
 ## Documentation
 
