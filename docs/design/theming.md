@@ -46,6 +46,8 @@ The M7 customizer exposes only document fields; chrome follows automatically. `t
 | `--surface-text-muted` | text at 62% alpha               | Secondary text.                                                                                                                        |
 | `--surface-border`     | text at 20% alpha               | Hairlines, input borders.                                                                                                              |
 | `--surface-scrim`      | constant `rgb(0 0 0 / 0.55)`    | Overlay backdrop (clue layer, dialogs).                                                                                                |
+| `--score-positive`     | constant `#21b45e`              | Positive score deltas (judged flash on phones, console feedback). Paired with a sign/label, never color alone.                         |
+| `--score-negative`     | constant `#ff5470`              | Negative deltas and negative score readouts. Same pairing rule.                                                                        |
 
 ### Effects tokens (the flat/dimensional switch)
 

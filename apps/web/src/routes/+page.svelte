@@ -178,6 +178,24 @@
     Build {__BUILD_META__.sha} · {__BUILD_META__.builtAt.slice(0, 16).replace("T", " ")}Z ·
     <a class="underline" href="https://github.com/Phauks/Jeopardy_Machine">source</a>
   </p>
+  <p>
+    <a class="underline" href="/dev/hotseat">Dev: hotseat</a>
+    - keyboard-driven full game against the engine, no server (M2 exit criteria).
+  </p>
+  <p class="mt-2 font-bold">M4 play surfaces (mock rooms until the M3 reconcile - each tab is
+    its own simulated room seeded from the fixture dataset; docs/design/surfaces.md):</p>
+  <p>
+    <a class="underline" href="/room/DUMYX">Player: /room/DUMYX</a>
+    - A2 join, A3 lobby, A4 buzzer (open on a phone; ?theme=modern-flat previews presets).
+  </p>
+  <p>
+    <a class="underline" href="/room/DUMYX/display">Display: /room/DUMYX/display</a>
+    - projector board: title screen + QR, category reveal, clue card, winner screen.
+  </p>
+  <p>
+    <a class="underline" href="/room/DUMYX/host">Host: /room/DUMYX/host</a>
+    - C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.
+  </p>
 </main>
 
 <BuildBadge />
