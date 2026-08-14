@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node globals (process/console in the CLI, setTimeout typing) opted in explicitly;
+    // bot.ts/behavior.ts stay runtime-neutral (browser, workerd, node all run them).
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}
