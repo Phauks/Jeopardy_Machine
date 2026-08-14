@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-14 (M3.5 room visibility/passwords/lobby landed on top of M3 realtime rooms: room protocol, real GameRoomDO, single-origin WS proven, bot players, workerd + Playwright suites. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-14 (lobby diagnostics + the room instrument panel: the registry now reports why a lobby is empty, rooms can be inspected and closed by their host, and `/dev/echo` became `/dev/rooms`. M3.5 room visibility/passwords/lobby sits on top of M3 realtime rooms. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -35,7 +35,7 @@ Progress 2026-08-13 - everything agent-verifiable is done; what remains is owner
 - [x] Monorepo + catalog-pinned toolchain (versions verified live; docs/decisions/2026-08-13-m0-version-pins.md)
 - [x] `packages/protocol`: versioned envelope + `ext` bag + limits module, tested
 - [x] `apps/realtime`: `GameRoomDO` stub on partyserver (verdict: use, transport-only - docs/decisions/2026-08-13-partyserver.md), tested inside workerd
-- [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + `/dev/echo` proof page
+- [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + the `/dev/echo` proof page (since grown into `/dev/rooms`, the room instrument panel)
 - [x] Local dev loop proven end to end (`pnpm dev`; cross-script DO binding `[connected]` under multi-config `wrangler dev`) - docs/DEVELOPMENT.md
 - [x] CI gate (PR-only: fmt, lint, typecheck, test, build), deploy denies, CLAUDE.md, STATUS.md, per-package READMEs
 - [ ] Owner: first manual hello-world deploy of both Workers (docs/cloudflare-setup.md) - closes M0
@@ -83,8 +83,8 @@ Progress 2026-08-14 - landed; both exit criteria green:
 - [x] Single-origin path live: `POST /api/rooms` + `/room/[code]/ws` through the uncommented `GAME_ROOM` binding; **upgrade passthrough PROVEN on the pinned kit/adapter - no fallback entry needed** (verdict + canary script in the decision doc's 2026-08-14 addendum)
 - [x] Bot players (`packages/bots`): seeded headless clients on the real protocol + CLI (`pnpm -F @jeopardy/bots bots`); the M4 sim panel builds on them
 - [x] workerd suite (33 tests): create/refuse/expiry incl. code reuse, full game incl. wager cell + final, forced eviction mid-game, token reconnect, concurrent buzz races, team lifecycle + succession, authority/redaction/limit guardrails
-- [x] Playwright multi-context e2e (`pnpm -F @jeopardy/web test:e2e`): real chromium phones + display + host through the single origin - roster sync, deterministic staggered buzz race, the /dev/echo harness flow
-- Scope amendment (recorded in the decision addendum): `/dev/echo` + `REALTIME_ORIGIN` were not deleted but repurposed - the page is now the owner's room harness (create/join/refusal probes) and the env var survives only as its deprecated vite-dev direct-dial fallback; both retire with the M4 surfaces
+- [x] Playwright multi-context e2e (`pnpm -F @jeopardy/web test:e2e`): real chromium phones + display + host through the single origin - roster sync, deterministic staggered buzz race, the /dev/rooms panel flow
+- [x] Scope amendment, resolved 2026-08-14: `REALTIME_ORIGIN` and the direct-realtime-origin toggle are **deleted** (owner: deprecated) - single origin is the only path, `apps/web/src/env.ts` now declares no variables at all, and `pnpm dev:rooms` runs the loop in one command (docs/decisions/2026-08-13-single-origin-binding.md addendum b). The harness did not retire; it became `/dev/rooms`, the room instrument panel
 
 ### M3.5 - Room visibility, passwords, and the public lobby
 
@@ -98,6 +98,13 @@ Progress 2026-08-14 - landed:
 - [x] Passwords verified in the DO: PBKDF2-SHA256 (100k, per-room salt, constant-time compare), per-connection attempt budget, host exempt via the creation token, `has_password` the only public fact
 - [x] Wire additions requested by the M4 surfaces (2026-08-14 reconcile): a role-redacted `clue-content` channel (authored prompt/answer - the engine never sees content, so it rides beside the event stream; answers reach the HOST only), host `set-pause`/`expire-timer`/`close-room`, `room-closed` reasons split into expired/host-closed/**kicked** for the polite screen, and the teams-mode seating policy agreed with M4 (an unteamed player is seated as a solo team of one instead of blocking start-game)
 - [x] Surfaces: the root page's real **Join** section (code box + password + polling public-rooms list, code-box-wins) and the harness's create/list controls - which answers the owner's "can the harness list all rooms?" (it can, for public rooms; unlisted rooms have no row by design)
+
+Follow-up 2026-08-14 (owner report: "creating a public room does not appear to have it appear in the lobby ... I cannot tell if the rooms are actually created") - landed:
+
+- [x] Root cause: the registry's D1 migration was never applied to the deployed environment, and every registry failure was swallowed into an empty list. Reproduced both ways in the single-origin loop (docs/decisions/2026-08-14-room-visibility-and-lobby.md addendum b)
+- [x] The wire now carries a discriminated `registry` status (`ok` / `no-binding` / `no-table` / `error`) on the lobby listing, the create response and `/api/version`; graceful degradation kept, silence removed. Broken registries are never cached
+- [x] Host-authenticated room ops: `DELETE /api/rooms/<CODE>` closes a room end to end and delists it; `GET /api/rooms/<CODE>` is a DO inspector (lifecycle, connection census, roster/team counts, state version, alarm book, storage sizes, the registry row beside it) with a redaction gate over tokens, password material and clue text
+- [x] `/dev/echo` -> `/dev/rooms` (old path redirects): three-column instrument panel - rooms this tab created (create ADDS, never replaces; per-room delete/connect/lobby-presence/expiry countdown), connection + join + actions + DO inspector, and a full-height filterable log; auto-refreshing lobby panel (60s, visible countdown, manual refresh, registry status) and a separate Test area for the refusal probes with expected-vs-actual PASS/FAIL chips
 
 ### M4 - Play surfaces (board, buzzer, host)
 

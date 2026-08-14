@@ -19,19 +19,28 @@ runs both dev servers in parallel:
 | `apps/web`: `vite dev`          | SvelteKit 3 app (SSR + routes; Cloudflare bindings emulated by the adapter when the app grows some) | 5173 |
 | `apps/realtime`: `wrangler dev` | The realtime Worker + `GameRoomDO` in local workerd (miniflare)                                     | 8787 |
 
-`pnpm dev` is the UI-iteration loop. The production topology is SINGLE-ORIGIN (M3, docs/decisions/2026-08-13-single-origin-binding.md): clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to `GameRoomDO` over the cross-script binding. vite dev cannot emulate that binding, so exercising the real connection path uses the multi-config loop below; in plain `pnpm dev` the `/dev/echo` harness falls back to dialing the realtime Worker directly via `REALTIME_ORIGIN` (deprecated, harness-only - `apps/web/src/env.ts`).
+`pnpm dev` is the UI-iteration loop, and **it cannot serve rooms at all**. The production topology is SINGLE-ORIGIN (M3, docs/decisions/2026-08-13-single-origin-binding.md): clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to `GameRoomDO` over the cross-script binding. vite dev emulates neither that binding nor D1, so under `pnpm dev` the room routes answer 503 and the instrument panel says so on the page rather than failing quietly. Anything touching rooms, the lobby, or D1 uses the loop below. (There is no direct-realtime-origin escape hatch any more: `REALTIME_ORIGIN` and its toggle were deleted 2026-08-14 - single origin is the only path.)
 
-### The single-origin dev loop (M3 - the real topology)
+### The room dev loop (single origin - the real topology)
+
+```sh
+pnpm dev:rooms
+```
+
+is the whole thing: it builds the web app and runs BOTH Workers in one process on :8788 with the `GAME_ROOM` binding live (`Durable Object · local [connected]`). It is the equivalent of
 
 ```sh
 pnpm -F @jeopardy/web build
 npx wrangler dev -c apps/web/wrangler.jsonc -c apps/realtime/wrangler.jsonc --port 8788
 ```
 
-runs BOTH Workers in one process with the `GAME_ROOM` binding live (`Durable Object · local [connected]`). Smoke checks against it:
+which is still the form to reach for when you want different flags. There is no HMR here - it serves a BUILD, so rerun the command after changing web code.
+
+Smoke checks against it:
 
 - **Automated:** `node apps/web/scripts/prove-single-origin.mjs http://localhost:8788` - creates a room through `POST /api/rooms`, upgrades a WebSocket through the SvelteKit worker, joins as host, and verifies the no-such-room refusal for uncreated codes. This is the canary for the SvelteKit-upgrade-passthrough (rerun it after any kit/adapter pin bump).
-- **Browser:** open <http://localhost:8788/dev/echo> - the room harness. "Create room (sample game)" allocates a code via the create route and fills it in; Connect + "Join as host/player/spectator" speak the real room protocol; "Connect to uncreated room" is a one-click PASS/FAIL probe that connects-never-create holds; Ping rides the runtime auto-response (hibernation check).
+- **Browser:** open <http://localhost:8788/dev/rooms> - the room instrument panel (formerly `/dev/echo`, which now redirects). Three columns: **Rooms** (create, plus every room this tab created with its lobby-presence, expiry countdown, Connect and Delete), **Connection** (socket/room state, join controls, action probes, the DO inspector), and **Log** (full height, filter by sent/received/errors, compact or verbose bodies). Below them, the **Test area** runs the refusal probes with expected-vs-actual PASS/FAIL chips (uncreated room, wrong password, stale version, malformed JSON, oversized payload, rate-limit burst). The Lobby panel auto-refreshes every 60s with a visible countdown, a manual Refresh, and the registry's health in words.
+- **Ops by curl:** `curl localhost:8788/api/version` reports the build plus `realtimeBinding` and `registry` health; `curl localhost:8788/api/rooms` carries the same `registry` status beside the list; `curl -H "x-host-token: <token>" localhost:8788/api/rooms/<CODE>` is the DO inspector and `curl -X DELETE -H "content-type: application/json" -H "x-host-token: <token>" ...` closes a room (the content type is required - SvelteKit's CSRF guard rejects a bare cross-site DELETE).
 - **Bots:** `pnpm -F @jeopardy/bots bots -- --origin http://localhost:8788 --create --count 5 --host` plays a bots-only game to game-over through the single origin (packages/bots/README.md).
 
 **Local D1 (the room registry, 2026-08-14):** the public lobby reads a `rooms` table in D1; both Workers bind the same database and the schema lives in `apps/web/migrations/`. Create it in the local simulated D1 once per state directory:
@@ -40,7 +49,9 @@ runs BOTH Workers in one process with the `GAME_ROOM` binding live (`Durable Obj
 npx wrangler d1 migrations apply jeopardy-machine --local -c apps/web/wrangler.jsonc
 ```
 
-Run it before the multi-config loop above (the two Workers share one `.wrangler` state directory there, so one apply covers both). Skipping it is not fatal - rooms create and join normally, `GET /api/rooms` just answers an empty lobby and the Worker logs a registry warning; that is exactly how an unapplied production migration behaves, on purpose. The realtime test suite applies these same migration files to its own simulated D1 (`apps/realtime/test/apply-migrations.ts`), which is what keeps the DO's registry statements honest against the web app's schema.
+Run it before the loop above (the two Workers share one `.wrangler` state directory there, so one apply covers both). Skipping it is not fatal - rooms create and join normally, the lobby just cannot list them; that is exactly how an unapplied production migration behaves, on purpose. The realtime test suite applies these same migration files to its own simulated D1 (`apps/realtime/test/apply-migrations.ts`), which is what keeps the DO's registry statements honest against the web app's schema.
+
+**Empty lobby? Check the registry status.** `GET /api/rooms` and `GET /api/version` both carry a `registry` field: `{"status":"ok"}` means the lobby works and is genuinely empty; `{"status":"unavailable","reason":"no-table"}` means this environment never had the migration applied (the command above, `--remote` for a deploy); `no-binding` means there is no D1 at all (you are on vite dev); `error` carries D1's own message. `POST /api/rooms` reports the same verdict for its own row write, so "the room was created but is NOT listed" is a sentence the creating surface can say. The instrument panel renders all of it - a session room shows `NOT in lobby` when it is public, live, and genuinely absent. This exists because it once did not: a public room that never appeared and an empty lobby looked identical (owner report 2026-08-14).
 
 **Theme smoke check:** <http://localhost:5173/dev/theme> renders the board component, type specimens, token swatches, and the avatar picker/chips with a live preset switcher + effects toggle - the fastest way to eyeball the token contract (docs/design/theming.md) after any theme-layer change. The avatar sprites themselves are baked, not live-rendered - changing avatars/accents means re-running `tools/avatar-bake` (its README).
 
@@ -48,7 +59,7 @@ Run it before the multi-config loop above (the two Workers share one `.wrangler`
 
 ### Cross-worker DO access (architecture risk 6 - resolved in M3)
 
-The web Worker reaches the same `GameRoomDO` instances via the cross-script binding (`GAME_ROOM`, live in `apps/web/wrangler.jsonc`): room creation (`POST /api/rooms`) and every room WebSocket ride it. The M0 open question - vite-dev-side emulation of a cross-script DO call - resolved AGAINST vite dev: it does not emulate the binding, so the routes answer 503 there and the multi-config `wrangler dev` loop above is the way to run the single-origin path locally (it was the known-good fallback all along). `pnpm dev` remains the fast loop for UI work; the WebSocket-upgrade passthrough itself is proven and documented in the single-origin decision doc's 2026-08-14 addendum.
+The web Worker reaches the same `GameRoomDO` instances via the cross-script binding (`GAME_ROOM`, live in `apps/web/wrangler.jsonc`): room creation (`POST /api/rooms`) and every room WebSocket ride it. The M0 open question - vite-dev-side emulation of a cross-script DO call - resolved AGAINST vite dev: it does not emulate the binding, so the routes answer 503 there and `pnpm dev:rooms` (the multi-config `wrangler dev` loop above) is the way to run the single-origin path locally (it was the known-good fallback all along). `pnpm dev` remains the fast loop for UI work; the WebSocket-upgrade passthrough itself is proven and documented in the single-origin decision doc's 2026-08-14 addendum.
 
 ## Testing
 
@@ -71,7 +82,7 @@ pnpm -F @jeopardy/realtime test   # one package (same for web/protocol)
 pnpm -F @jeopardy/web test:e2e
 ```
 
-builds the web app, spawns the single-origin loop on :8790 (`apps/web/e2e/global-setup.ts`), and drives REAL chromium contexts as phones + display + host (`apps/web/e2e/room.e2e.ts`): roster sync across surfaces, a staggered auto-buzz race proving deterministic arrival-order adjudication with exactly one room-wide `buzz-won`, and the `/dev/echo` harness flow (create room, uncreated-room PASS probe, host a lobby). Deliberately NOT part of `pnpm test`/CI: it needs a chromium binary (resolution order: `E2E_CHROMIUM` env, playwright's own install, `/opt/pw-browsers/chromium`) and a free port. Playwright is pinned in the catalog and used library-only - its browser-download postinstall stays blocked; point it at an existing chromium instead.
+builds the web app, spawns the single-origin loop on :8790 (`apps/web/e2e/global-setup.ts`), and drives REAL chromium contexts as phones + display + host (`apps/web/e2e/room.e2e.ts`): roster sync across surfaces, a staggered auto-buzz race proving deterministic arrival-order adjudication with exactly one room-wide `buzz-won`, and the `/dev/rooms` panel flow (uncreated-room PASS probe, two creates that both survive in the session list, host a lobby). Deliberately NOT part of `pnpm test`/CI: it needs a chromium binary (resolution order: `E2E_CHROMIUM` env, playwright's own install, `/opt/pw-browsers/chromium`) and a free port. Playwright is pinned in the catalog and used library-only - its browser-download postinstall stays blocked; point it at an existing chromium instead.
 
 ## PWA bits (service worker + manifest)
 

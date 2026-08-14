@@ -1,6 +1,6 @@
 // The M3 exit-criteria end-to-end proof: real chromium contexts as phones + display + host
 // against the BUILT app under multi-config wrangler dev - deterministic buzz ordering and
-// roster sync through the single origin, plus the owner's /dev/echo harness flow. Run via
+// roster sync through the single origin, plus the owner's /dev/rooms panel flow. Run via
 // `pnpm -F @jeopardy/web test:e2e` (not part of `pnpm test`/CI: needs a local chromium -
 // see chromiumExecutable below - and a free port).
 //
@@ -229,23 +229,28 @@ describe("single-origin rooms end to end", () => {
     expect(judged["type"]).toBe("event");
   });
 
-  it("walks the owner's /dev/echo harness flow: create, PASS the uncreated-room probe, host a lobby", async () => {
+  it("walks the owner's /dev/rooms panel: probe PASS, create two rooms, host a lobby", async () => {
     const page = await newPage();
-    await page.goto(`${e2eOrigin}/dev/echo`);
+    await page.goto(`${e2eOrigin}/dev/rooms`);
 
-    // The refusal probe: connects never create - one click, labeled PASS.
-    await page.getByRole("button", { name: /Connect to uncreated room/ }).click();
-    await page.getByRole("button", { name: /Connect to uncreated room - PASS/ }).waitFor({
+    // The refusal probe in the test area: connects never create, and the chip says PASS.
+    const uncreatedProbe = page.locator("li", { hasText: "Connect to an uncreated room" });
+    await uncreatedProbe.getByRole("button", { name: "Run" }).click();
+    await uncreatedProbe.locator('[data-verdict="pass"]').waitFor({ timeout: 10_000 });
+
+    // Create TWO real rooms: the second must not evict the first from the session list -
+    // the owner-reported "creating a room deletes a previously created room".
+    await page.getByRole("button", { name: "Create room" }).click();
+    await page.getByRole("heading", { name: /Rooms this tab created \(1\)/ }).waitFor({
+      timeout: 10_000,
+    });
+    await page.getByRole("button", { name: "Create room" }).click();
+    await page.getByRole("heading", { name: /Rooms this tab created \(2\)/ }).waitFor({
       timeout: 10_000,
     });
 
-    // Create a real room from the harness (sample game definition payload).
-    await page.getByRole("button", { name: /Create room \(sample game\)/ }).click();
-    // The created-room summary span (anchored to dodge the log pane's echo of the event).
-    await page.getByText(/^created [A-Z0-9]{5}/).waitFor({ timeout: 10_000 });
-
     // Connect through the single origin and join as host; the status panel reflects it.
-    await page.getByRole("button", { name: "Connect", exact: true }).click();
+    await page.getByRole("button", { name: "Connect", exact: true }).first().click();
     await page.getByRole("button", { name: "Join as host" }).click();
     await page.getByText("role:").locator("strong").filter({ hasText: "host" }).waitFor({
       timeout: 10_000,

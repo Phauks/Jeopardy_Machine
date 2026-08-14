@@ -15,7 +15,7 @@ const passwordStorageKey = "jeopardy.room-password";
 
 /** The destination for "join this room". M4's join screen swaps this line. */
 export function joinUrlForRoom(rawCode: string): string {
-  return `/dev/echo?code=${normalizeRoomCode(rawCode)}`;
+  return `/dev/rooms?code=${normalizeRoomCode(rawCode)}`;
 }
 
 /** Stash the room password for the next surface. No password = clear any stale one. */

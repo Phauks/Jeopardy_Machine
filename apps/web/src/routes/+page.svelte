@@ -85,9 +85,9 @@
       note: "Four presets on the live token contract - board, type, swatches, emblems, effects toggle (M4 phase 1).",
     },
     {
-      href: "/dev/echo",
-      title: "Realtime room harness",
-      note: "Create a real room (public/unlisted, with or without a password), list the live public rooms, connect through the single origin, join as host/player/spectator, and probe refusals.",
+      href: "/dev/rooms",
+      title: "Room instrument panel",
+      note: "Three-column room console: create/delete rooms and see every one this tab made, connect and join through the single origin with a live DO inspector, watch the auto-refreshing public lobby with the registry's health stated out loud, and run the refusal probes in the test area.",
     },
     {
       href: "/api/rooms",

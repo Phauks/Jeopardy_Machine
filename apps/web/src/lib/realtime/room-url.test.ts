@@ -14,14 +14,27 @@ describe("normalizeRoomCode", () => {
 
 describe("roomWebSocketUrl", () => {
   it("maps http dev origins to ws", () => {
-    expect(roomWebSocketUrl("http://localhost:8787", "bqkx7")).toBe(
-      "ws://localhost:8787/room/BQKX7/ws",
+    expect(roomWebSocketUrl("bqkx7", "http://localhost:8788")).toBe(
+      "ws://localhost:8788/room/BQKX7/ws",
     );
   });
 
   it("maps https deployed origins to wss", () => {
-    expect(roomWebSocketUrl("https://rt.example.com", "BQKX7")).toBe(
-      "wss://rt.example.com/room/BQKX7/ws",
+    expect(roomWebSocketUrl("BQKX7", "https://play.example.com")).toBe(
+      "wss://play.example.com/room/BQKX7/ws",
     );
+  });
+
+  it("defaults to the page's own origin - there is no second host to dial", () => {
+    // The deleted direct-realtime-origin mode is why this default exists rather than a
+    // parameter every caller has to get right (single-origin decision, 2026-08-14 deletion).
+    const page = { origin: "https://play.example.com" };
+    const previous = globalThis.location;
+    Object.defineProperty(globalThis, "location", { value: page, configurable: true });
+    try {
+      expect(roomWebSocketUrl("BQKX7")).toBe("wss://play.example.com/room/BQKX7/ws");
+    } finally {
+      Object.defineProperty(globalThis, "location", { value: previous, configurable: true });
+    }
   });
 });
