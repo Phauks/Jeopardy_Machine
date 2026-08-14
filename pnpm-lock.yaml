@@ -68,6 +68,9 @@ importers:
 
   apps/realtime:
     dependencies:
+      '@jeopardy/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@jeopardy/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
@@ -78,6 +81,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
         version: 0.21.3(@cloudflare/workers-types@5.20260813.1)(@vitest/runner@4.1.10)(@vitest/snapshot@4.1.10)(vitest@4.1.10)
+      '@jeopardy/bots':
+        specifier: workspace:*
+        version: link:../../packages/bots
       typescript:
         specifier: 'catalog:'
         version: 6.0.3

@@ -3,7 +3,8 @@
 // | Message      | Delivery                                                                    |
 // | ------------ | --------------------------------------------------------------------------- |
 // | welcome      | to the joining/resuming connection only, before anything else               |
-// | refused      | to the refused connection, immediately followed by a close (codes below)    |
+// | refused      | to the refused connection; room-level reasons then close (codes below),     |
+// |              | team-level reasons keep the socket for a retry with another team            |
 // | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note)       |
 // | event        | broadcast after every accepted engine transition; role-redacted             |
 // | buzz-won     | broadcast, EXACTLY ONCE per arming - the room-audio driver (owner           |
@@ -212,9 +213,13 @@ export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResu
 
 // WebSocket close codes paired with `refused`/`room-closed` (documented here so both ends
 // share one table; 4xxx is the application range the runtime passes through untouched).
+// Room-level refusals (no-such-room, bad tokens, room-full, late-join-disabled) close the
+// socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
+// phone keeps its socket and retries the join with another team card.
 export const roomCloseCodes = {
   roomClosed: 4000,
   badToken: 4401,
+  joinRefused: 4403,
   noSuchRoom: 4404,
   roomFull: 4409,
 } as const;

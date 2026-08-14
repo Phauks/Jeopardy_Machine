@@ -57,7 +57,9 @@ export const limits = {
     // A client message is an envelope + small payload (a buzz, a wager, a typed Final answer).
     // 4 KiB is an order of magnitude of headroom; anything larger is a bug or abuse.
     clientMessageMaxBytes: 4 * kibibyte,
-    // Rate limit per connection, enforced in the DO. Normal play peaks at ~2 msgs/s (buzz spam).
+    // Rate limit per connection, enforced in the DO for every role except the host (the
+    // console authenticated with the creation token and legitimately bursts - keyboard
+    // judging, undo runs, sound check). Normal player traffic peaks at ~2 msgs/s (buzz spam).
     clientMessagesPerSecondMax: 10,
   },
 } as const;

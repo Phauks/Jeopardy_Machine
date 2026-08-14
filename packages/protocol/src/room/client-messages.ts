@@ -86,6 +86,9 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelopeFields,
     type: z.literal("team-update"),
+    // Which team: leaders omit it (their own team is unambiguous); the HOST must name the
+    // team it is overriding. A leader naming someone else's team is refused.
+    teamId: teamIdSchema.optional(),
     // Sparse: only present fields change. Leaders may retune any subset mid-lobby;
     // the armed-window identity lock applies (server-messages error reason identity-locked).
     name: teamNameSchema.optional(),

@@ -14,11 +14,13 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
+    "@jeopardy/engine": "workspace:*",
     "@jeopardy/protocol": "workspace:*",
     "partyserver": "0.5.10"
   },
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "catalog:",
+    "@jeopardy/bots": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "wrangler": "catalog:"
