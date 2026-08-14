@@ -1,0 +1,225 @@
+// Server -> client room message catalog. Delivery contract per message:
+//
+// | Message      | Delivery                                                                    |
+// | ------------ | --------------------------------------------------------------------------- |
+// | welcome      | to the joining/resuming connection only, before anything else               |
+// | refused      | to the refused connection; room-level reasons then close (codes below),     |
+// |              | team-level reasons keep the socket for a retry with another team            |
+// | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note)       |
+// | event        | broadcast after every accepted engine transition; role-redacted             |
+// | buzz-won     | broadcast, EXACTLY ONCE per arming - the room-audio driver (owner           |
+// |              | directive "Only the winning buzz is heard"; sound resolution note below)    |
+// | buzz-rejected| to the losing/early phone only - silent local feedback, never room audio    |
+// | roster       | broadcast on any roster or team change                                      |
+// | room-closed  | broadcast, then all connections close                                       |
+// | error        | to the offending connection only                                            |
+//
+// Close codes (WebSocket application range): 4404 no-such-room, 4401 bad token, 4409 room
+// full, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
+import { z } from "zod";
+import { extensionBagSchema } from "../ext.ts";
+import { protocolVersion } from "../envelope/wire.ts";
+import { limits } from "../limits.ts";
+import {
+  curatedAssetIdSchema,
+  playerIdSchema,
+  roomRoleSchema,
+  sessionTokenSchema,
+} from "./identity.ts";
+import { rosterPayloadSchema, teamIdSchema } from "./roster.ts";
+
+const envelopeFields = {
+  version: z.literal(protocolVersion),
+  ext: extensionBagSchema.optional(),
+};
+
+export const roomCodeSchema = z
+  .string()
+  .regex(new RegExp(`^[A-Z0-9]{${String(limits.room.roomCodeLength)}}$`));
+export type RoomCode = z.infer<typeof roomCodeSchema>;
+
+export const refusalReasonSchema = z.enum([
+  // The friendly bad-code error of user-flows A1; also what an expired room's code answers
+  // (creation is explicit - connecting never creates, decision doc 2026-08-13).
+  "no-such-room",
+  "room-full",
+  "bad-host-token",
+  "bad-session-token",
+  "late-join-disabled",
+  "team-locked",
+  "unknown-team",
+]);
+export type RefusalReason = z.infer<typeof refusalReasonSchema>;
+
+export const errorReasonSchema = z.enum([
+  "malformed",
+  "unsupported-version",
+  // The sender's role fails the authority matrix for what it tried to do.
+  "unauthorized",
+  // Sent something requiring a joined session (action/team/identity messages) before join.
+  "not-joined",
+  // The engine refused a relayed action; `detail` carries the engine's rejection reason.
+  "action-rejected",
+  // Nickname/team edits during the armed window (owner directive: the display never
+  // relabels mid-adjudication) - retry after the clue resolves.
+  "identity-locked",
+  // Rename rate limit (limits.player.renameBurstMax per renameWindowMs) or the
+  // per-connection message-rate cap (limits.wire.clientMessagesPerSecondMax).
+  "rate-limited",
+  "unknown-team",
+  "unknown-player",
+  // Structurally valid but impossible right now (join a team mid-game, create a 33rd team...).
+  "rejected",
+]);
+export type RoomErrorReason = z.infer<typeof errorReasonSchema>;
+
+// What `snapshot.game` contains, by receiving role (redaction happens in the DO;
+// apps/realtime/src/room/redact.ts is the one implementation):
+// - host: the full engine GameState minus actionLog/rngState (those are recovery internals).
+// - everyone else: additionally hidden-wager-cell positions are emptied and uncommitted
+//   final wagers/answers are stripped - phones and the public display must never receive
+//   Daily-Double locations or secret wagers, even in devtools.
+// Typed as unknown at the protocol layer because GameState belongs to @jeopardy/engine
+// (which depends on this package); consumers cast to their engine version's GameState.
+const gameViewSchema = z.unknown();
+
+export const roomPhaseSchema = z.enum(["lobby", "active", "ended"]);
+export type RoomPhase = z.infer<typeof roomPhaseSchema>;
+
+export const roomServerMessageSchema = z.discriminatedUnion("type", [
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("welcome"),
+    roomCode: roomCodeSchema,
+    role: roomRoleSchema,
+    // Player seats only; null for host/display/spectator (they re-join by URL + token).
+    playerId: playerIdSchema.nullable(),
+    // The resume credential (sessionStorage per user-flows A2); only ever sent to its owner.
+    sessionToken: sessionTokenSchema.nullable(),
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("refused"),
+    reason: refusalReasonSchema,
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("snapshot"),
+    // Monotonic per accepted engine transition; a client that sees event.stateVersion jump
+    // by more than one missed a message and should send `sync`.
+    stateVersion: z.number().int().nonnegative(),
+    phase: roomPhaseSchema,
+    // Engine state (see gameViewSchema note); null until start-game creates it.
+    game: gameViewSchema.nullable(),
+    roster: rosterPayloadSchema,
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("event"),
+    stateVersion: z.number().int().nonnegative(),
+    // GameEvent[] from @jeopardy/engine (typed unknown for the same layering reason as
+    // `game`), role-redacted: everyone-answers submission text is stripped for everyone but
+    // the host and the submitting phone.
+    events: z.array(z.unknown()),
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("buzz-won"),
+    stateVersion: z.number().int().nonnegative(),
+    playerId: playerIdSchema,
+    // The scoring entity: the team in teams mode, the player otherwise.
+    entityId: z.string().min(1).max(64),
+    teamId: teamIdSchema.nullable(),
+    // Resolved server-side to the ROOM-audible sound: the team's in teams mode (leader-picked,
+    // the double-confirmation directive), the winner's personal sound otherwise. Room audio
+    // keys off this field of this message alone.
+    buzzSoundId: curatedAssetIdSchema.nullable(),
+    at: z.number().int().nonnegative(),
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("buzz-rejected"),
+    reason: z.enum([
+      "not-armed",
+      "early-lockout",
+      "too-late",
+      "locked-out",
+      "not-captain",
+      "unknown-player",
+    ]),
+    // Present for early-lockout: when this phone's buzzer unlocks (the visible penalty ring).
+    lockedUntil: z.number().int().nonnegative().nullable(),
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("roster"),
+    roster: rosterPayloadSchema,
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("room-closed"),
+    reason: z.enum(["expired", "host-closed"]),
+  }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("error"),
+    reason: errorReasonSchema,
+    detail: z.string().max(500).optional(),
+  }),
+]);
+
+export type RoomServerMessage = z.infer<typeof roomServerMessageSchema>;
+export type RoomServerMessageType = RoomServerMessage["type"];
+
+export type RoomServerMessageParseResult =
+  | { ok: true; message: RoomServerMessage }
+  | { ok: false; reason: "malformed" | "unsupported-version"; detail: string };
+
+// Client-side mirror of parseRoomClientMessage: phones, displays, and bots parse every
+// incoming frame through this one function.
+export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResult {
+  let candidate: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      candidate = JSON.parse(raw);
+    } catch {
+      return { ok: false, reason: "malformed", detail: "message is not valid JSON" };
+    }
+  }
+  if (typeof candidate === "object" && candidate !== null && "version" in candidate) {
+    const declared = (candidate as { version: unknown }).version;
+    if (
+      typeof declared === "number" &&
+      Number.isInteger(declared) &&
+      declared !== protocolVersion
+    ) {
+      return {
+        ok: false,
+        reason: "unsupported-version",
+        detail: `this client speaks protocol version ${String(protocolVersion)}, message declared version ${String(declared)}`,
+      };
+    }
+  }
+  const parsed = roomServerMessageSchema.safeParse(candidate);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      reason: "malformed",
+      detail: parsed.error.issues.map((issue) => issue.message).join("; "),
+    };
+  }
+  return { ok: true, message: parsed.data };
+}
+
+// WebSocket close codes paired with `refused`/`room-closed` (documented here so both ends
+// share one table; 4xxx is the application range the runtime passes through untouched).
+// Room-level refusals (no-such-room, bad tokens, room-full, late-join-disabled) close the
+// socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
+// phone keeps its socket and retries the join with another team card.
+export const roomCloseCodes = {
+  roomClosed: 4000,
+  badToken: 4401,
+  joinRefused: 4403,
+  noSuchRoom: 4404,
+  roomFull: 4409,
+} as const;

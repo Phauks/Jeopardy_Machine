@@ -28,18 +28,38 @@ export const limits = {
     // 5 uppercase-alphanumeric chars ~= 33 million codes - collision-safe for idFromName rooms
     // while staying shoutable across a noisy hall.
     roomCodeLength: 5,
+    // Room lifetime after the last client activity (docs/decisions/2026-08-13-single-origin-binding.md
+    // lifecycle): the expiry alarm wipes the DO, frees the code, and later joins get no-such-room.
+    // 2h idle covers a dinner break mid-game night without keeping dead rooms alive for days.
+    idleExpiryMs: 2 * 60 * 60 * 1000,
   },
   player: {
     nicknameMinLength: 1,
     // Long enough for "Team Environmental Sequoias", short enough for the roster UI and
     // the scoreboard strip on a phone.
     nicknameMaxLength: 24,
+    // Post-join rename rate limit (user-flows "Post-join customization": anti-confusion, not
+    // anti-fun) - burst per sliding window, applied to nickname changes only; avatar/sound
+    // swaps are unmetered.
+    renameBurstMax: 3,
+    renameWindowMs: 60 * 1000,
+  },
+  team: {
+    teamMaxCount: 32,
+    teamNameMinLength: 1,
+    teamNameMaxLength: 40,
+    // Leader-disconnect succession grace (user-flows "Teams & leadership"): leadership
+    // auto-passes to the longest-tenured connected member only after this much continuous
+    // absence, so a phone-sleep blip never reshuffles the crown.
+    leaderDisconnectGraceMs: 30 * 1000,
   },
   wire: {
     // A client message is an envelope + small payload (a buzz, a wager, a typed Final answer).
     // 4 KiB is an order of magnitude of headroom; anything larger is a bug or abuse.
     clientMessageMaxBytes: 4 * kibibyte,
-    // Rate limit per connection, enforced in the DO. Normal play peaks at ~2 msgs/s (buzz spam).
+    // Rate limit per connection, enforced in the DO for every role except the host (the
+    // console authenticated with the creation token and legitimately bursts - keyboard
+    // judging, undo runs, sound check). Normal player traffic peaks at ~2 msgs/s (buzz spam).
     clientMessagesPerSecondMax: 10,
   },
 } as const;

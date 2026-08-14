@@ -10,7 +10,13 @@
     ".": "./src/index.ts",
     "./envelope": "./src/envelope/wire.ts",
     "./ext": "./src/ext.ts",
-    "./limits": "./src/limits.ts"
+    "./limits": "./src/limits.ts",
+    "./room/identity": "./src/room/identity.ts",
+    "./room/roster": "./src/room/roster.ts",
+    "./room/client-messages": "./src/room/client-messages.ts",
+    "./room/server-messages": "./src/room/server-messages.ts",
+    "./room/authority": "./src/room/authority.ts",
+    "./room/create": "./src/room/create.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

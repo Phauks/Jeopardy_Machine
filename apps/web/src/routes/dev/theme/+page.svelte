@@ -146,7 +146,18 @@
             <span class="text-xs tracking-wide text-surface-text-muted uppercase">
               {specimen.slot} · <code>{specimen.token}</code>
             </span>
-            <span class="specimen" style="font-family: var({specimen.token})">
+            <!-- Specimens render in the slot's REAL board context (value gold on cell blue,
+                 clue text on cell bg) - not inherited panel text color, which could sit
+                 illegibly on light presets and misrepresents how the font actually appears. -->
+            <span
+              class="specimen"
+              class:specimen-on-cell={specimen.slot !== "chrome"}
+              style="font-family: var({specimen.token}); color: {specimen.slot === 'clue'
+                ? 'var(--clue-text-color)'
+                : specimen.slot === 'chrome'
+                  ? 'var(--surface-text)'
+                  : 'var(--board-value-color)'}"
+            >
               {specimen.sample}
             </span>
           </div>
@@ -270,12 +281,23 @@
     overflow-wrap: anywhere;
   }
 
+  .specimen-on-cell {
+    background: var(--board-cell-bg);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--board-radius);
+    align-self: flex-start;
+  }
+
   .swatch-chip {
     width: 2.4rem;
     height: 2.4rem;
     flex: none;
     border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
+    /* Dual ring reads on ANY ground - a paper swatch on a paper panel (event-poster) was
+       invisible with a theme-derived border. Never derive a swatch's outline from the
+       theme it is displaying. */
+    border: 1px solid rgb(0 0 0 / 0.45);
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.45);
   }
 
   .emblem-grid {
@@ -287,5 +309,12 @@
   .emblem-tile {
     font-size: 3rem;
     line-height: 1;
+    /* Emblems sit on a cell-colored backing chip - their real home in the product (player
+       chips, roster cards) - so a light tint on a light panel can never vanish. */
+    display: grid;
+    place-items: center;
+    padding: 0.5rem;
+    border-radius: 6px;
+    background: var(--board-cell-bg);
   }
 </style>

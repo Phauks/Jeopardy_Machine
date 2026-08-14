@@ -1,0 +1,199 @@
+// Shared scaffolding for the workerd room suite: initialize rooms through the same typed
+// RPC the web Worker uses, open real WebSocket upgrades through the worker router, and wrap
+// sockets in either a raw TestClient (host/display/manual frames) or a @jeopardy/bots Bot
+// (the simulation layer exercising the exact phone code paths).
+import { env, SELF } from "cloudflare:test";
+import { expect } from "vitest";
+import { protocolVersion } from "@jeopardy/protocol/envelope";
+import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
+import { Bot } from "@jeopardy/bots/bot";
+import type { BotOptions } from "@jeopardy/bots/bot";
+import type { BotSocket } from "@jeopardy/bots/socket";
+import type { CreateRoomRequest } from "@jeopardy/protocol/room/create";
+import type { RoomServerMessage } from "@jeopardy/protocol/room/server-messages";
+import type { GameEvent } from "@jeopardy/engine/events";
+
+let codeCounter = 0;
+
+/** Unique per test: DO instances outlive isolated-storage rollbacks, codes must not. */
+export function uniqueCode(): string {
+  codeCounter += 1;
+  return `T${String(codeCounter).padStart(4, "0")}`.slice(0, 5);
+}
+
+export const compactGame: CreateRoomRequest["game"] = {
+  kind: "compact",
+  rounds: [{ columns: 3, rows: 3 }],
+  preset: "casual-party",
+  // Wager cells off by default (tests opt in with authoredWagers + manual placement).
+  overrides: { wagers: { countRoundOne: 0, countRoundTwo: 0 } },
+  hasFinalClue: false,
+};
+
+export function roomStub(code: string) {
+  return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
+}
+
+export async function initializeRoom(
+  code: string,
+  game: CreateRoomRequest["game"] = compactGame,
+  seed = "workerd-suite-seed",
+): Promise<{ hostToken: string; expiresAt: number }> {
+  const response = await roomStub(code).fetch("https://do/initialize", {
+    method: "POST",
+    body: JSON.stringify({ game, seed } satisfies CreateRoomRequest),
+  });
+  expect(response.status).toBe(201);
+  return (await response.json()) as { hostToken: string; expiresAt: number };
+}
+
+export async function upgradeToRoom(code: string): Promise<WebSocket> {
+  const response = await SELF.fetch(`https://realtime.test/room/${code}/ws`, {
+    headers: { Upgrade: "websocket" },
+  });
+  expect(response.status).toBe(101);
+  const socket = response.webSocket;
+  if (socket === null) throw new Error("upgrade did not yield a WebSocket");
+  return socket;
+}
+
+// Raw protocol client with an awaitable message queue - the host console / display stand-in.
+export class TestClient {
+  readonly received: RoomServerMessage[] = [];
+  readonly closes: { code: number; reason: string }[] = [];
+  /** Engine events flattened out of `event` messages, in arrival order. */
+  readonly engineEvents: GameEvent[] = [];
+  private readonly eventCursors = new Map<string, number>();
+  private readonly waiters: {
+    predicate: (message: RoomServerMessage) => boolean;
+    resolve: (message: RoomServerMessage) => void;
+  }[] = [];
+
+  constructor(readonly socket: WebSocket) {
+    socket.addEventListener("message", (event) => {
+      const parsed = parseRoomServerMessage(String(event.data));
+      if (!parsed.ok) throw new Error(`server sent unparseable frame: ${parsed.detail}`);
+      this.received.push(parsed.message);
+      if (parsed.message.type === "event") {
+        this.engineEvents.push(...(parsed.message.events as GameEvent[]));
+      }
+      for (let index = this.waiters.length - 1; index >= 0; index -= 1) {
+        const waiter = this.waiters[index];
+        if (waiter !== undefined && waiter.predicate(parsed.message)) {
+          this.waiters.splice(index, 1);
+          waiter.resolve(parsed.message);
+        }
+      }
+    });
+    socket.addEventListener("close", (event) => {
+      this.closes.push({ code: event.code, reason: event.reason });
+    });
+    socket.accept();
+  }
+
+  /**
+   * Consume the NEXT engine event of a type (per-type cursor), waiting for it if it has not
+   * arrived - the sequential-script primitive scripted host flows are written with.
+   */
+  async takeEvent<Type extends GameEvent["type"]>(
+    type: Type,
+    timeoutMs = 5000,
+  ): Promise<Extract<GameEvent, { type: Type }>> {
+    const deadline = Date.now() + timeoutMs;
+    const cursor = this.eventCursors.get(type) ?? 0;
+    for (;;) {
+      const matching = this.engineEvents.filter((event) => event.type === type);
+      const next = matching[cursor];
+      if (next !== undefined) {
+        this.eventCursors.set(type, cursor + 1);
+        return next as Extract<GameEvent, { type: Type }>;
+      }
+      if (Date.now() > deadline) {
+        // The full receive history makes timeout failures self-diagnosing.
+        const seen = this.engineEvents.map((event) => event.type).join(", ");
+        const errors = this.received
+          .filter((message) => message.type === "error")
+          .map((message) => JSON.stringify(message))
+          .join("; ");
+        throw new Error(
+          `timed out waiting for engine event ${type} (cursor ${String(cursor)}); events seen: [${seen}]; errors: [${errors}]`,
+        );
+      }
+      // Polling keeps the primitive trivially correct; 10ms granularity is invisible
+      // against test timeouts.
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+  }
+
+  send(payload: Record<string, unknown>): void {
+    this.socket.send(JSON.stringify({ version: protocolVersion, ...payload }));
+  }
+
+  sendAction(action: Record<string, unknown>): void {
+    this.send({ type: "action", action });
+  }
+
+  waitFor<Type extends RoomServerMessage["type"]>(
+    type: Type,
+    predicate?: (message: Extract<RoomServerMessage, { type: Type }>) => boolean,
+    timeoutMs = 5000,
+  ): Promise<Extract<RoomServerMessage, { type: Type }>> {
+    const matches = (message: RoomServerMessage): boolean =>
+      message.type === type &&
+      (predicate === undefined || predicate(message as Extract<RoomServerMessage, { type: Type }>));
+    const already = this.received.find(matches);
+    if (already !== undefined) {
+      return Promise.resolve(already as Extract<RoomServerMessage, { type: Type }>);
+    }
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`timed out waiting for ${type}`)), timeoutMs);
+      this.waiters.push({
+        predicate: matches,
+        resolve: (message) => {
+          clearTimeout(timer);
+          resolve(message as Extract<RoomServerMessage, { type: Type }>);
+        },
+      });
+    });
+  }
+
+  messagesOf<Type extends RoomServerMessage["type"]>(
+    type: Type,
+  ): Extract<RoomServerMessage, { type: Type }>[] {
+    return this.received.filter((message) => message.type === type) as Extract<
+      RoomServerMessage,
+      { type: Type }
+    >[];
+  }
+}
+
+export async function connectHost(code: string, hostToken: string): Promise<TestClient> {
+  const client = new TestClient(await upgradeToRoom(code));
+  client.send({ type: "join", role: "host", hostToken });
+  await client.waitFor("welcome");
+  await client.waitFor("snapshot");
+  return client;
+}
+
+export async function connectBot(code: string, options: BotOptions): Promise<Bot> {
+  const socket = await upgradeToRoom(code);
+  const bot = new Bot(socket as unknown as BotSocket, options);
+  socket.accept();
+  bot.start();
+  await bot.waitFor((message) => message.type === "welcome");
+  return bot;
+}
+
+/** Deterministic bot: always buzzes, fixed latency, so ordering assertions are exact. */
+export function instantBot(nickname: string, latencyMs = 0): Omit<BotOptions, "team"> {
+  return {
+    nickname,
+    seed: `seed-${nickname}`,
+    behavior: {
+      buzzProbability: 1,
+      buzzLatencyMinMs: latencyMs,
+      buzzLatencyMaxMs: latencyMs,
+    },
+  };
+}

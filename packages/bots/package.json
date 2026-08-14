@@ -1,0 +1,28 @@
+{
+  "name": "@jeopardy/bots",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Bot players - headless clients speaking the real room WebSocket protocol (owner directive 'Development simulation', realtime level). Used by the apps/realtime workerd suite, the Playwright end-to-end test, a CLI for local rooms, and later the M4 host-console simulation panel.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    "./bot": "./src/bot.ts",
+    "./behavior": "./src/behavior.ts",
+    "./socket": "./src/socket.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "bots": "node --experimental-strip-types src/run-bots.ts"
+  },
+  "dependencies": {
+    "@jeopardy/engine": "workspace:*",
+    "@jeopardy/protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
