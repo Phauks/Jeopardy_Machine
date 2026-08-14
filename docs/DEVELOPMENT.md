@@ -57,6 +57,14 @@ pnpm -F @jeopardy/realtime test   # one package (same for web/protocol)
 
 `pnpm check` runs svelte-check (web, plus a separate `tsc -p src/service-worker` for WebWorker libs) and `tsc --noEmit` elsewhere. `pnpm lint` / `pnpm fmt` are repo-wide via Vite+ (`vp`), configured in the root `vite.config.ts`.
 
+### End to end (Playwright, local-only)
+
+```sh
+pnpm -F @jeopardy/web test:e2e
+```
+
+builds the web app, spawns the single-origin loop on :8790 (`apps/web/e2e/global-setup.ts`), and drives REAL chromium contexts as phones + display + host (`apps/web/e2e/room.e2e.ts`): roster sync across surfaces, a staggered auto-buzz race proving deterministic arrival-order adjudication with exactly one room-wide `buzz-won`, and the `/dev/echo` harness flow (create room, uncreated-room PASS probe, host a lobby). Deliberately NOT part of `pnpm test`/CI: it needs a chromium binary (resolution order: `E2E_CHROMIUM` env, playwright's own install, `/opt/pw-browsers/chromium`) and a free port. Playwright is pinned in the catalog and used library-only - its browser-download postinstall stays blocked; point it at an existing chromium instead.
+
 ## PWA bits (service worker + manifest)
 
 Policy and rationale: docs/decisions/2026-08-13-pwa.md. Implementation: `apps/web/src/service-worker/index.ts` (precache hashed immutable assets; network-first for ALL navigations; never `skipWaiting`) and `apps/web/static/manifest.webmanifest` (standalone display; no install prompts anywhere - install affordances appear only in editor chrome, later).

@@ -16,6 +16,9 @@ onlyBuiltDependencies:
 # vitest-pool-workers 0.21.3 peers vitest ^4.1.0.
 catalog:
   "@cloudflare/vitest-pool-workers": 0.21.3
+  # Verified live on npm 2026-08-14 (M3 e2e). Library-only usage (chromium.launch with an
+  # explicit executablePath); the browser-download postinstall stays blocked by pnpm.
+  playwright: 1.62.1
   # Node 22 line to match .nvmrc/engines - NOT the latest major; bump alongside the runtime.
   "@types/node": 22.20.1
   "@sveltejs/adapter-cloudflare": 8.0.0-next.6
