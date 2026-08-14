@@ -1,0 +1,50 @@
+// The roster: the room's participant list plus the two customization tiers from
+// docs/design/user-flows.md "Teams & leadership". Team membership and personal identity live
+// HERE (room tier), not in engine state - the engine only learns seats at start-game, so the
+// lobby can rearrange teams freely without engine actions. After start, the roster stays the
+// source of truth for presentation (names, avatars, sounds) while the engine owns scores.
+//
+// The tiers are separate protocol shapes on purpose (owner directive): personal identity is
+// never leader-editable, team customization is never member-editable, and the host console
+// out-ranks both (guiding principle 4).
+import { z } from "zod";
+import { limits } from "../limits.ts";
+import { curatedAssetIdSchema, personalIdentitySchema, playerIdSchema } from "./identity.ts";
+
+export const teamIdSchema = z.string().min(1).max(64);
+export type TeamId = z.infer<typeof teamIdSchema>;
+
+// The team customization tier, leader-controlled. `leaderPlayerId` moves via team-handoff,
+// leader-disconnect succession (after the grace in limits.team), or host override.
+export const teamDocSchema = z.strictObject({
+  teamId: teamIdSchema,
+  name: z.string().min(limits.team.teamNameMinLength).max(limits.team.teamNameMaxLength),
+  colorId: curatedAssetIdSchema.nullable(),
+  // The room-audible buzz sound in teams mode (leader-picked; the double-confirmation
+  // directive: room hears the TEAM's sound while the display shows the team name/color).
+  buzzSoundId: curatedAssetIdSchema.nullable(),
+  leaderPlayerId: playerIdSchema.nullable(),
+  // Lock = no new joiners (the anti-nuisance tool after a kick, not a ban list).
+  locked: z.boolean(),
+});
+export type TeamDoc = z.infer<typeof teamDocSchema>;
+
+export const rosterEntrySchema = z.strictObject({
+  playerId: playerIdSchema,
+  identity: personalIdentitySchema,
+  teamId: teamIdSchema.nullable(),
+  connected: z.boolean(),
+  // Unix ms of first join - team-leadership succession picks the longest-tenured connected
+  // member, and the roster UI sorts by it.
+  joinedAt: z.number().int().nonnegative(),
+});
+export type RosterEntry = z.infer<typeof rosterEntrySchema>;
+
+// The full roster payload as broadcast in `roster` messages and embedded in snapshots.
+// Always sent whole: at the 128-player hard cap this is a few KB, and whole-payload sync
+// makes the client store trivial (no roster diffing protocol to get wrong in M4).
+export const rosterPayloadSchema = z.strictObject({
+  players: z.array(rosterEntrySchema).max(limits.room.playerHardCap),
+  teams: z.array(teamDocSchema).max(limits.team.teamMaxCount),
+});
+export type RosterPayload = z.infer<typeof rosterPayloadSchema>;
