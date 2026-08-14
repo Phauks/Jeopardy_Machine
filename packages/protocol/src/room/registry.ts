@@ -39,11 +39,41 @@ export const roomSummarySchema = z.strictObject({
 });
 export type RoomSummary = z.infer<typeof roomSummarySchema>;
 
+// Why the registry might not be answering. Added 2026-08-14 after the owner reported "I
+// created a public room and it never appeared in the lobby": every registry failure used to
+// be swallowed into an empty list, so an unapplied migration and a genuinely quiet lobby were
+// the same pixel on screen. They are different facts and the wire now says which:
+//
+// - `no-binding`: no D1 binding at all (vite dev). Rooms cannot even be created here.
+// - `no-table`:   binding present, `rooms` table missing - the migration has not been applied
+//                 to this environment (docs/cloudflare-setup.md 2a). THE common production
+//                 cause, and the one a host can fix.
+// - `error`:      anything else D1 said. Detail carries the message, trimmed, for the log.
+export const registryUnavailableReasonSchema = z.enum(["no-binding", "no-table", "error"]);
+export type RegistryUnavailableReason = z.infer<typeof registryUnavailableReasonSchema>;
+
+// Discriminated on purpose: `ok` with zero rooms (a quiet lobby) must never be confusable
+// with `unavailable` (the lobby is broken), which is exactly the confusion this replaces.
+export const registryStatusSchema = z.discriminatedUnion("status", [
+  z.strictObject({ status: z.literal("ok") }),
+  z.strictObject({
+    status: z.literal("unavailable"),
+    reason: registryUnavailableReasonSchema,
+    // Operator-facing, never player-facing: a trimmed D1 message. Capped because an error
+    // string is untrusted length, and this rides a cacheable public response.
+    detail: z.string().max(300).optional(),
+  }),
+]);
+export type RegistryStatus = z.infer<typeof registryStatusSchema>;
+
 // Body of GET /api/rooms. `fetchedAt` is the server's stamp, not the browser's: the response
 // is edge-cacheable (limits.lobby.listingCacheSeconds), so the page can show how old the list
 // it is looking at actually is rather than assuming it just arrived.
 export const lobbyListingSchema = z.strictObject({
   rooms: z.array(roomSummarySchema).max(limits.lobby.listingMax),
   fetchedAt: z.int().positive(),
+  // Always present, never optional: a caller that forgets to look at it still cannot ship a
+  // UI that silently renders a broken registry as "no rooms right now".
+  registry: registryStatusSchema,
 });
 export type LobbyListing = z.infer<typeof lobbyListingSchema>;

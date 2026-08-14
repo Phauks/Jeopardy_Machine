@@ -11,13 +11,20 @@
   //    replaces the index; the Join half is already the landing it will sit beside.)
   import BuildBadge from "#lib/dev/build-badge.svelte";
   import PublicRoomsList from "#lib/lobby/public-rooms-list.svelte";
+  import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
   import { joinUrlForRoom, rememberRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 
   let typedCode = $state("");
   let password = $state("");
-  let listing = $state<LobbyListing>({ rooms: [], fetchedAt: Date.now() });
+  // The registry starts "unavailable/error" rather than "ok": until the first fetch answers,
+  // an empty list has no verdict behind it, and claiming one would be the old bug in reverse.
+  let listing = $state<LobbyListing>({
+    rooms: [],
+    fetchedAt: Date.now(),
+    registry: { status: "unavailable", reason: "error", detail: "not fetched yet" },
+  });
   let listingError = $state<string | null>(null);
 
   const normalizedCode = $derived(typedCode.trim().toUpperCase());
@@ -147,6 +154,9 @@
         The public list is unavailable right now ({listingError}). A room code still works.
       </p>
     {/if}
+    <!-- Quiet while healthy (the Join section is not a status board), loud when the registry
+         cannot answer - an empty list must always be able to say why it is empty. -->
+    <RegistryStatusLine status={listing.registry} quiet />
     <PublicRoomsList
       rooms={listing.rooms}
       fetchedAt={listing.fetchedAt}

@@ -29,9 +29,11 @@ import { protocolVersion } from "@jeopardy/protocol/envelope";
 import { limits } from "@jeopardy/protocol/limits";
 import { createRoomRequestSchema, generateSecretToken } from "@jeopardy/protocol/room/create";
 import { parseRoomClientMessage } from "@jeopardy/protocol/room/client-messages";
+import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
 import { clueContentFor, resolveCellContent, resolveFinalContent } from "./room/content.ts";
+import { buildRoomDiagnostics } from "./room/diagnostics.ts";
 import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
 import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
@@ -41,6 +43,7 @@ import type { GameAction } from "@jeopardy/engine/actions";
 import type { GameEvent } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
+import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 import type { RoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
@@ -465,6 +468,50 @@ export class GameRoomDO extends Server {
         { status: 201 },
       );
     }
+    // Host-authenticated ops surface (owner request 2026-08-14). Both endpoints ride the
+    // cross-script binding from the web Worker's /api/rooms/<CODE> route, which forwards the
+    // caller's host token in this header - the DO verifies it here rather than trusting the
+    // web Worker, so "internal traffic" is never itself an authorization.
+    if (request.method === "GET" && url.pathname === "/diagnostics") {
+      const room = await this.load();
+      if (room === null) return Response.json({ error: "no-such-room" }, { status: 404 });
+      if (!this.hostTokenMatches(request, room)) {
+        return Response.json({ error: "bad-host-token" }, { status: 403 });
+      }
+      return Response.json(
+        buildRoomDiagnostics({
+          meta: room.meta,
+          roster: room.roster,
+          teams: room.teams,
+          schedule: room.schedule,
+          connections: this.connectionCensus(),
+          bundle: {
+            meta: room.meta,
+            setup: room.setup,
+            state: room.state,
+            spec: room.spec,
+            roster: room.roster,
+            teams: room.teams,
+            renames: room.renames,
+            schedule: room.schedule,
+          },
+        }),
+      );
+    }
+    if (request.method === "POST" && url.pathname === "/close") {
+      // The host closing a room they created from a surface that holds no socket (the
+      // harness's per-room Delete, later the console's "end game"). Same semantics as the
+      // close-room client message: everyone gets the polite screen, the lobby delists, and
+      // the storage wipe waits for the ordinary expiry alarm so an accidental close is still
+      // recoverable state and the code stays spent until it ages out.
+      const room = await this.load();
+      if (room === null) return Response.json({ error: "no-such-room" }, { status: 404 });
+      if (!this.hostTokenMatches(request, room)) {
+        return Response.json({ error: "bad-host-token" }, { status: 403 });
+      }
+      await this.closeRoom(room);
+      return Response.json({ closed: true, code: room.meta.code });
+    }
     if (request.method === "GET" && url.pathname === "/registry-snapshot") {
       // Ops/debug + the registry reconcile story: what this DO believes about itself right
       // now. Reachable only through the cross-script binding (the public router forwards
@@ -474,6 +521,35 @@ export class GameRoomDO extends Server {
       return Response.json(this.registrySnapshot(room));
     }
     return Response.json({ error: "not-found" }, { status: 404 });
+  }
+
+  // Constant-time-ish comparison is not needed here (the token is 128 bits of randomness and
+  // an attacker cannot reach this endpoint without already being inside the binding), but a
+  // missing header must never match a room, so the empty case is rejected explicitly.
+  private hostTokenMatches(request: Request, room: LoadedRoom): boolean {
+    const offered = request.headers.get(hostTokenHeader);
+    return offered !== null && offered !== "" && offered === room.meta.hostToken;
+  }
+
+  // Who is attached right now, by the role they joined as. `unjoined` is a socket that
+  // upgraded and has sent neither join nor resume - the state a refused or still-typing
+  // client sits in, and the one worth seeing when a phone "connects" but nothing happens.
+  private connectionCensus(): ConnectionCensus {
+    const census: ConnectionCensus = {
+      total: 0,
+      host: 0,
+      player: 0,
+      display: 0,
+      spectator: 0,
+      unjoined: 0,
+    };
+    for (const connection of this.getConnections<Attachment>()) {
+      census.total += 1;
+      const role = connection.state?.role;
+      if (role === undefined || role === null) census.unjoined += 1;
+      else census[role] += 1;
+    }
+    return census;
   }
 
   // ---- connection lifecycle -------------------------------------------------------------
@@ -1416,6 +1492,13 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "unauthorized", "closing the room is host-only");
       return;
     }
+    await this.closeRoom(room);
+  }
+
+  // The close itself, shared by the host's close-room message and the token-authenticated
+  // /close RPC (the harness's per-room Delete). One body so the two doors cannot drift into
+  // meaning different things.
+  private async closeRoom(room: LoadedRoom): Promise<void> {
     room.meta.lifecycle = "ended";
     await this.persist("meta");
     await endRegistryRow(this.env.DB, room.meta.code, Date.now());

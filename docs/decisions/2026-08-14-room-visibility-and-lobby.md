@@ -85,3 +85,15 @@ The decision above says the registry is "refreshed by the DO on meaningful trans
 - The realtime harness gets its room list for free (it queries the same endpoint) - answering the earlier question.
 - Host console gains visibility controls (list/delist, set/clear password) - M4 surface work.
 - Future: the same registry backs "my rooms" for hosts once accounts exist (M8), and multi-room events (expansion 1.2).
+
+## Addendum 2026-08-14 (b): the registry reports its own health - graceful is not the same as silent
+
+**What happened.** The owner created a public room on the deployed site; it never appeared in the lobby, and every surface showed the same thing an ordinary quiet night shows. Reproduced locally in the single-origin loop with and without the migration applied: **rooms create and join normally either way** (201, real code, working WebSocket) and `GET /api/rooms` answers `{"rooms":[]}` in both cases. The only difference was a `console.warn` in the Worker log - `D1_ERROR: no such table: rooms` - which nobody was reading. The registry's D1 migration (§2a of the runbook) had never been applied to that environment.
+
+**The design flaw, stated exactly.** "Best effort" was implemented as "silent". Degrading gracefully was right - a D1 fault may never cost anyone a game - but swallowing the reason made an operational misconfiguration indistinguishable from an empty lobby, on every surface, indefinitely.
+
+**The fix: a status on the wire, everywhere a room list travels.** `packages/protocol/src/room/registry.ts` gains a discriminated `registryStatus`: `{status:"ok"}` or `{status:"unavailable", reason:"no-binding"|"no-table"|"error", detail?}`. It is a REQUIRED field of `lobbyListing`, so an empty list can never again be shipped without a verdict, and of `createRoomResponse`, so the creating surface can say "room created; NOT listed because the registry table is missing". `/api/version` reports the same probe (plus whether the DO binding exists) so an owner can diagnose a deployment with one curl instead of a room. `no-table` is detected from SQLite's own "no such table" message, including inside D1's wrapper `cause`.
+
+Behavior kept: rooms still work with no registry at all, writes are still best-effort, and the listing still degrades to empty. Behavior added: a broken registry is never cached (an applied migration must show up immediately, not after the cache window), and every surface renders the reason with the fix command verbatim.
+
+**Companion surfaces (same owner report).** `DELETE /api/rooms/<CODE>` closes a room end to end (host token required, verified inside the DO; the polite screen goes out, the lobby row is deleted) and `GET /api/rooms/<CODE>` is a host-authenticated DO inspector - lifecycle, timestamps, connection census by role, roster/team counts, state version, the alarm book, per-key storage sizes, and the registry's own row beside it so drift is visible rather than inferred. The inspector carries no host token, no session token, no password material and no authored clue text, held by a redaction test that searches the serialized response for all four.

@@ -34,6 +34,24 @@ describe("room creation contracts", () => {
         expiresAt: Date.now() + limits.room.idleExpiryMs,
         visibility: "unlisted",
         hasPassword: false,
+        registry: { status: "ok" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("makes the registry verdict mandatory: 'created but not listed' must be sayable", () => {
+    const base = {
+      code: generateRoomCode(),
+      hostToken: generateSecretToken(),
+      expiresAt: Date.now() + limits.room.idleExpiryMs,
+      visibility: "public" as const,
+      hasPassword: false,
+    };
+    expect(createRoomResponseSchema.safeParse(base).success).toBe(false);
+    expect(
+      createRoomResponseSchema.safeParse({
+        ...base,
+        registry: { status: "unavailable", reason: "no-table" },
       }).success,
     ).toBe(true);
   });

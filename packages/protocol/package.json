@@ -18,7 +18,8 @@
     "./room/authority": "./src/room/authority.ts",
     "./room/create": "./src/room/create.ts",
     "./room/visibility": "./src/room/visibility.ts",
-    "./room/registry": "./src/room/registry.ts"
+    "./room/registry": "./src/room/registry.ts",
+    "./room/diagnostics": "./src/room/diagnostics.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",
