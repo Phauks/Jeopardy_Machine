@@ -69,6 +69,11 @@
   --surface-text-muted: color-mix(in srgb, #ffffff 62%, transparent);
   --surface-border: color-mix(in srgb, #ffffff 20%, transparent);
   --surface-scrim: rgb(0 0 0 / 0.55);
+  /* Score-delta semantics (judged flash, negative scores). Constants like --surface-scrim:
+   * mid-lightness hues hand-checked readable on every preset's raised surface, dark and
+   * paper alike. Never conveyed by color alone (a sign/verdict label always accompanies). */
+  --score-positive: #21b45e;
+  --score-negative: #ff5470;
 
   /* --- Board layout constants. Thick gutters are trade dress (research section 2: the grid
    * lines are part of the look) - a layout decision, not a theme decision. */

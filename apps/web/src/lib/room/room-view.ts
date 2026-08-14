@@ -1,0 +1,313 @@
+// The client's view of a room - the read side of the room-store seam (docs/design/surfaces.md).
+// Field names deliberately mirror the M3 room protocol shapes (packages/protocol/src/room/
+// roster.ts + server-messages.ts in the main tree) so the ws store implementation is a
+// field-for-field mapping at reconcile, not a rename exercise: playerId/teamId/colorId/
+// leaderPlayerId/locked/connected/joinedAt and the personal identity quartet
+// nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
+import type { GamePhase, GameState } from "@jeopardy/engine/state";
+import type { TimerKind } from "@jeopardy/engine/events";
+
+export type RoomConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
+
+/** Mirrors the protocol's roomPhaseSchema: the room tier, not the engine's GamePhase. */
+export type RoomPhaseView = "lobby" | "active" | "ended";
+
+export type RoomRoleView = "host" | "display" | "player" | "spectator";
+
+export type RoomPlayerView = {
+  playerId: string;
+  nickname: string;
+  /** Curated-set ids (avatar manifest / accent palette / buzz-sound catalog); null = default. */
+  avatarId: string | null;
+  accentId: string | null;
+  buzzSoundId: string | null;
+  teamId: string | null;
+  connected: boolean;
+  joinedAt: number;
+};
+
+export type RoomTeamView = {
+  teamId: string;
+  name: string;
+  /** Accent-palette id (protocol colorId) - team color always resolves through the manifest. */
+  colorId: string | null;
+  /** The room-audible buzz sound in teams mode (leader-picked; the double-confirmation rule). */
+  buzzSoundId: string | null;
+  leaderPlayerId: string | null;
+  locked: boolean;
+};
+
+export type RoomRosterView = {
+  players: RoomPlayerView[];
+  teams: RoomTeamView[];
+};
+
+/**
+ * This phone's buzz feedback channel - the per-connection messages (buzz-won / buzz-rejected)
+ * plus the optimistic local press. "pending" is the instant pointerdown state that the server
+ * verdict resolves; in mock mode the verdict is synchronous so pending is never observed.
+ */
+export type MyBuzzView =
+  | { status: "idle" }
+  | { status: "pending"; at: number }
+  | { status: "won"; at: number }
+  | {
+      status: "rejected";
+      reason: "not-armed" | "early-lockout" | "too-late" | "locked-out" | "not-captain";
+      /** Early-lockout only: when this phone's buzzer unlocks (the visible penalty ring). */
+      lockedUntil: number | null;
+    };
+
+/** A pending engine timer hint (timer-set event), kept so surfaces can render rings/bars. */
+export type PendingTimerView = {
+  kind: TimerKind;
+  durationMs: number;
+  firesAt: number;
+};
+
+/** The judged-flash payload (A4 "Score delta flash"): cleared when the next clue opens. */
+export type LastJudgedView = {
+  entityId: string;
+  verdict: "correct" | "wrong" | "no-penalty" | "timeout";
+  delta: number;
+  at: number;
+};
+
+/** Wager bounds for the entity currently wagering (from wager-cell-hit / final-wagers-open). */
+export type WagerRangeView = {
+  entityId: string;
+  minimum: number;
+  maximum: number;
+  label: string;
+};
+
+/**
+ * The content join the engine deliberately never sees (a clue is coordinates + value to it):
+ * prompts for display surfaces, responses for the host console only. The ws store fills this
+ * from whatever content channel M3's reconcile defines (see docs/design/surfaces.md - the
+ * snapshot does not carry clue text yet, a noted divergence); responses stay null for
+ * non-host roles so a mirrored or player device never holds answers, even in memory.
+ */
+export type ClueContentView = {
+  categoryTitle: string;
+  prompt: string;
+  /** Host consoles only; null everywhere else (mirror-mode safety starts at the data layer). */
+  response: string | null;
+};
+
+export type RoomContentView = {
+  /** categoryTitles[roundIndex][categoryIndex]. */
+  categoryTitles: string[][];
+  /** Resolved face values, cellValues[roundIndex][categoryIndex][rowIndex] - board rendering
+   * needs them and the engine state carries only played/hidden status. */
+  cellValues: number[][][];
+  clueAt: (roundIndex: number, category: number, row: number) => ClueContentView | null;
+  final: ClueContentView | null;
+};
+
+export type RoomView = {
+  roomCode: string;
+  role: RoomRoleView;
+  connection: RoomConnectionState;
+  phase: RoomPhaseView;
+  roster: RoomRosterView;
+  /** True when the room plays in teams (team cards on join, team-scoped room buzz sounds). */
+  teamsMode: boolean;
+  /** This connection's seat; null for host/display/spectator connections. */
+  myPlayerId: string | null;
+  /**
+   * The engine state as this role is allowed to see it (M3 redacts wager positions and
+   * uncommitted final entries for non-host roles); null until start-game creates it.
+   */
+  game: GameState | null;
+  content: RoomContentView | null;
+  myBuzz: MyBuzzView;
+  pendingTimers: PendingTimerView[];
+  lastJudged: LastJudgedView | null;
+  wagerRange: WagerRangeView | null;
+  finalWagerRanges: WagerRangeView[];
+  /** Host pause (C4): a driver concern, not an engine phase - timers freeze, display dims. */
+  paused: boolean;
+};
+
+/** Everything the buzzer screen can be, per the A4 states table (docs/design/user-flows.md). */
+export type BuzzerStage =
+  | { kind: "waiting"; pickerName: string | null }
+  | { kind: "reading" }
+  | { kind: "armed" }
+  | { kind: "you-won" }
+  | { kind: "other-won"; winnerName: string }
+  | { kind: "locked-out"; lockedUntil: number }
+  | { kind: "judged"; delta: number; verdict: LastJudgedView["verdict"] }
+  | { kind: "wager"; range: WagerRangeView; trueDoubleValue: number; label: string }
+  | { kind: "wager-other"; name: string; label: string }
+  | { kind: "final-wager"; range: WagerRangeView | null; committed: boolean }
+  | { kind: "final-answer"; categoryTitle: string | null; submitted: boolean }
+  | { kind: "final-reveal" }
+  | { kind: "between-rounds"; next: "round" | "final" | "game-over" }
+  | { kind: "game-over"; placement: number | null }
+  | { kind: "lobby" };
+
+/** The scoring entity a player acts as (mirror of the engine's entityForPlayer, on the view). */
+export function viewEntityForPlayer(view: RoomView, playerId: string): string | null {
+  const game = view.game;
+  if (game === null) return null;
+  const player = game.players[playerId];
+  if (player === undefined) return null;
+  return player.teamId ?? player.id;
+}
+
+export function entityDisplayName(view: RoomView, entityId: string): string {
+  const team = view.roster.teams.find((entry) => entry.teamId === entityId);
+  if (team !== undefined) return team.name;
+  const player = view.roster.players.find((entry) => entry.playerId === entityId);
+  if (player !== undefined) return player.nickname;
+  // Engine-only participants (sim bots joined without roster entries) still have a name there.
+  return view.game?.players[entityId]?.name ?? view.game?.teams[entityId]?.name ?? entityId;
+}
+
+/** 1-based placement of my entity at game over; ties share a number (engine standings rule). */
+function placementFor(view: RoomView, entityId: string | null): number | null {
+  const game = view.game;
+  if (game === null || entityId === null) return null;
+  const myScore = game.scores[entityId];
+  if (myScore === undefined) return null;
+  const higher = game.entityOrder.filter((entry) => (game.scores[entry] ?? 0) > myScore).length;
+  return higher + 1;
+}
+
+const judgedFlashMs = 2500;
+
+/**
+ * Derive the buzzer screen's stage from the view - one pure function so every A4 row is a
+ * unit-testable mapping instead of template conditionals. Order matters: the judged flash
+ * briefly outranks the underlying phase, and the personal lockout outranks "armed".
+ */
+export function buzzerStageFor(view: RoomView, now: number): BuzzerStage {
+  const game = view.game;
+  const myPlayerId = view.myPlayerId;
+  if (game === null || view.phase === "lobby") return { kind: "lobby" };
+  const myEntityId = myPlayerId === null ? null : viewEntityForPlayer(view, myPlayerId);
+  const phase: GamePhase = game.phase;
+
+  // The score-delta flash (A4 "Judged") shows briefly for MY entity's verdicts, then falls
+  // through to whatever the room is doing now.
+  const lastJudged = view.lastJudged;
+  if (
+    lastJudged !== null &&
+    lastJudged.entityId === myEntityId &&
+    now - lastJudged.at < judgedFlashMs &&
+    (phase === "awaiting-selection" || phase === "reading" || phase === "round-break")
+  ) {
+    return { kind: "judged", delta: lastJudged.delta, verdict: lastJudged.verdict };
+  }
+
+  switch (phase) {
+    case "awaiting-selection": {
+      const controlName =
+        game.controlEntity === null ? null : entityDisplayName(view, game.controlEntity);
+      return { kind: "waiting", pickerName: controlName };
+    }
+    case "reading":
+    case "tiebreaker-reading":
+      return { kind: "reading" };
+    case "armed":
+    case "tiebreaker-armed": {
+      // My early-buzz penalty (A4 "You buzzed early"): visible ring until lockedUntil.
+      if (view.myBuzz.status === "rejected" && view.myBuzz.reason === "early-lockout") {
+        const until = view.myBuzz.lockedUntil ?? now;
+        if (until > now) return { kind: "locked-out", lockedUntil: until };
+      }
+      return { kind: "armed" };
+    }
+    case "answering":
+    case "tiebreaker-answering": {
+      const winner = phase === "answering" ? game.clue?.buzzWinner : game.tiebreaker?.buzzWinner;
+      if (winner === null || winner === undefined) return { kind: "reading" };
+      if (myEntityId !== null && winner.entityId === myEntityId) return { kind: "you-won" };
+      return { kind: "other-won", winnerName: entityDisplayName(view, winner.entityId) };
+    }
+    case "wagering": {
+      const selector = game.clue?.selectedBy ?? null;
+      const label = view.wagerRange?.label ?? "Double Down";
+      if (selector !== null && selector === myEntityId && view.wagerRange !== null) {
+        // "True DD" shortcut: everything you have or the clue row's worth, whichever is more -
+        // exactly the wager maximum the engine computed.
+        return {
+          kind: "wager",
+          range: view.wagerRange,
+          trueDoubleValue: view.wagerRange.maximum,
+          label,
+        };
+      }
+      return {
+        kind: "wager-other",
+        name: selector === null ? "Someone" : entityDisplayName(view, selector),
+        label,
+      };
+    }
+    case "wager-answering": {
+      const selector = game.clue?.selectedBy ?? null;
+      if (selector !== null && selector === myEntityId) return { kind: "you-won" };
+      return {
+        kind: "other-won",
+        winnerName: selector === null ? "Someone" : entityDisplayName(view, selector),
+      };
+    }
+    case "all-answering":
+    case "all-judging":
+      // Everyone-answers rides the final-answer input surface (typed answer + deadline bar).
+      return {
+        kind: "final-answer",
+        categoryTitle: null,
+        submitted: myEntityId !== null && game.clue?.submissions[myEntityId] !== undefined,
+      };
+    case "final-wagers": {
+      const committed = myEntityId !== null && game.final?.wagers[myEntityId] !== undefined;
+      const range = view.finalWagerRanges.find((entry) => entry.entityId === myEntityId) ?? null;
+      return { kind: "final-wager", range, committed };
+    }
+    case "final-writing": {
+      const submitted = myEntityId !== null && game.final?.answers[myEntityId] !== undefined;
+      return {
+        kind: "final-answer",
+        categoryTitle: view.content?.final?.categoryTitle ?? null,
+        submitted,
+      };
+    }
+    case "final-reveal":
+      return { kind: "final-reveal" };
+    case "round-break":
+      return { kind: "between-rounds", next: game.breakNextStage ?? "round" };
+    case "game-over":
+      return { kind: "game-over", placement: placementFor(view, myEntityId) };
+    case "lobby":
+      return { kind: "lobby" };
+  }
+}
+
+export type StandingRow = {
+  entityId: string;
+  name: string;
+  score: number;
+  hasControl: boolean;
+  /** Accent hex for the score chip: team color in teams mode, player accent otherwise. */
+  colorId: string | null;
+};
+
+/** Scores in entity order for the strip surfaces (display, buzzer, console, hotseat). */
+export function standingsFor(view: RoomView): StandingRow[] {
+  const game = view.game;
+  if (game === null) return [];
+  return game.entityOrder.map((entityId) => {
+    const team = view.roster.teams.find((entry) => entry.teamId === entityId);
+    const player = view.roster.players.find((entry) => entry.playerId === entityId);
+    return {
+      entityId,
+      name: entityDisplayName(view, entityId),
+      score: game.scores[entityId] ?? 0,
+      hasControl: game.controlEntity === entityId,
+      colorId: team?.colorId ?? player?.accentId ?? null,
+    };
+  });
+}
