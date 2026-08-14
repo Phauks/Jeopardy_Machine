@@ -1,5 +1,5 @@
 <script lang="ts">
-  // The room instrument panel (was /dev/echo; renamed 2026-08-14 because "echo" stopped
+  // The room instrument panel: create rooms, connect through the single origin, and probe
   // describing it three milestones ago). Three columns, by owner direction:
   //
   //   left   - Rooms:      create, and every room THIS TAB made, with delete + connect

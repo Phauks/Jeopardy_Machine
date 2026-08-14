@@ -2,7 +2,7 @@
   // /dev/theme - the theme gallery and the owner's requested proof drill: a WORKING preset
   // switcher that flips all four built-in themes live over one token contract
   // (docs/research/00-user-directives.md "UI gallery feedback round 1"; contract:
-  // docs/design/theming.md). Like /dev/echo, dev-routes convention applies: /dev/* pages are
+  // docs/design/theming.md). Dev-routes convention applies: /dev/* pages are
   // developer surfaces, never linked from product UI, and carry no player-facing weight.
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
   import AvatarPicker from "#lib/avatars/avatar-picker.svelte";

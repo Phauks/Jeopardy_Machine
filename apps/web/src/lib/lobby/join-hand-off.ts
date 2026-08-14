@@ -1,9 +1,8 @@
 // Where the lobby sends someone once they have picked a room, and how the password travels
 // with them (docs/decisions/2026-08-14-room-visibility-and-lobby.md, "The lobby browser").
 //
-// ONE reconcile point on purpose: the M4 join screen replaces the destination below and
-// nothing else about the lobby changes. Until it lands, a picked room opens in the room
-// harness - the only surface that currently speaks the room protocol in a browser.
+// The lobby hands off to the M4 join screen (A2 in docs/design/user-flows.md); the harness
+// at /dev/rooms is a developer surface and never a destination for a real player.
 //
 // The password NEVER rides the URL. Room links are pasted into group chats, printed onto QR
 // codes, and logged by every proxy in between; a shared secret in a query string would leak
@@ -13,9 +12,9 @@ import { normalizeRoomCode } from "#lib/realtime/room-url.ts";
 
 const passwordStorageKey = "jeopardy.room-password";
 
-/** The destination for "join this room". M4's join screen swaps this line. */
+/** The destination for "join this room": the player join screen. */
 export function joinUrlForRoom(rawCode: string): string {
-  return `/dev/rooms?code=${normalizeRoomCode(rawCode)}`;
+  return `/room/${normalizeRoomCode(rawCode)}`;
 }
 
 /** Stash the room password for the next surface. No password = clear any stale one. */

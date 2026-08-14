@@ -64,7 +64,7 @@ The clue-bearing phases are excluded by name and a gate test (`motion-guardrails
 | Route                        | Static JS delta                     | Notes                                                    |
 | ---------------------------- | ----------------------------------- | -------------------------------------------------------- |
 | `/room/[code]` (the phone)   | **+2.8 KB**                         | The animated avatar and its sheet entries. No three.js.  |
-| `/`, `/dev/echo`, layouts    | **0 to +0.2 KB**                    | -                                                        |
+| `/`, layouts                 | **0 to +0.2 KB**                    | -                                                        |
 | `/dev/theme`, `/dev/hotseat` | +1.5 to +1.7 KB                     | Shared avatar-manifest growth                            |
 | `/room/[code]/display`       | +6.1 KB static, **+686 KB dynamic** | The three.js chunk, fetched only when the diorama mounts |
 
