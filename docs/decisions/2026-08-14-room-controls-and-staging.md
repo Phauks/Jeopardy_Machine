@@ -28,6 +28,12 @@ Listing values should read **public / private**. Wants: a Run-all button in the 
 
 The host console gains a **Room settings** panel (and the harness gets the same controls, since it is the developer's console): change listing, entry/password, caps, spectators, streamer mode; view and rotate the join code; see the live participant census split players/spectators; close the room. Every change broadcasts to connected clients so displays update immediately (a code that just became hidden must vanish from the projector at once).
 
+> **Wired to the surfaces 2026-08-16 (the reconcile).** The room layer shipped these settings, their two doors and their broadcast on 2026-08-14; the reconcile made the SURFACES respect them. `RoomView` carries the room's settings verbatim and the room's last refusal, so:
+>
+> - **`hideJoinCode` reaches the display.** The title screen's code, QR and join URL (which contains the code) are a template BRANCH, not a CSS rule - in streamer mode the code is not in the markup at all, which is the only version of the promise that survives a screenshot or a paused stream. In its place is a deliberate "Join code hidden - ask the host for the code" panel occupying the QR's footprint, so a streamed room does not look like a broken display. Mirror mode inherits it, because it renders the same component. Reveal is deliberately NOT on the display (a button on the streamed screen defeats the setting): it belongs to the console's room-settings panel, which `/dev/rooms` already drives against real rooms and which is the next surface pass.
+> - **The caps reach the join path.** A room at `maxPlayers`, or one whose host allows no spectators, refuses in human copy before a character is chosen - `room-refusal.ts` is the one place the protocol's refusal reasons become English, exhaustively, so a new reason fails to compile rather than reaching a player as `spectators-not-allowed`. The two spectator refusals keep their separate sentences, which is why they are separate reasons.
+> - **The spectator budget reaches the lobby card**, via the registry columns the same reconcile added (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
+
 ## The staged lobby - "you are somewhere, with your team"
 
 The lobby stops being a list and becomes a **place**. First theme: **boats**.

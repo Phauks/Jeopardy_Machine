@@ -6,6 +6,8 @@
 // nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 
 export type RoomConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
 
@@ -128,6 +130,27 @@ export type RoomView = {
   finalWagerRanges: WagerRangeView[];
   /** Host pause (C4): a driver concern, not an engine phase - timers freeze, display dims. */
   paused: boolean;
+  /**
+   * The ROOM's own settings, as the protocol's `room-settings` message carries them - who may
+   * come in, how many, and whether the join code is safe to show
+   * (packages/protocol/src/room/room-settings.ts). The protocol type verbatim, not a copy:
+   * every connection is sent this on join and again on every host edit, so a surface that
+   * respects it cannot drift from the room that owns it. Nothing here is a secret; the
+   * password is the one settings field that never leaves the DO.
+   */
+  settings: RoomSettings;
+  /**
+   * Why the room turned this connection away, in the protocol's own vocabulary, or null. The
+   * REASON travels rather than a sentence, so the copy lives in one place
+   * (room-refusal.ts) and the phone, the console and the tests all say the same thing.
+   */
+  refusal: RoomRefusalView | null;
+};
+
+export type RoomRefusalView = {
+  reason: RefusalReason;
+  /** Stamp so a repeated refusal (tap the same locked team twice) re-announces itself. */
+  at: number;
 };
 
 /** Everything the buzzer screen can be, per the A4 states table (docs/design/user-flows.md). */

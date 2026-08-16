@@ -16,6 +16,7 @@
   import BuzzSoundPicker from "#lib/room/buzz-sound-picker.svelte";
   import { accentById, avatarById, avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import { limits } from "@jeopardy/protocol/limits";
+  import type { RefusalCopy } from "#lib/room/room-refusal.ts";
   import type { RoomRosterView } from "#lib/room/room-view.ts";
 
   export type CharacterChoice = {
@@ -32,6 +33,14 @@
     teamsMode: boolean;
     /** True for a phone arriving mid-game - it goes straight to the buzzer after this. */
     lateJoin?: boolean;
+    /**
+     * Why this phone cannot take a seat (room-refusal.ts: a full room, an audience the host
+     * turned off). Shown as a sentence and used to disable the way forward, so nobody fills in
+     * a name and picks a creature only to be turned away by a fact that was true all along.
+     * Never a protocol code on screen, and never a blank screen either - the character choices
+     * stay usable, because the room may free a seat while you decide.
+     */
+    blocked?: RefusalCopy | null;
     onConfirm: (choice: CharacterChoice) => void;
     onPreviewSound?: ((soundId: string) => void) | null;
   };
@@ -40,6 +49,7 @@
     roster,
     teamsMode,
     lateJoin = false,
+    blocked = null,
     onConfirm,
     onPreviewSound = null,
   }: Props = $props();
@@ -68,6 +78,7 @@
 
   function confirm(): void {
     attempted = true;
+    if (blocked !== null) return;
     if (!nameReady) {
       validationMessage = "Tell us what to call you first";
       return;
@@ -156,11 +167,36 @@
 
   <!-- Sticky, because the pickers are long and the way forward should never be a scroll away. -->
   <div class="continue-bar">
-    <button type="button" class="primary" onclick={confirm}>{continueLabel}</button>
+    {#if blocked !== null}
+      <p class="refusal" role="status">
+        <strong>{blocked.headline}</strong>
+        {#if blocked.advice !== null}
+          <span>{blocked.advice}</span>
+        {/if}
+      </p>
+    {/if}
+    <button type="button" class="primary" disabled={blocked !== null} onclick={confirm}>
+      {blocked === null ? continueLabel : "Waiting for a seat"}
+    </button>
   </div>
 </section>
 
 <style>
+  .refusal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0 0 0.6rem;
+    font-family: var(--font-chrome);
+    font-size: 0.9rem;
+    color: var(--surface-text);
+  }
+
+  .refusal span {
+    color: var(--surface-text-muted);
+    font-size: 0.85em;
+  }
+
   .character-screen {
     display: flex;
     flex-direction: column;

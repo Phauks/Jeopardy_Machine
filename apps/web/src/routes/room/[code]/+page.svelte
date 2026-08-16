@@ -21,6 +21,7 @@
   import LobbyScreen from "#lib/room/lobby-screen.svelte";
   import TeamScreen from "#lib/room/team-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { joinBlock } from "#lib/room/room-refusal.ts";
   import { playerRouteStageFor } from "#lib/room/pre-game-stage.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
@@ -60,6 +61,11 @@
 
   const view = $derived(store.view);
   const stage = $derived(playerRouteStageFor(view, { soloAccepted }));
+  // The room's settings, respected before the first tap: a full room or a host who takes no
+  // spectators refuses in the room's own words rather than after a wasted character screen
+  // (#lib/room/room-refusal.ts). It is a courtesy, not the gate - the room refuses on join
+  // regardless, and this only saves the trip.
+  const blocked = $derived(joinBlock(view));
 </script>
 
 <svelte:head>
@@ -74,6 +80,7 @@
       roster={view.roster}
       teamsMode={view.teamsMode}
       lateJoin={view.phase !== "lobby"}
+      {blocked}
       onConfirm={(choice) => {
         localAudio.prime();
         // Deliberately joined WITHOUT a team: the next screen is where the team is picked, and

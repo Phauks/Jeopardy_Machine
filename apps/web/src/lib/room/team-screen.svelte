@@ -16,6 +16,7 @@
   import { limits } from "@jeopardy/protocol/limits";
   import { stagingFromRoom } from "#lib/staging/room-staging.ts";
   import { stagingThemeById } from "#lib/staging/staging-theme-registry.ts";
+  import { refusalCopy } from "#lib/room/room-refusal.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
 
   type Props = {
@@ -37,6 +38,11 @@
   const theme = $derived(stagingThemeById(stagingThemeId));
   const staging = $derived(stagingFromRoom(view));
   const atCap = $derived(view.roster.teams.length >= limits.team.teamMaxCount);
+  // The room's own answer to the last thing this phone tried - a locked team, a team that was
+  // disbanded while the screen was open (room-refusal.ts turns the protocol's reason into the
+  // sentence). Team-level refusals keep the connection, so this is a notice on a working
+  // screen rather than an error page: pick another station and carry on.
+  const refused = $derived(view.refusal === null ? null : refusalCopy(view.refusal.reason));
 
   function createTeam(event: SubmitEvent): void {
     event.preventDefault();
@@ -81,6 +87,15 @@
       }}
     />
   </div>
+
+  {#if refused !== null}
+    <p class="refusal" role="status">
+      <strong>{refused.headline}</strong>
+      {#if refused.advice !== null}
+        <span>{refused.advice}</span>
+      {/if}
+    </p>
+  {/if}
 
   <div class="team-grid">
     {#each view.roster.teams as team (team.teamId)}
@@ -132,6 +147,21 @@
 </section>
 
 <style>
+  .refusal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0;
+    font-family: var(--font-chrome);
+    font-size: 0.9rem;
+    color: var(--surface-text);
+  }
+
+  .refusal span {
+    color: var(--surface-text-muted);
+    font-size: 0.85em;
+  }
+
   .team-screen {
     display: flex;
     flex-direction: column;
