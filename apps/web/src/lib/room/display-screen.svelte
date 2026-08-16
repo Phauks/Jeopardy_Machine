@@ -26,15 +26,16 @@
     /** Origin for the join URL under the QR; defaults to the current origin at runtime. */
     joinOrigin?: string | null;
     /**
-     * The 3D scene the avatars inhabit. "none" is the clean 2D lobby this surface has always
-     * had. Local vocabulary until the theme document reserves an `environment` slot - the
-     * exact schema addition is written down in src/lib/diorama/diorama-environment.ts.
-     * Mirror mode passes "none": a host console must not spin up a second renderer.
+     * The 3D scene the avatars inhabit, ALREADY RESOLVED to what this build can draw - the
+     * route reads the theme document's `environment` slot and passes it through
+     * `resolveDioramaEnvironment` (src/lib/diorama/diorama-environment.ts). "none" is the
+     * clean 2D lobby this surface has always had. Mirror mode passes "none": a host console
+     * must not spin up a second renderer.
      */
     environment?: DioramaEnvironment;
     /**
      * Which staging theme the pre-game lobby uses (src/lib/staging/staging-theme-registry.ts).
-     * A theme-document field in waiting, exactly like `environment` above.
+     * The theme document's `staging` slot, with the route's ?staging= dev override on top.
      */
     stagingThemeId?: string | null;
   };

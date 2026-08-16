@@ -82,7 +82,7 @@ Before the game the same stage stops being scenery and becomes the seating chart
 | `staging-theme.ts`            | The theme INTERFACE: primitives (`box`/`cylinder`/`plane`), colour roles, seats, nouns. All data - no three.js anywhere in this directory |
 | `staging-themes/boats.ts`     | First theme. Water, hulls in the team's colour, a pennant in the room's accent, six standing spots, a nameplate over the mast             |
 | `staging-themes/campfires.ts` | Second theme, shipped to prove the seam: no drawn surface, a ring you sit around, four inward seats, milling instead of bobbing           |
-| `staging-theme-registry.ts`   | The two built-ins + the `themeBodySchema` line the protocol needs when staging becomes a theme-document field                             |
+| `staging-theme-registry.ts`   | The two built-ins, resolving the theme document's `staging` slot (ids held equal to the protocol enum by test)                            |
 | `staging-layout.ts`           | Pure placement: station packing without overlap, seats, the holding grid, and the two anti-shuffle rules                                  |
 | `staging-motion.ts`           | Pure movement: walking to a seat facing the way you travel, the reduced-motion snap, the holding-area bob                                 |
 | `room-staging.ts`             | The one mapping from `RoomView` to stations/occupants/waiting, so no two surfaces can disagree about who is aboard what                   |
@@ -93,7 +93,7 @@ Before the game the same stage stops being scenery and becomes the seating chart
 
 **Degradation differs from the diorama's, deliberately.** The diorama is decoration and may vanish; staging carries an answer ("which boat am I on") and may not, so it degrades to the 2D layout instead of to nothing. Everything else holds and is gate-tested in `motion-guardrails.gate.test.ts`: three stays behind the dynamic import, the staging layer is three-free, reduced motion stands everyone still on their spot, and no staged view renders behind a live clue.
 
-**Environment slot.** The environments direction (docs/research/00-user-directives.md) wants a curated `environment` field on the THEME document - forest / pirate / dungeon / none, presentation-layer only. The protocol theme schema does not have it yet and this milestone does not edit the protocol, so the vocabulary is a local enum in `diorama-environment.ts` (`"none" | "studio"`), kept in the shape the schema will take. That file names the exact one-line addition `themeBodySchema` needs, mirroring how `soundSet` already reserves its slot.
+**The theme document's two presentation slots** (wired 2026-08-16). `themeBodySchema` carries `environment` (forest / pirate / dungeon / studio / none - the 3D scenery) and `staging` (boats / campfires - the pre-game seating chart), both optional, presentation-layer only, zero game-logic coupling. The display reads `theme.environment` through `resolveDioramaEnvironment` and `theme.staging` through `stagingThemeById`; the phone reads `staging` alone. Both resolvers FALL BACK rather than fail, because a theme document is data: scenery whose kit has not shipped renders on the studio stage, and an unknown staging id renders boats. `?environment=` and `?staging=` remain dev overrides and win over the document.
 
 ## The display on a phone
 

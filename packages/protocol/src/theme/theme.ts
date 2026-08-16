@@ -10,6 +10,27 @@ import { themeBackgroundSchema } from "./background.ts";
 import { fontSlotsSchema } from "./fonts.ts";
 import { themeTokensSchema } from "./tokens.ts";
 
+// The two PRESENTATION slots the display layer reserved while it was being built and the
+// reconcile filled in (docs/decisions/2026-08-14-avatars-in-motion.md,
+// docs/decisions/2026-08-15-staged-lobby.md). Both follow `soundSet`'s precedent exactly:
+// optional, so adding them broke no document, and a CURATED enum rather than free text, so a
+// theme can never name an asset bundle this build does not ship.
+//
+// They answer different questions and are deliberately not one field:
+// - `environment` is the SCENERY - the 3D stage the avatars inhabit. `none` means the clean 2D
+//   lobby, and is how a theme opts out of the diorama entirely.
+// - `staging` is the SEATING CHART - what the holding area and the team stations look like
+//   before the game starts (water and boats, a clearing and campfires).
+//
+// A build renders what it has: the web display resolves an environment it cannot draw yet to
+// the one it can (apps/web/src/lib/diorama/diorama-environment.ts), and an unknown staging id
+// falls back to the default theme, because a theme document is data and data can be old.
+export const themeEnvironmentSchema = z.enum(["none", "studio", "forest", "pirate", "dungeon"]);
+export type ThemeEnvironment = z.infer<typeof themeEnvironmentSchema>;
+
+export const themeStagingSchema = z.enum(["boats", "campfires"]);
+export type ThemeStaging = z.infer<typeof themeStagingSchema>;
+
 export const themeBodySchema = z.strictObject({
   tokens: themeTokensSchema,
   fontSlots: fontSlotsSchema.prefault({}),
@@ -20,6 +41,10 @@ export const themeBodySchema = z.strictObject({
   // Boundary 2.10's deliberate bend: a slot for choosing among OUR curated system-cue sound
   // sets. Optional now (minor-bump-free reservation), populated when M7 ships the sets.
   soundSet: z.enum(["classic-original", "minimal-beeps"]).optional(),
+  // The two slots above. Optional for the same minor-bump-free reason `soundSet` is: a theme
+  // that says nothing keeps whatever the surface defaults to.
+  environment: themeEnvironmentSchema.optional(),
+  staging: themeStagingSchema.optional(),
   // Background-image bytes ride like pack media (content/media-ref.ts indirection).
   media: z.array(mediaAssetSchema).max(4).default([]),
 });

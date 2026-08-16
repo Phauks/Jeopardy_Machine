@@ -5,6 +5,8 @@ import { render } from "svelte/server";
 import StagedLobby from "#lib/staging/staged-lobby.svelte";
 import StagedLobby2d from "#lib/staging/staged-lobby-2d.svelte";
 import { stagingFromRoom } from "#lib/staging/room-staging.ts";
+import { stagingThemeById, stagingThemes } from "#lib/staging/staging-theme-registry.ts";
+import { themeStagingSchema } from "@jeopardy/protocol";
 import { boatsStagingTheme } from "#lib/staging/staging-themes/boats.ts";
 import { campfiresStagingTheme } from "#lib/staging/staging-themes/campfires.ts";
 import { accentById } from "#lib/avatars/avatar-manifest.ts";
@@ -164,5 +166,27 @@ describe("the staged lobby wrapper", () => {
     });
     expect(body).not.toContain("<canvas");
     expect(body).toContain("the water");
+  });
+});
+
+// The theme document's `staging` slot (packages/protocol/src/theme/theme.ts, landed at the
+// 2026-08-16 reconcile). What matters is that the two vocabularies stay ONE vocabulary: a
+// theme that names a staging theme this build ships must resolve to it, and a build that ships
+// one the schema has never heard of would make valid documents unwritable.
+describe("the staging slot on the theme document", () => {
+  it("ships exactly the themes the protocol enum names", () => {
+    expect(stagingThemes.map((theme) => theme.id).toSorted()).toEqual(
+      [...themeStagingSchema.options].toSorted(),
+    );
+  });
+
+  it("resolves every document value to a real theme, and anything else to the default", () => {
+    for (const id of themeStagingSchema.options) {
+      expect(stagingThemeById(id).id).toBe(id);
+    }
+    // A theme document is data and data can be old (or newer than this build): an unknown id
+    // falls back rather than throwing, because a projector must not go blank over a string.
+    expect(stagingThemeById("spaceships").id).toBe(boatsStagingTheme.id);
+    expect(stagingThemeById(null).id).toBe(boatsStagingTheme.id);
   });
 });

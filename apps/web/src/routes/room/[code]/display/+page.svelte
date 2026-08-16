@@ -11,6 +11,7 @@
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
@@ -60,10 +61,16 @@
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
-  // ?staging=<theme-id> previews a staging theme, the same dev affordance the player route
-  // carries. Both become theme-document fields (staging-theme-registry.ts writes out the
-  // schema line); neither ever ships in a link we print.
-  const stagingThemeId = $derived(page.url.searchParams.get("staging"));
+  // The two presentation slots come from the THEME DOCUMENT (`theme.staging`,
+  // `theme.environment` - packages/protocol/src/theme/theme.ts, wired at the 2026-08-16
+  // reconcile). The query strings stay as DEV OVERRIDES and deliberately win, so a preset can
+  // be reviewed against any stage without editing a document; neither ever ships in a link we
+  // print. `environment` resolves through the display's own capability map: a theme naming
+  // scenery whose kit has not shipped still renders on the studio stage.
+  const stagingThemeId = $derived(page.url.searchParams.get("staging") ?? theme.staging ?? null);
+  const environment = $derived(
+    resolveDioramaEnvironment(page.url.searchParams.get("environment") ?? theme.environment),
+  );
 </script>
 
 <svelte:head>
@@ -77,7 +84,7 @@
 <svelte:window onpointerdown={primeAudio} />
 
 <div class="display-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <DisplayScreen {store} {stagingThemeId} />
+  <DisplayScreen {store} {stagingThemeId} {environment} />
   {#if !audioReady}
     <p class="audio-hint">Click anywhere to enable room audio on this device</p>
   {/if}

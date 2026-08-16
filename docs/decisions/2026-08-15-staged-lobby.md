@@ -20,9 +20,11 @@ Three consequences, and they are the reason for the shape:
 
 Adding a theme is a file next to `staging-themes/boats.ts` plus a line in `staging-theme-registry.ts`. Nothing in the scene, the layout, the fallback, or any screen changes. **Campfires ships alongside boats to prove that**, not to fill out a menu: it has a holding area with no drawn surface, a station you sit around rather than stand in, four inward-facing seats instead of six camera-facing ones, and milling instead of bobbing. It is also the Terra Verde forest lobby the first event wants.
 
-### 2. Which staging theme a room uses is a theme-document field in waiting
+### 2. Which staging theme a room uses is a theme-document field
 
-`staging-theme-registry.ts` reserves the vocabulary and writes out the one-line `themeBodySchema` addition it needs, exactly the way `diorama-environment.ts` reserves `environment`. This milestone does not edit the protocol.
+`staging-theme-registry.ts` reserved the vocabulary and wrote out the one-line `themeBodySchema` addition it needed, exactly the way `diorama-environment.ts` reserved `environment`. This milestone did not edit the protocol.
+
+> **Wired 2026-08-16 (the reconcile).** Both reserved lines landed in one protocol change: `staging: z.enum(["boats", "campfires"]).optional()` beside `environment`. Optional, so no document migrated. The display and the phone now read `theme.staging` and pass it into `stagingThemeById()`; `?staging=` remains a dev override that wins over the document. The registry's ids and the protocol enum are held EQUAL by a test (`staged-lobby.states.test.ts`), so adding a theme is still a file, a line in the registry, and now a value in the enum - and forgetting the third reddens instead of making a document that names it unwritable. Unknown ids still fall back to boats: a projector must not go blank over a string from a newer build.
 
 ### 3. Placement is pure; the scene only copies it
 

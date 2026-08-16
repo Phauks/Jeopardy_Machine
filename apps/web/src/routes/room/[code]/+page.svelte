@@ -48,14 +48,15 @@
     localAudio.playLocalPreview(soundId);
   }
 
-  // Dev affordances shared by the play surfaces: ?theme=<preset-id> previews any preset, and
-  // ?staging=<theme-id> previews a staging theme (both become theme-document fields at M5/M7;
-  // neither ever ships in a link we print).
+  // Which staging theme the phone's staged views use is the THEME DOCUMENT's `staging` slot
+  // (packages/protocol/src/theme/theme.ts), wired at the 2026-08-16 reconcile. ?theme= and
+  // ?staging= remain dev overrides and win over the document, so any preset can be reviewed
+  // against any stage; neither ever ships in a link we print.
   const theme = $derived(
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
-  const stagingThemeId = $derived(page.url.searchParams.get("staging"));
+  const stagingThemeId = $derived(page.url.searchParams.get("staging") ?? theme.staging ?? null);
 
   const view = $derived(store.view);
   const stage = $derived(playerRouteStageFor(view, { soloAccepted }));

@@ -66,6 +66,10 @@ describe("themeSchema", () => {
     expect(minimal.body.effectsLevel).toBe("flat");
     expect(minimal.body.media).toEqual([]);
     expect(minimal.body.soundSet).toBeUndefined();
+    // The two presentation slots are reservations like soundSet: a theme that says nothing
+    // leaves the surface on its own default rather than being handed "none".
+    expect(minimal.body.environment).toBeUndefined();
+    expect(minimal.body.staging).toBeUndefined();
     expect(minimal.body.tokens.usedCellTreatment).toBe("blank-dark");
   });
 
@@ -95,6 +99,39 @@ describe("themeSchema", () => {
         body: { ...validTheme.body, background: { kind: "image", media: { mediaId }, dim: 1.5 } },
       }).success,
     ).toBe(false);
+  });
+
+  it("carries the two presentation slots: scenery and the pre-game seating chart", () => {
+    const staged = themeSchema.parse({
+      ...validTheme,
+      body: { ...validTheme.body, environment: "forest", staging: "campfires" },
+    });
+    expect(staged.body.environment).toBe("forest");
+    expect(staged.body.staging).toBe("campfires");
+    // They answer different questions and are separately settable - a room can want the
+    // forest without campfires in it, or campfires on the plain studio stage.
+    expect(
+      themeSchema.parse({ ...validTheme, body: { ...validTheme.body, environment: "none" } }).body
+        .staging,
+    ).toBeUndefined();
+    // Round-trip: a document with both slots survives serialization unchanged.
+    expect(themeSchema.parse(JSON.parse(JSON.stringify(staged)))).toEqual(staged);
+  });
+
+  it("rejects environments and staging themes outside the curated sets (boundary 2.5)", () => {
+    for (const stray of [
+      { environment: "space-station" },
+      { environment: "" },
+      { staging: "tables" },
+      // Not interchangeable: each slot names its own vocabulary.
+      { staging: "forest" },
+      { environment: "boats" },
+    ]) {
+      expect(
+        themeSchema.safeParse({ ...validTheme, body: { ...validTheme.body, ...stray } }).success,
+        JSON.stringify(stray),
+      ).toBe(false);
+    }
   });
 
   it("rejects unknown sound sets and stray body keys", () => {

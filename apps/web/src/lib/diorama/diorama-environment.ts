@@ -1,18 +1,16 @@
 // What the avatars stand in, and where its colors come from.
 //
-// ENVIRONMENT SLOT - the state of play. docs/research/00-user-directives.md ("3D environments")
-// asks for a curated `environment` field on the THEME document, exactly like `soundSet`:
-// forest / pirate / dungeon / none, presentation-layer only, zero game-logic coupling. The
-// theme schema in packages/protocol/src/theme/theme.ts does NOT have that field yet, and this
-// milestone does not edit the protocol. So the vocabulary lives here as a local enum, kept
-// deliberately in the shape the schema will take, and the display resolves it locally.
+// ENVIRONMENT SLOT - landed. docs/research/00-user-directives.md ("3D environments") asked for
+// a curated `environment` field on the THEME document, exactly like `soundSet`: forest /
+// pirate / dungeon / none, presentation-layer only, zero game-logic coupling. The vocabulary
+// lived here as a local enum while the diorama was built; the 2026-08-16 reconcile put it in
+// `themeBodySchema` (packages/protocol/src/theme/theme.ts) and this file now resolves the
+// document's value rather than owning it.
 //
-// WHAT THE PROTOCOL NEEDS (one line in themeBodySchema, mirroring soundSet's precedent):
-//   environment: z.enum(["none", "studio", "forest", "pirate", "dungeon"]).optional(),
-// Optional keeps it a minor-bump-free reservation, the same trick soundSet uses. Once it
-// lands: delete DioramaEnvironment below, import the protocol enum, and have the display pass
-// theme.environment straight through - nothing else here changes, because everything past
-// this file already speaks in terms of the enum value. "none" must keep meaning "render the
+// The RESOLUTION is the part worth keeping local, because a theme document is data and this
+// build is a build: a theme may name an environment whose kit has not shipped, and the display
+// still has to render something. So `resolveDioramaEnvironment` maps every scenery choice this
+// build cannot draw onto the one it can, and only "none" is honoured exactly - it means "the
 // clean 2D lobby", which is why avatar-diorama.svelte treats it as "do not mount" rather than
 // as an empty scene.
 //
@@ -20,9 +18,22 @@
 // same visual universe as the avatars) are a later pass: they need their own download +
 // license verification + budget in tools/avatar-bake, and "studio" exists so the diorama is
 // shippable and reviewable before any of that.
+import type { ThemeEnvironment } from "@jeopardy/protocol";
 
-/** The environment vocabulary. Only "none" and "studio" are implemented today. */
+/** What this build can actually draw. The theme document's vocabulary is wider - see below. */
 export type DioramaEnvironment = "none" | "studio";
+
+/**
+ * A theme document's `environment` as this build renders it. Unknown and unbuilt scenery falls
+ * back to the studio rather than to nothing: losing the avatars is a worse answer than showing
+ * them on a plain stage, and a theme written for a later release must not blank the display.
+ * Only "none" turns the diorama off, because only "none" MEANS off.
+ */
+export function resolveDioramaEnvironment(
+  value: ThemeEnvironment | string | null | undefined,
+): DioramaEnvironment {
+  return value === "none" ? "none" : "studio";
+}
 
 /** Colors the scene paints itself with, all derived from the active theme's tokens. */
 export type DioramaPalette = {

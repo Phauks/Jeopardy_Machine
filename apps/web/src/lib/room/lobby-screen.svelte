@@ -15,7 +15,7 @@
 
   type Props = {
     store: RoomStore;
-    /** Staging theme id; a theme-document field in waiting (staging-theme-registry.ts). */
+    /** Staging theme id - the theme document's `staging` slot (staging-theme-registry.ts). */
     stagingThemeId?: string | null;
     onPreviewSound?: ((soundId: string) => void) | null;
   };

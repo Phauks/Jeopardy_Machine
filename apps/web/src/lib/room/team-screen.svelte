@@ -20,7 +20,7 @@
 
   type Props = {
     store: RoomStore;
-    /** Staging theme id; a theme-document field in waiting (staging-theme-registry.ts). */
+    /** Staging theme id - the theme document's `staging` slot (staging-theme-registry.ts). */
     stagingThemeId?: string | null;
     /** "Play on my own" - the route remembers it so this screen stops asking. */
     onPlaySolo: () => void;
