@@ -19,7 +19,7 @@ const room: RoomSummary = {
   code: "BQKX7",
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
-  visibility: "public",
+  listing: "public",
   hasPassword: false,
   phase: "lobby",
   playerCount: 7,
