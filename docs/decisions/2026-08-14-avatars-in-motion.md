@@ -30,11 +30,6 @@ The GLB models therefore **ship as static assets** (they were only downloaded fo
 - The diorama degrades to the existing 2D lobby if WebGL is unavailable - it is decoration, never a dependency of play.
 - Frame budget: the display also renders the board; the diorama only runs on lobby/interstitial/winner screens, never behind a live clue.
 
-<<<<<<< HEAD
-## Milestone placement
-
-Sprite-sheet mode and the GLB commit land now (they are small and unblock the identity moment). The diorama lands as the M4-follow-on delight pass; the Kenney world kits (forest for the club night) attach to it via the theme document's environment slot per the earlier environments direction.
-=======
 ## Built 2026-08-14 - what the implementation added to this decision
 
 All four points above shipped together (tools/avatar-bake/README.md, docs/design/surfaces.md "The avatar diorama"). Four things this decision did not anticipate, recorded here because each changes a number or a constraint in it:
@@ -49,4 +44,3 @@ All four points above shipped together (tools/avatar-bake/README.md, docs/design
 Sprite-sheet mode and the GLB commit land now (they are small and unblock the identity moment). The diorama lands as the M4-follow-on delight pass; the Kenney world kits (forest for the club night) attach to it via the theme document's environment slot per the earlier environments direction.
 
 **Landed 2026-08-14: all three tiers, in one pass** (ROADMAP M4). The environment slot is not in the protocol yet - the diorama carries a local `"none" | "studio"` enum shaped like the field the schema will grow, and `apps/web/src/lib/diorama/diorama-environment.ts` writes out the exact one-line addition `themeBodySchema` needs, mirroring how `soundSet` already reserves its own. The world kits remain the M7 item; "studio" is a themed ground plane so the diorama is shippable and reviewable before any kit is downloaded.
->>>>>>> worktree-agent-a196ede850854c061
