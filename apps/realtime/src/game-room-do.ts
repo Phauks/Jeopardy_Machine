@@ -1677,9 +1677,10 @@ export class GameRoomDO extends Server {
     }
     await this.persist("meta");
     this.broadcastRoomSettings();
-    // Turning spectators off, or shrinking the audience, must not silently keep serving the
-    // people it now excludes - and going private must leave the lobby at once rather than at
-    // the next sweep.
+    // Going private must leave the lobby AT ONCE rather than at the next sweep - a browsable
+    // door onto a room its host just closed to strangers is the one drift that matters here.
+    // (Nobody already connected is ever removed by an edit: turning spectators off, or
+    // lowering a cap, changes who may come in next, not who is already watching.)
     await this.syncRegistryListing(room);
     return { ok: true };
   }

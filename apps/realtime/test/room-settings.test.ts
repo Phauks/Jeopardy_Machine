@@ -301,3 +301,34 @@ describe("changing the room password mid-night", () => {
     expect((await phone.waitFor("welcome")).role).toBe("player");
   });
 });
+
+describe("what a settings surface may never carry", () => {
+  it("keeps the password out of every settings answer: broadcast, RPC, and inspector", async () => {
+    const code = uniqueCode();
+    const secret = "shout-this-across-the-hall";
+    const { hostToken } = await initializeRoom(code, undefined, "redaction-suite");
+    const host = await connectHost(code, hostToken);
+
+    // Set the secret over the socket, then read every surface that describes the room.
+    host.send({ type: "update-room-settings", settings: { password: secret } });
+    await host.waitFor("room-settings", (message) => message.settings.entry === "password");
+
+    const overRpc = await (await patchOverRpc(code, hostToken, { hideJoinCode: true })).text();
+    const inspector = await (
+      await roomStub(code).fetch("https://do/diagnostics", {
+        headers: { [hostTokenHeader]: hostToken },
+      })
+    ).text();
+    const broadcast = JSON.stringify(host.messagesOf("room-settings"));
+
+    for (const surface of [overRpc, inspector, broadcast]) {
+      expect(surface).not.toContain(secret);
+      // The host token is the room's strongest secret and belongs to no settings surface.
+      expect(surface).not.toContain(hostToken);
+      // Nor does any hash material: `entry` is the only password fact any of them carry.
+      expect(surface).not.toContain("saltHex");
+      expect(surface).not.toContain("hashHex");
+    }
+    expect(JSON.parse(overRpc)).toMatchObject({ settings: { entry: "password" } });
+  });
+});
