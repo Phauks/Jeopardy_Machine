@@ -1,23 +1,22 @@
 <script lang="ts">
-  // The landing page. Two halves, in this order:
+  // The site root. The SCREEN lives in #lib/landing/landing-screen.svelte (so it can be
+  // server-rendered in a test like every other surface); this route owns the two things a
+  // component should not: polling the lobby endpoint, and navigating.
   //
-  // 1. JOIN - the real product surface (docs/decisions/2026-08-14-room-visibility-and-lobby.md):
-  //    a room-code box, a password field, and the public rooms list. The CODE BOX ALWAYS WINS:
-  //    a complete typed code bypasses the list entirely, because someone holding a code came
-  //    here to use it, not to browse. The list polls on an interval - browsing is not playing,
-  //    so it gets no socket.
-  // 2. The dev-surface index below it - OWNER RULE: every new meaningful surface gets a card
-  //    here in the same PR that ships it. (The creator Library, user-flows B1, eventually
-  //    replaces the index; the Join half is already the landing it will sit beside.)
+  // OWNER RULE, still in force: every new meaningful surface gets a card in the list below, in
+  // the same PR that ships it. The list moved into a closed drawer on 2026-08-15 when the real
+  // front door was built - demoted, not deleted. (The creator Library, user-flows B1, is what
+  // eventually replaces it.)
   import BuildBadge from "#lib/dev/build-badge.svelte";
-  import PublicRoomsList from "#lib/lobby/public-rooms-list.svelte";
-  import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
+  import LandingScreen from "#lib/landing/landing-screen.svelte";
   import { joinUrlForRoom, rememberRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { limits } from "@jeopardy/protocol/limits";
-  import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
+  import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
+  import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
+  import { page } from "$app/state";
+  import type { LobbyListing } from "@jeopardy/protocol/room/registry";
+  import type { SurfaceCard } from "#lib/landing/landing-screen.svelte";
 
-  let typedCode = $state("");
-  let password = $state("");
   // The registry starts "unavailable/error" rather than "ok": until the first fetch answers,
   // an empty list has no verdict behind it, and claiming one would be the old bug in reverse.
   let listing = $state<LobbyListing>({
@@ -26,9 +25,6 @@
     registry: { status: "unavailable", reason: "error", detail: "not fetched yet" },
   });
   let listingError = $state<string | null>(null);
-
-  const normalizedCode = $derived(typedCode.trim().toUpperCase());
-  const codeComplete = $derived(normalizedCode.length === limits.room.roomCodeLength);
 
   async function refreshListing(): Promise<void> {
     try {
@@ -49,31 +45,31 @@
     return () => clearInterval(timer);
   });
 
-  function enterRoom(code: string, roomPassword: string): void {
+  function enterRoom(code: string, password: string): void {
     let destination: string;
     try {
       destination = joinUrlForRoom(code);
     } catch {
-      listingError = "That is not a room code - they are 5 letters and digits.";
+      listingError = `That is not a room code - they are ${String(limits.room.roomCodeLength)} letters and digits.`;
       return;
     }
-    rememberRoomPassword(code, roomPassword);
+    rememberRoomPassword(code, password);
     globalThis.location.assign(destination);
   }
 
-  function joinTypedCode(event: SubmitEvent): void {
-    event.preventDefault();
-    if (!codeComplete) return;
-    enterRoom(normalizedCode, password);
-  }
+  // Same dev affordance the play surfaces carry: ?theme=<preset-id> previews any preset, so
+  // the front door is checked against all four the same way the board is.
+  const theme = $derived(
+    themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
+      retroTvPreset,
+  );
 
-  // Picking a listed room reuses whatever is in the password box - a locked room in the list
-  // is exactly the case where someone was told the password out loud.
-  function joinListedRoom(room: RoomSummary): void {
-    enterRoom(room.code, password);
-  }
-
-  const surfaces = [
+  const surfaces: SurfaceCard[] = [
+    {
+      href: "/lobby",
+      title: "Public rooms",
+      note: "The room browser: title and host label, players and spectators against caps, lock icon, phase badge, age - with the password prompt inline on a locked room.",
+    },
     {
       href: "/dev/hotseat",
       title: "Hotseat game",
@@ -92,7 +88,7 @@
     {
       href: "/dev/diorama",
       title: "Avatar diorama",
-      note: "The live 3D lobby scene with fake players: add avatars, switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
+      note: "The live 3D scene with fake players: free-wander mode and the staged lobby (boats and campfires), switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
     },
     {
       href: "/api/rooms",
@@ -102,12 +98,12 @@
     {
       href: "/room/DUMYX",
       title: "Player room",
-      note: "A2 join, A3 lobby, A4 buzzer - open on a phone (M4 mock room seeded from the fixture dataset; ?theme=modern-flat previews presets).",
+      note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (M4 mock room; ?theme=modern-flat previews presets).",
     },
     {
       href: "/room/DUMYX/display",
       title: "Display screen",
-      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the live 3D avatar diorama on lobby and winner phases.",
+      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the staged 3D lobby on lobby and winner phases. Works on a phone too.",
     },
     {
       href: "/room/DUMYX/host",
@@ -124,91 +120,19 @@
 
 <svelte:head>
   <title>Jeopardy Machine</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
-<main class="mx-auto flex min-h-screen max-w-2xl flex-col justify-center gap-6 p-8">
-  <div>
-    <h1 class="text-3xl font-bold">Jeopardy Machine</h1>
-    <p class="mt-2 text-lg">
-      A free, self-hosted quiz-show game suite - in the foundation phase. No account, ever:
-      a room code is the whole join flow.
-    </p>
-  </div>
-
-  <section class="flex flex-col gap-3 rounded-sm border p-4">
-    <h2 class="text-xl font-bold">Join a room</h2>
-    <form class="flex flex-wrap items-end gap-3" onsubmit={joinTypedCode}>
-      <label class="flex flex-col gap-1">
-        <span class="text-sm">Room code</span>
-        <input
-          class="w-32 border px-2 py-1 text-lg uppercase"
-          autocapitalize="characters"
-          autocomplete="off"
-          spellcheck="false"
-          maxlength={limits.room.roomCodeLength}
-          placeholder="BQKX7"
-          bind:value={typedCode}
-        />
-      </label>
-      <label class="flex flex-col gap-1">
-        <span class="text-sm">Password (only if the room has one)</span>
-        <input
-          class="w-56 border px-2 py-1"
-          type="password"
-          autocomplete="off"
-          maxlength={limits.room.roomPasswordMaxLength}
-          bind:value={password}
-        />
-      </label>
-      <button class="border px-4 py-1.5 font-bold" disabled={!codeComplete} type="submit">
-        Join
-      </button>
-    </form>
-
-    <h3 class="mt-2 text-sm font-bold">
-      Public rooms
-      {#if listing.rooms.length > 0}({listing.rooms.length}){/if}
-    </h3>
-    {#if listingError !== null}
-      <p class="text-sm opacity-70">
-        The public list is unavailable right now ({listingError}). A room code still works.
-      </p>
-    {/if}
-    <!-- Quiet while healthy (the Join section is not a status board), loud when the registry
-         cannot answer - an empty list must always be able to say why it is empty. -->
-    <RegistryStatusLine status={listing.registry} quiet />
-    <PublicRoomsList
-      rooms={listing.rooms}
-      fetchedAt={listing.fetchedAt}
-      dimmed={codeComplete}
-      onSelect={joinListedRoom}
-    />
-    {#if codeComplete}
-      <p class="text-sm opacity-70">Using the code you typed - clear it to browse the list.</p>
-    {/if}
-  </section>
-
-  <div>
-    <h2 class="text-xl font-bold">What exists so far</h2>
-    <p class="mt-1 text-sm opacity-80">
-      The editor, play surfaces, and host console arrive milestone by milestone.
-    </p>
-  </div>
-
-  <ul class="flex flex-col gap-3">
-    {#each surfaces as surface (surface.href)}
-      <li class="rounded-sm border p-4">
-        <a class="text-lg font-bold underline" href={surface.href}>{surface.title}</a>
-        <p class="mt-1 text-sm opacity-80">{surface.note}</p>
-      </li>
-    {/each}
-  </ul>
-
-  <p class="text-sm opacity-70">
-    Build {__BUILD_META__.sha} · {__BUILD_META__.builtAt.slice(0, 16).replace("T", " ")}Z ·
-    <a class="underline" href="https://github.com/Phauks/Jeopardy_Machine">source</a>
-
-  </p>
-</main>
+<div class="root-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
+  <LandingScreen {listing} {listingError} {surfaces} onJoin={enterRoom} />
+</div>
 
 <BuildBadge />
+
+<style>
+  .root-shell {
+    min-height: 100dvh;
+    background: var(--page-bg);
+    color: var(--surface-text);
+  }
+</style>

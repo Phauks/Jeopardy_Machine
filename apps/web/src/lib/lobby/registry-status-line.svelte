@@ -16,19 +16,57 @@
 </script>
 
 {#if !(quiet && notice.tone === "ok")}
-  <div
-    class="flex flex-col gap-1 rounded-sm border p-3 text-sm"
-    class:border-dashed={notice.tone === "ok"}
-    class:opacity-70={notice.tone === "ok"}
-    data-tone={notice.tone}
-  >
+  <div class="registry-status" data-tone={notice.tone}>
     <strong>{notice.headline}</strong>
     <span>{notice.hint}</span>
     {#if notice.fix !== null}
-      <code class="overflow-x-auto rounded-sm border p-2 text-xs">{notice.fix}</code>
+      <code>{notice.fix}</code>
     {/if}
     {#if notice.detail !== null}
-      <span class="text-xs opacity-70">{notice.detail}</span>
+      <span class="detail">{notice.detail}</span>
     {/if}
   </div>
 {/if}
+
+<style>
+  /* Token-only styling (docs/design/theming.md): this renders on the landing page and the
+     lobby, which are themed surfaces, as well as inside the unthemed dev panel - where the
+     tokens fall back to their retro-tv defaults in tokens.css and it still reads correctly. */
+  .registry-status {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.7rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: var(--board-radius);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-raised);
+    color: var(--surface-text);
+  }
+
+  .registry-status[data-tone="ok"] {
+    border-style: dashed;
+    opacity: 0.7;
+  }
+
+  /* Warnings are meant to look wrong - a broken registry that renders quietly is the bug
+     registry-status.ts was written to end. */
+  .registry-status[data-tone="warning"] {
+    border-color: var(--score-negative);
+  }
+
+  .registry-status code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    padding: 0.4rem 0.5rem;
+    border-radius: var(--board-radius);
+    border: 1px solid var(--surface-border);
+    background: var(--surface-page);
+  }
+
+  .detail {
+    font-size: 0.75rem;
+    color: var(--surface-text-muted);
+  }
+</style>
