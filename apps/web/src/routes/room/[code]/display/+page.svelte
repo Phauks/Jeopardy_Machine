@@ -60,6 +60,10 @@
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
+  // ?staging=<theme-id> previews a staging theme, the same dev affordance the player route
+  // carries. Both become theme-document fields (staging-theme-registry.ts writes out the
+  // schema line); neither ever ships in a link we print.
+  const stagingThemeId = $derived(page.url.searchParams.get("staging"));
 </script>
 
 <svelte:head>
@@ -73,7 +77,7 @@
 <svelte:window onpointerdown={primeAudio} />
 
 <div class="display-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <DisplayScreen {store} />
+  <DisplayScreen {store} {stagingThemeId} />
   {#if !audioReady}
     <p class="audio-hint">Click anywhere to enable room audio on this device</p>
   {/if}
