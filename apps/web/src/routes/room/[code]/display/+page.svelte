@@ -64,6 +64,10 @@
 
 <svelte:head>
   <title>Display - Room {roomCode}</title>
+  <!-- The display is not only a projector. A host checking the room from their hand must not
+       get a broken page, so this route is responsive down to a phone (display-screen.svelte's
+       compact block) and carries the same viewport meta the player route does. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
 <svelte:window onpointerdown={primeAudio} />
@@ -76,10 +80,21 @@
 </div>
 
 <style>
+  /* A projector window is a fixed pane that never scrolls. A phone is not, so the shell drops
+     out of fixed positioning at the same breakpoint the screen inside it goes compact - a
+     fixed, inset-0 shell would trap the page at exactly one viewport height and hide
+     everything below the fold. */
   .display-shell {
     position: fixed;
     inset: 0;
     background: var(--page-bg);
+  }
+
+  @media (max-width: 48rem), (max-height: 26rem) {
+    .display-shell {
+      position: static;
+      min-height: 100dvh;
+    }
   }
 
   .audio-hint {

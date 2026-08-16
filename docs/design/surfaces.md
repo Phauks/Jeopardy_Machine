@@ -4,13 +4,13 @@
 
 ## Route map
 
-| Route                  | Surface                                                                                                                                                                                                                                   | Store role |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
-| `/`                    | The landing (A1): what this is, the room-code box, a secondary link to the browser with a live count, and the dev-surface index in a closed drawer. Polls `/api/rooms` for the count only - it never lists rooms                          | none       |
-| `/lobby`               | The public room browser (A1 alternative arrival): room cards with title AND host label, capacity meters, lock, phase badge, age, inline per-card password prompt, and the code box repeated at the top. Polls, never sockets              | none       |
-| `/room/[code]`         | Player path, four stages: A2 character (name, avatar+accent, animated preview, buzzer sound) -> A2 team (staged lobby + team cards) -> A3 lobby (roster, staged view, post-join customization, overflow menus) -> A4 buzzer               | `player`   |
-| `/room/[code]/display` | Projector window (C1): title screen with QR + code, category-reveal, board + clue card, scores strip, interstitials, winner screen, plus the live avatar diorama on the non-clue screens. Default owner of room audio (per-device toggle) | `display`  |
-| `/room/[code]/host`    | C4 console: minimap, ARM (spacebar), judge row (arrows), answer visible, undo, score drawer, pause, DD + Final wizards, manual mode, **mirror mode** (C1b, `?mirror`), dev sim panel                                                      | `host`     |
+| Route                  | Surface                                                                                                                                                                                                                                                                                | Store role |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| `/`                    | The landing (A1): what this is, the room-code box, a secondary link to the browser with a live count, and the dev-surface index in a closed drawer. Polls `/api/rooms` for the count only - it never lists rooms                                                                       | none       |
+| `/lobby`               | The public room browser (A1 alternative arrival): room cards with title AND host label, capacity meters, lock, phase badge, age, inline per-card password prompt, and the code box repeated at the top. Polls, never sockets                                                           | none       |
+| `/room/[code]`         | Player path, four stages: A2 character (name, avatar+accent, animated preview, buzzer sound) -> A2 team (staged lobby + team cards) -> A3 lobby (roster, staged view, post-join customization, overflow menus) -> A4 buzzer                                                            | `player`   |
+| `/room/[code]/display` | Projector window (C1): title screen with QR + code, category-reveal, board + clue card, scores strip, interstitials, winner screen, the staged lobby before the game and the diorama on the other non-clue screens. Default owner of room audio. **Responsive to a phone** - see below | `display`  |
+| `/room/[code]/host`    | C4 console: minimap, ARM (spacebar), judge row (arrows), answer visible, undo, score drawer, pause, DD + Final wizards, manual mode, **mirror mode** (C1b, `?mirror`), dev sim panel                                                                                                   | `host`     |
 
 All three shells apply a theme preset via `themeToStyleAttribute` + `data-effects` at the route root and accept `?theme=<preset-id>` as a dev preview affordance. Every component underneath consumes semantic tokens only.
 
@@ -94,6 +94,19 @@ Before the game the same stage stops being scenery and becomes the seating chart
 **Degradation differs from the diorama's, deliberately.** The diorama is decoration and may vanish; staging carries an answer ("which boat am I on") and may not, so it degrades to the 2D layout instead of to nothing. Everything else holds and is gate-tested in `motion-guardrails.gate.test.ts`: three stays behind the dynamic import, the staging layer is three-free, reduced motion stands everyone still on their spot, and no staged view renders behind a live clue.
 
 **Environment slot.** The environments direction (docs/research/00-user-directives.md) wants a curated `environment` field on the THEME document - forest / pirate / dungeon / none, presentation-layer only. The protocol theme schema does not have it yet and this milestone does not edit the protocol, so the vocabulary is a local enum in `diorama-environment.ts` (`"none" | "studio"`), kept in the shape the schema will take. That file names the exact one-line addition `themeBodySchema` needs, mirroring how `soundSet` already reserves its slot.
+
+## The display on a phone
+
+The display was written for one situation - a laptop driving a projector, one fixed pane, nothing scrolls - and a host checking their own room from their hand is an ordinary thing to do. The failure was worse than "small": a fixed, `inset: 0`, `overflow: hidden` pane makes everything past the first viewport height unreachable rather than tiny.
+
+One breakpoint, `(max-width: 48rem), (max-height: 26rem)`, catches a phone in both orientations and neither a laptop nor a projector. Under it:
+
+- The shell AND the screen both leave fixed positioning (either one left behind re-traps the page) and the page scrolls.
+- The board type scale gains a **width** term. The projector scale in `tokens.css` is clamped against viewport HEIGHT alone, which is right across a 720p projector and a 4K TV and wrong on a tall narrow screen, where 8vh of numeral does not fit a 60px column. The compact block re-clamps the three layout constants on the display's own subtree - they are app layout constants, not theme document fields, so overriding them per viewport class is the sanctioned move.
+- The stage joins the flow (`order: 2`) with a definite height and its own scroll, instead of floating over the lower 46%.
+- The board scrolls sideways against a 34rem minimum rather than shrinking columns into illegibility; the scores strip caps and scrolls; the pause veil goes `fixed` so it stays over the viewport.
+
+`display-responsive.gate.test.ts` holds all of the above as source-level invariants, including "no fixed pixel layout size anywhere in the screen". Source-level because CSS media queries do not resolve in an SSR render, and adding a browser to `pnpm test` for a layout would break the PR gate.
 
 ## Audio (`room-audio.ts`)
 
