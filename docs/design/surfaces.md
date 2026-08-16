@@ -49,7 +49,7 @@ The display's live 3D layer: one Kenney model per scoring entity, wandering a th
 
 | Room state                                                       | Diorama | What the avatars do                                                            |
 | ---------------------------------------------------------------- | ------- | ------------------------------------------------------------------------------ |
-| Lobby / title screen (`view.phase === "lobby"`, or no game yet)  | yes     | Wander; the newest arrival turns to the room and celebrates as they walk on    |
+| Lobby / title screen (`view.phase === "lobby"`, or no game yet)  | STAGED  | Wait in the holding area or stand on their team's station (see below)          |
 | `round-break`, `final-wagers`, `final-writing`, `final-reveal`   | yes     | Wander behind the interstitial's scores                                        |
 | `game-over`                                                      | yes     | The winners face the camera and celebrate; everyone else strolls               |
 | Category reveal, board, clue card, wagering, any answering phase | **no**  | -                                                                              |
@@ -72,6 +72,26 @@ The clue-bearing phases are excluded by name and a gate test (`motion-guardrails
 
 Two rules keep that true, both gate-tested: no static `three` import outside `diorama-scene.ts`, and `avatar-models.json` (the display-only GLB/clip/recolor data) is imported only from `src/lib/diorama/`. It used to live in `avatar-manifest.json` and cost every phone in the room 7.5 KB. Frame cost is capped too: at most 24 avatars animate (`maxDioramaAvatars`), the renderer's pixel ratio is capped at 2, and the whole thing runs only on screens that are about the people rather than the game.
 
+## The staged lobby (`src/lib/staging/`)
+
+Before the game the same stage stops being scenery and becomes the seating chart: a **holding area** where unassigned players wait and **team stations** they move to when they pick a team. Decision + the one guardrail that differs: docs/decisions/2026-08-15-staged-lobby.md.
+
+| Piece                         | What it owns                                                                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `staging-theme.ts`            | The theme INTERFACE: primitives (`box`/`cylinder`/`plane`), colour roles, seats, nouns. All data - no three.js anywhere in this directory |
+| `staging-themes/boats.ts`     | First theme. Water, hulls in the team's colour, a pennant in the room's accent, six standing spots, a nameplate over the mast             |
+| `staging-themes/campfires.ts` | Second theme, shipped to prove the seam: no drawn surface, a ring you sit around, four inward seats, milling instead of bobbing           |
+| `staging-theme-registry.ts`   | The two built-ins + the `themeBodySchema` line the protocol needs when staging becomes a theme-document field                             |
+| `staging-layout.ts`           | Pure placement: station packing without overlap, seats, the holding grid, and the two anti-shuffle rules                                  |
+| `staging-motion.ts`           | Pure movement: walking to a seat facing the way you travel, the reduced-motion snap, the holding-area bob                                 |
+| `room-staging.ts`             | The one mapping from `RoomView` to stations/occupants/waiting, so no two surfaces can disagree about who is aboard what                   |
+| `staged-lobby-2d.svelte`      | The layout in CSS: stations as team-coloured cards over a water band. Rendered by SSR and kept forever without WebGL                      |
+| `staged-lobby.svelte`         | Picks one. 2D first, the live scene once it reports ready                                                                                 |
+
+**Recolour is the cheap variant, concretely**: a theme names which parts wear the team's colour; `DioramaScene.#paintStation` derives shade and tint from one hex and writes two material colours per mesh. No geometry, no reload, no second theme.
+
+**Degradation differs from the diorama's, deliberately.** The diorama is decoration and may vanish; staging carries an answer ("which boat am I on") and may not, so it degrades to the 2D layout instead of to nothing. Everything else holds and is gate-tested in `motion-guardrails.gate.test.ts`: three stays behind the dynamic import, the staging layer is three-free, reduced motion stands everyone still on their spot, and no staged view renders behind a live clue.
+
 **Environment slot.** The environments direction (docs/research/00-user-directives.md) wants a curated `environment` field on the THEME document - forest / pirate / dungeon / none, presentation-layer only. The protocol theme schema does not have it yet and this milestone does not edit the protocol, so the vocabulary is a local enum in `diorama-environment.ts` (`"none" | "studio"`), kept in the shape the schema will take. That file names the exact one-line addition `themeBodySchema` needs, mirroring how `soundSet` already reserves its slot.
 
 ## Audio (`room-audio.ts`)
@@ -85,6 +105,8 @@ Web Audio, pre-decoded buffers, three channels honoring the owner directives: `p
 - `surfaces-presets.smoke.test.ts`: all four theme presets x all three surfaces render; QR + room code on the title screen.
 - `room-audio.test.ts`: the exclusive-slot drop rule and the sound-check queue against a fake AudioContext.
 - `diorama/wander.test.ts`: the movement rules where they are pure - avatars never leave the pen (including under an absurd frame delta), reduced motion stops them dead, a beat expires, arrivals never stack, and a seed reproduces a layout exactly.
+- `staging/staging-layout.test.ts`: the staged lobby where it is pure - station packing without overlap on either theme, waiting occupants never inside a station, a station keeping its spot when a team is created, a waiting player keeping theirs when somebody boards, the walk to a seat taking real time and never overshooting, the reduced-motion snap, and the theme interface's own shape.
+- `staging/staged-lobby.states.test.ts`: the roster-to-stations mapping, and the 2D degradation carrying the same answer (nameplates, hull colours, crews aboard, the holding area) under both themes.
 - `diorama/motion-guardrails.gate.test.ts`: the decision doc's guardrails as source-level invariants - the animated avatar reaches the join and lobby screens and nothing else (above all not the buzz screen), the reduced-motion freeze exists as a real state, `three` and `avatar-models.json` stay behind the dynamic import, and the clue phases stay out of the diorama's mount list.
 - `avatar-manifest.gate.test.ts`: all three asset tiers agree with the files on disk and with their byte budgets (stills < 2 MB, sheets < 1 MB, models < 3 MB), with no orphans on either side.
 - Not automated: the diorama itself. Verified by hand in headless Chromium against a preview build (models load, recolor, animate, react, degrade) - CI has no browser, and adding one to `pnpm test` would break the PR gate for a decoration. `/dev/diorama` is the standing way to look at it.

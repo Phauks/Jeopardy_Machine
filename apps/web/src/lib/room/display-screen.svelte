@@ -11,8 +11,11 @@
   import AvatarDiorama from "#lib/diorama/avatar-diorama.svelte";
   import BoardDisplay from "#lib/board/board-display.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
+  import StagedLobby from "#lib/staging/staged-lobby.svelte";
   import { cellKey } from "@jeopardy/engine/state";
   import { entityDisplayName, standingsFor } from "#lib/room/room-view.ts";
+  import { stagingFromRoom } from "#lib/staging/room-staging.ts";
+  import { stagingThemeById } from "#lib/staging/staging-theme-registry.ts";
   import type { DioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import type { DioramaOccupant } from "#lib/diorama/diorama-scene.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -29,8 +32,13 @@
      * Mirror mode passes "none": a host console must not spin up a second renderer.
      */
     environment?: DioramaEnvironment;
+    /**
+     * Which staging theme the pre-game lobby uses (src/lib/staging/staging-theme-registry.ts).
+     * A theme-document field in waiting, exactly like `environment` above.
+     */
+    stagingThemeId?: string | null;
   };
-  let { store, joinOrigin = null, environment = "studio" }: Props = $props();
+  let { store, joinOrigin = null, environment = "studio", stagingThemeId = null }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -138,6 +146,18 @@
       (game === null || view.phase === "lobby" || dioramaPhases.includes(game.phase)),
   );
 
+  // THE STAGED LOBBY. Before the game the diorama is not scenery, it is the seating chart:
+  // people waiting in the holding area, people aboard their team's station, and a team change
+  // visible as a move (docs/decisions/2026-08-14-room-visibility-and-lobby.md's successor work;
+  // the mechanism is src/lib/staging/). Once play starts the stage goes back to free wandering
+  // behind the interstitials - by then everyone has chosen, and there is nothing to stage.
+  //
+  // Unlike the diorama, the staged view survives a display with no WebGL: it degrades to the
+  // same layout in CSS rather than to nothing, because "which boat am I on" is information.
+  const staged = $derived(view.phase === "lobby");
+  const stagingTheme = $derived(stagingThemeById(stagingThemeId));
+  const roomStaging = $derived(stagingFromRoom(view));
+
   // One avatar per SCORING entity, so teams mode shows teams rather than a duplicate crowd -
   // the same entity vocabulary buzz and winner events speak. A team borrows its avatar from
   // its leader (the face the room already associates with it) and wears the team's color.
@@ -187,13 +207,24 @@
     <!-- Behind the screen's own content, never over it: the QR, the scores, and the winner
          names stay the readable foreground. Sits outside the phase branches below so a
          lobby -> interstitial move does not tear the scene down and re-spawn the crowd. -->
-    <div class="diorama-layer">
-      <AvatarDiorama
-        occupants={dioramaOccupants}
-        {environment}
-        {celebratingEntityIds}
-        beat={dioramaBeat}
-      />
+    <div class="diorama-layer" class:staged>
+      {#if staged}
+        <StagedLobby
+          theme={stagingTheme}
+          stations={roomStaging.stations}
+          occupants={roomStaging.occupants}
+          waitingEntityIds={roomStaging.waitingEntityIds}
+          {environment}
+          beat={dioramaBeat}
+        />
+      {:else}
+        <AvatarDiorama
+          occupants={dioramaOccupants}
+          {environment}
+          {celebratingEntityIds}
+          beat={dioramaBeat}
+        />
+      {/if}
     </div>
   {/if}
 
@@ -341,6 +372,16 @@
     height: 46%;
     z-index: 0;
     pointer-events: none;
+  }
+
+  /* The staged lobby's 2D degradation is a block of cards, not a canvas, so the band lets it
+     sit on the floor of the screen and scroll if a room has more teams than fit. With WebGL
+     up, the scene fills the band exactly as before and none of this applies. */
+  .diorama-layer.staged {
+    display: flex;
+    align-items: flex-end;
+    padding: 0 2vw 1.5vh;
+    overflow-y: auto;
   }
 
   /* Everything the screen actually says sits above the scenery. */

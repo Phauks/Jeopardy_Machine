@@ -90,6 +90,54 @@ describe("guardrail: three.js stays off every non-display surface", () => {
       expect(source(module), module).not.toMatch(/^import .*"three/m);
     }
   });
+
+  it("keeps the WHOLE staging layer free of three.js", () => {
+    // The staging themes are DATA - primitives, positions, and colour roles - precisely so a
+    // theme can be unit-tested and so the 2D degradation can read the same objects. A theme
+    // that reached for three would import a renderer into the phone's bundle through the team
+    // screen, and would stop being reviewable without a GPU.
+    const stagingFiles = readdirSync(libDirectory + "staging", {
+      recursive: true,
+      encoding: "utf8",
+    }).filter((name) => /\.(ts|svelte)$/.test(name) && !name.endsWith(".test.ts"));
+    expect(stagingFiles.length).toBeGreaterThan(0);
+    for (const name of stagingFiles) {
+      const text = source(`staging/${name}`);
+      expect(text, name).not.toMatch(/from "three/);
+      expect(text, name).not.toMatch(/import\("three/);
+    }
+    // ...and the one module that IS allowed three is the one that turns the primitives into
+    // geometry, so the vocabulary has exactly one implementation.
+    expect(source("diorama/diorama-scene.ts")).toContain("function geometryFor");
+  });
+});
+
+describe("the staged lobby degrades differently from the diorama, on purpose", () => {
+  it("renders its 2D layout whenever the scene is not live", () => {
+    // The diorama may degrade to NOTHING - it is decoration. The staging may not: which
+    // station you are on is the answer to the question the pre-game screens are asking, so
+    // the wrapper renders the CSS staged view until the renderer reports itself up.
+    const wrapper = source("staging/staged-lobby.svelte");
+    expect(wrapper).toContain("{#if !sceneReady}");
+    expect(wrapper).toContain("StagedLobby2d");
+    // And it must start not-ready, so SSR and a WebGL-less browser both get the layout.
+    expect(wrapper).toMatch(/let sceneReady = \$state\(false\)/);
+  });
+
+  it("carries the theme's own nouns into the 2D view rather than hard-coding boats", () => {
+    const fallback = source("staging/staged-lobby-2d.svelte");
+    expect(fallback).toContain("theme.stationNoun");
+    expect(fallback).toContain("theme.holdingAreaNoun");
+    expect(fallback).not.toMatch(/>\s*boat\b/);
+  });
+
+  it("stands everyone still on their spot under reduced motion", () => {
+    // Same rule the wander freeze follows: the layout survives, the journey does not.
+    const motion = source("staging/staging-motion.ts");
+    expect(motion).toContain("if (options.frozen)");
+    expect(motion).toMatch(/frozen[\s\S]{0,400}mode: "idle"/);
+    expect(source("staging/staging-motion.ts")).toMatch(/if \(frozen\) return 0;/);
+  });
 });
 
 describe("guardrail 3+4: the diorama is decoration, and never behind a live clue", () => {
@@ -116,7 +164,10 @@ describe("guardrail 3+4: the diorama is decoration, and never behind a live clue
     const mount = source("diorama/avatar-diorama.svelte");
     expect(mount).toContain("supportsWebGl()");
     // No context, no scene, no canvas fade-in: the surrounding 2D screen is left untouched.
-    expect(mount).toMatch(/if \(!supportsWebGl\(\)\) return;/);
+    // The branch reports the unavailability out (staged-lobby.svelte needs to know) and then
+    // returns without constructing anything - what matters is that nothing is built.
+    expect(mount).toMatch(/if \(!supportsWebGl\(\)\) \{[^}]*return;\s*\}/);
+    expect(mount).not.toMatch(/new SceneClass[\s\S]{0,200}supportsWebGl/);
   });
 
   it("host mirror mode does not spin up a second renderer", () => {
