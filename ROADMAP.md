@@ -88,16 +88,16 @@ Progress 2026-08-14 - landed; both exit criteria green:
 
 ### M3.5 - Room visibility, passwords, and the public lobby
 
-Owner direction 2026-08-14 (docs/decisions/2026-08-14-room-visibility-and-lobby.md): a room is public or unlisted, and independently open or password-protected - the multiplayer server-browser model, with the default (`unlisted` + open) leaving the QR/code flow exactly as it was.
+Owner direction 2026-08-14 (docs/decisions/2026-08-14-room-visibility-and-lobby.md): a room is public or private, and independently open or password-protected - the multiplayer server-browser model, with the default (`private` + open) leaving the QR/code flow exactly as it was. (The listing values read `public`/`unlisted` for the first day of this milestone; the owner renamed the axis on 2026-08-14 - see the room-controls entry below.)
 
 Progress 2026-08-14 - landed:
 
-- [x] Protocol: creation gains `visibility`/`title`/`hostLabel`/`password`, join gains the shared room password, `refused` gains `password-required`/`bad-password` (retryable on the same socket), and `roomSummary`/`lobbyListing` describe the registry projection; new caps in `limits.room`/`limits.lobby`
+- [x] Protocol: creation gains `listing`/`title`/`hostLabel`/`password`, join gains the shared room password, `refused` gains `password-required`/`bad-password` (retryable on the same socket), and `roomSummary`/`lobbyListing` describe the registry projection; new caps in `limits.room`/`limits.lobby`
 - [x] D1's first real use: the `rooms` registry table (`apps/web/migrations/0001_create_rooms.sql`, applied by hand from the runbook) + a typed server-only repository; rows are a cache, the DO stays authority
 - [x] Registry updates from the room DO through a **shared D1 binding** (alternatives weighed and rejected in the decision's addendum), coalesced for roster churn, forced on phase change, row deleted with the room by the expiry alarm, sweep for drift
 - [x] Passwords verified in the DO: PBKDF2-SHA256 (100k, per-room salt, constant-time compare), per-connection attempt budget, host exempt via the creation token, `has_password` the only public fact
 - [x] Wire additions requested by the M4 surfaces (2026-08-14 reconcile): a role-redacted `clue-content` channel (authored prompt/answer - the engine never sees content, so it rides beside the event stream; answers reach the HOST only), host `set-pause`/`expire-timer`/`close-room`, `room-closed` reasons split into expired/host-closed/**kicked** for the polite screen, and the teams-mode seating policy agreed with M4 (an unteamed player is seated as a solo team of one instead of blocking start-game)
-- [x] Surfaces: the root page's real **Join** section (code box + password + polling public-rooms list, code-box-wins) and the harness's create/list controls - which answers the owner's "can the harness list all rooms?" (it can, for public rooms; unlisted rooms have no row by design)
+- [x] Surfaces: the root page's real **Join** section (code box + password + polling public-rooms list, code-box-wins) and the harness's create/list controls - which answers the owner's "can the harness list all rooms?" (it can, for public rooms; private rooms have no row by design)
 
 Follow-up 2026-08-14 (owner report: "creating a public room does not appear to have it appear in the lobby ... I cannot tell if the rooms are actually created") - landed:
 
@@ -105,6 +105,16 @@ Follow-up 2026-08-14 (owner report: "creating a public room does not appear to h
 - [x] The wire now carries a discriminated `registry` status (`ok` / `no-binding` / `no-table` / `error`) on the lobby listing, the create response and `/api/version`; graceful degradation kept, silence removed. Broken registries are never cached
 - [x] Host-authenticated room ops: `DELETE /api/rooms/<CODE>` closes a room end to end and delists it; `GET /api/rooms/<CODE>` is a DO inspector (lifecycle, connection census, roster/team counts, state version, alarm book, storage sizes, the registry row beside it) with a redaction gate over tokens, password material and clue text
 - [x] `/dev/echo` -> `/dev/rooms` (old path redirects): three-column instrument panel - rooms this tab created (create ADDS, never replaces; per-room delete/connect/lobby-presence/expiry countdown), connection + join + actions + DO inspector, and a full-height filterable log; auto-refreshing lobby panel (60s, visible countdown, manual refresh, registry status) and a separate Test area for the refusal probes with expected-vs-actual PASS/FAIL chips
+
+Room controls, streaming mode, and room management 2026-08-14 (docs/decisions/2026-08-14-room-controls-and-staging.md, owner-approved) - landed:
+
+- [x] **The listing axis reads `public` / `private`** everywhere - schema, D1 column + CHECK, UI strings, docs, tests - with no alias and no compatibility shim. The migration was rewritten in place (it drops and recreates the fresh table), so the owner must re-apply it: docs/cloudflare-setup.md 2a
+- [x] **Room settings, all editable after creation**: `maxPlayers` and `maxSpectators` as INDEPENDENT budgets (a stream audience can never crowd out players; the two refuse with different reasons - `room-full` vs `spectators-full`), `spectatorsAllowed` (`spectators-not-allowed`), `hideJoinCode` (streamer mode), plus `listing` and the entry password. Both caps are bounded by `limits.room`, which hosts cannot lift; a cap can never be set below the people already in the room, and going public still needs a title
+- [x] **Every change broadcasts** a `room-settings` message to every connection (and each accepted join receives one), so a join code that just became hidden leaves the projector at once instead of at the next refresh. Changing the password never disconnects anyone already inside - the old secret simply stops admitting anyone new
+- [x] **Two doors, one implementation**: the host-only `update-room-settings` client message and `PATCH /api/rooms/<CODE>` both land in the DO's `applyRoomSettings`, which also re-projects the lobby row (a room that went private delists immediately; a retuned cap moves the lobby's fraction with it)
+- [x] **Empty-room expiry**: a second alarm beside idle expiry - zero connected participants arms a 15-minute grace (`limits.room.emptyRoomGraceMs`), any reconnect cancels it, and firing closes the room and marks the registry row ended while the storage wipe stays with the idle alarm. Both fire and cancel are tested
+- [x] **Room management contracts**: the DO inspector gains the live settings and a participant census split players/spectators (seated vs connected, each against its own cap), the alarm book names the `empty-room` entry, and the redaction gate now also scans the settings surfaces for password material
+- [x] **Harness**: panels extracted into `routes/dev/rooms/panels/` (rooms, room settings, lobby, connection, log, test area) so the layout is rearrangeable without touching probe logic; a new **Room settings** panel exercises every control through both doors with the broadcast and census on screen; and **Run all** runs every probe sequentially with an `N passed / M failed / K skipped` summary
 
 ### M4 - Play surfaces (board, buzzer, host)
 
@@ -155,7 +165,7 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 - [ ] M1 board format + editor core (protocol schemas landed 2026-08-13 - see the M1 progress list; visual editor remains)
 - [x] M2 game engine (landed 2026-08-13 - see the M2 progress list; everyone-answers is engine-complete but not yet driven by the hotseat page)
 - [x] M3 realtime rooms (landed 2026-08-14 - see the M3 progress list; fairness compensation stays M6)
-- [x] M3.5 room visibility, passwords, public lobby (landed 2026-08-14 - registry in D1, lobby on the root page)
+- [x] M3.5 room visibility, passwords, public lobby (landed 2026-08-14 - registry in D1, lobby on the root page; listing renamed public/private and room controls added the same day)
 
 **Later**
 

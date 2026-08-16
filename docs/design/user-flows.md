@@ -20,7 +20,7 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
 - Room full / game over / bad code -> clear friendly error, not a spinner.
 
-**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md). The site root carries a **Join** section - room-code box, password field, and the list of live **public** rooms (title, host label, players/capacity, lock, phase badge, age). Rooms are unlisted by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
+**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md). The site root carries a **Join** section - room-code box, password field, and the list of live **public** rooms (title, host label, players/capacity, lock, phase badge, age). Rooms are private by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
 
 - **The code box always wins**: a complete typed code bypasses the list entirely (someone holding a code came to use it, not to browse). The list dims while a code is typed.
 - **Password rooms** show a lock. The password is a shared room secret shouted across the hall or printed on a table tent - never an account (boundary 2.2 stands). It travels in the join message, never in the URL, and a wrong one is refused _on the same socket_ so the phone can just try again; too many wrong tries close the connection.

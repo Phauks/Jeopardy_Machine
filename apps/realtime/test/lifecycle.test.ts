@@ -38,7 +38,9 @@ async function waitForEmptyDeadline(
     });
     if (predicate(deadline)) return deadline ?? 0;
     if (Date.now() > giveUpAt) {
-      throw new Error(`empty-room deadline never satisfied the predicate (last: ${String(deadline)})`);
+      throw new Error(
+        `empty-room deadline never satisfied the predicate (last: ${String(deadline)})`,
+      );
     }
     // oxlint-disable-next-line no-await-in-loop
     await new Promise((resolve) => setTimeout(resolve, 25));

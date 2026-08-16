@@ -13,7 +13,7 @@ Built with SvelteKit 3 + Svelte 5 on Cloudflare Workers; one Durable Object per 
 - **The host is always in control** - every automated step has an override and an undo.
 - **Theming as a feature** - the board's look (fonts, colors, background) is a portable theme document, with built-in presets.
 - **Players never log in** - room code is the entire join flow, forever.
-- **Public lobby or private code** - a room is listed or unlisted, and independently open or password-protected; the password is a shared room secret, never an account.
+- **Public lobby or private code** - a room is public or private, and independently open or password-protected; the password is a shared room secret, never an account.
 
 ## Quick start (development)
 

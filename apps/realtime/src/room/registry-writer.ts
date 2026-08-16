@@ -43,8 +43,8 @@ export type RegistryListing = {
 };
 
 // Only ever an UPDATE: the row is created by the web Worker's create route, and a room that
-// has no row (unapplied migration, failed insert) must not resurrect itself as an unlisted
-// ghost with a fabricated title.
+// has no row (unapplied migration, failed insert) must not resurrect itself as a ghost row
+// with a fabricated title.
 const touchSql = `UPDATE rooms
   SET phase = ?, player_count = ?, last_seen_at = ?, expires_at = ?
   WHERE code = ?`;

@@ -10,21 +10,23 @@ Also answers the prior question "can the harness list all available rooms?" - it
 
 Adopt the multiplayer server-browser model, with two INDEPENDENT axes - the mistake to avoid is conflating "listed" with "open":
 
-| Axis        | Values                | Meaning                                      |
-| ----------- | --------------------- | -------------------------------------------- |
-| **Listing** | `public` / `unlisted` | Does the room appear in the browsable lobby? |
-| **Entry**   | `open` / `password`   | Is a shared room password required to join?  |
+| Axis        | Values               | Meaning                                      |
+| ----------- | -------------------- | -------------------------------------------- |
+| **Listing** | `public` / `private` | Does the room appear in the browsable lobby? |
+| **Entry**   | `open` / `password`  | Is a shared room password required to join?  |
+
+> **Renamed 2026-08-14** (docs/decisions/2026-08-14-room-controls-and-staging.md, owner call): the listing values were `public` / `unlisted` until this document's own vocabulary was judged wrong. `unlisted` was accurate jargon; a host choosing between **public** and **private** needs no explanation. Renamed with NO alias - the schema, the D1 column and its CHECK constraint, the UI strings and the tests all moved together, which is why `apps/web/migrations/0001_create_rooms.sql` was rewritten in place and must be re-applied (docs/cloudflare-setup.md 2a). Everything else below is unchanged: the two axes stay independent, and all four combinations still exist.
 
 All four combinations are legal and each maps to a real use case:
 
-| Combination         | Game analogue                  | Our use case                                                                                         |
-| ------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| public + open       | open server browser            | pub quiz night, drop-in trivia, demo rooms                                                           |
-| public + password   | listed server with a lock icon | club night: everyone sees it, the password keeps randoms out (owner's "public but needs a password") |
-| unlisted + open     | share-a-code lobby             | the current behavior: QR/code is the entire flow (guiding principle 3)                               |
-| unlisted + password | private match                  | rehearsals, staff-only games                                                                         |
+| Combination        | Game analogue                  | Our use case                                                                                         |
+| ------------------ | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| public + open      | open server browser            | pub quiz night, drop-in trivia, demo rooms                                                           |
+| public + password  | listed server with a lock icon | club night: everyone sees it, the password keeps randoms out (owner's "public but needs a password") |
+| private + open     | share-a-code lobby             | the current behavior: QR/code is the entire flow (guiding principle 3)                               |
+| private + password | private match                  | rehearsals, staff-only games                                                                         |
 
-**Default stays `unlisted` + `open`** - the QR-code flow is untouched and nothing a host does accidentally publishes their game.
+**Default stays `private` + `open`** - the QR-code flow is untouched and nothing a host does accidentally publishes their game.
 
 ### Room passwords are not accounts
 
@@ -34,7 +36,7 @@ Boundary check against guiding principle 3 (players never log in): a room passwo
 
 A D1 table written by the room-creation route and updated over the room's life:
 
-`rooms(code PK, title, host_label, visibility, has_password, phase, player_count, player_cap, created_at, last_seen_at, expires_at, ended_at)`
+`rooms(code PK, title, host_label, listing, has_password, phase, player_count, player_cap, created_at, last_seen_at, expires_at, ended_at)`
 
 - **Written on create**, refreshed by the DO on meaningful transitions (lobby -> active, roster count changes, close/expiry). Registry rows are a _projection_: the DO stays the source of truth, the row is a cache for browsing. A stale row can never let someone into a dead room - the DO refuses on connect regardless.
 - **Password verification lives in the DO, never in the registry**: the row stores only `has_password` (for the lock icon); the DO stores a salted hash and checks it during join. Wrong password = a join refusal, with rate limiting per connection, so the lobby list can never be used as an oracle.
@@ -56,7 +58,7 @@ Server-browser conventions we adopt: lock icons for password rooms, capacity fra
 
 ## Addendum 2026-08-14 (implementation): how registry updates reach D1
 
-The decision above says the registry is "refreshed by the DO on meaningful transitions" without saying how a Durable Object - which cannot import the web app - performs a D1 write. Three mechanisms were available; **the realtime Worker binds the same D1 database and the DO writes its own rows** (`apps/realtime/src/room/registry-writer.ts`, three statements: touch, end, delete).
+The decision above says the registry is "refreshed by the DO on meaningful transitions" without saying how a Durable Object - which cannot import the web app - performs a D1 write. Three mechanisms were available; **the realtime Worker binds the same D1 database and the DO writes its own rows** (`apps/realtime/src/room/registry-writer.ts`, four statements: touch, relist, end, delete - `relist` was added with the editable room settings, since a room that just went private must leave the lobby immediately rather than at the next sweep).
 
 | Option                                                              | Why not / why                                                                                                                                                                                                                                                                                                                                 |     |
 | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
@@ -81,9 +83,9 @@ The decision above says the registry is "refreshed by the DO on meaningful trans
 ## Consequences
 
 - **D1 gets its first real use** (it was bound but idle) - the registry table plus a migration file; `wrangler d1 migrations` becomes part of the deploy runbook.
-- The creation payload gains `visibility`, `password?`, `title`, `hostLabel`; the room protocol's join gains an optional `password`, and `refused` gains `bad-password`/`password-required` reasons.
+- The creation payload gains `listing`, `password?`, `title`, `hostLabel`; the room protocol's join gains an optional `password`, and `refused` gains `bad-password`/`password-required` reasons.
 - The realtime harness gets its room list for free (it queries the same endpoint) - answering the earlier question.
-- Host console gains visibility controls (list/delist, set/clear password) - M4 surface work.
+- Host console gains listing controls (list/delist, set/clear password) - shipped for the room layer 2026-08-14 as the host-only `update-room-settings` message and `PATCH /api/rooms/<CODE>` (docs/decisions/2026-08-14-room-controls-and-staging.md); the console UI itself is M4 surface work.
 - Future: the same registry backs "my rooms" for hosts once accounts exist (M8), and multi-room events (expansion 1.2).
 
 ## Addendum 2026-08-14 (b): the registry reports its own health - graceful is not the same as silent
