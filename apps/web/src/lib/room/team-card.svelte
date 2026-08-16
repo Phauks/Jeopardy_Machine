@@ -20,6 +20,12 @@
     onJoin?: ((teamId: string) => void) | null;
     onKick?: ((playerId: string) => void) | null;
     onHandOff?: ((playerId: string) => void) | null;
+    /**
+     * Leader-only team lock (the anti-nuisance tool, not a ban list - user-flows "Teams &
+     * leadership"). Lives behind the TEAM's own "..." for the same reason kick and hand-off
+     * live behind a member's: it is administrative, and one deliberate tap is the right cost.
+     */
+    onToggleLock?: ((locked: boolean) => void) | null;
     /** Tapping your own chip opens post-join customization (identity sheet). */
     onEditSelf?: (() => void) | null;
   };
@@ -31,10 +37,12 @@
     onJoin = null,
     onKick = null,
     onHandOff = null,
+    onToggleLock = null,
     onEditSelf = null,
   }: Props = $props();
 
   let openMenuFor = $state<string | null>(null);
+  let teamMenuOpen = $state(false);
 
   const teamHex = $derived(
     avatarManifest.accents.find((entry) => entry.id === team.colorId)?.hex ??
@@ -59,6 +67,36 @@
     <span class="team-sound" title="Team buzz sound">{buzzSoundLabel(team.buzzSoundId)}</span>
     {#if team.locked}
       <span class="locked-badge" title="Team locked - no new joiners">locked</span>
+    {/if}
+    {#if viewerIsAdmin && onToggleLock !== null}
+      <div class="overflow">
+        <button
+          type="button"
+          class="overflow-trigger"
+          aria-haspopup="menu"
+          aria-expanded={teamMenuOpen}
+          aria-label="Actions for {team.name}"
+          onclick={() => {
+            teamMenuOpen = !teamMenuOpen;
+          }}
+        >
+          ...
+        </button>
+        {#if teamMenuOpen}
+          <div class="overflow-menu" role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              onclick={() => {
+                teamMenuOpen = false;
+                onToggleLock(!team.locked);
+              }}
+            >
+              {team.locked ? "Unlock team" : "Lock team"}
+            </button>
+          </div>
+        {/if}
+      </div>
     {/if}
   </header>
 

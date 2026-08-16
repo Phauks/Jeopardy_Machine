@@ -17,18 +17,22 @@ function source(relativePath: string): string {
 describe("guardrail 1: motion never reaches the buzzer's critical path", () => {
   // "Never on the buzzer's critical path. The phone's buzz screen stays 2D and instant;
   //  animation lives on the join/lobby screens only."
-  const allowed = ["room/join-screen.svelte", "room/lobby-screen.svelte"];
+  // join-screen.svelte was split in two on 2026-08-15 (character + team); the animated sheet
+  // followed the identity half, which is the half it was ever about.
+  const allowed = ["room/character-screen.svelte", "room/lobby-screen.svelte"];
   const surfaces = [
     "room/buzzer-screen.svelte",
     "room/scores-strip.svelte",
     "room/team-card.svelte",
+    "room/team-screen.svelte",
     "room/identity-sheet.svelte",
     "room/host-console.svelte",
     "room/display-screen.svelte",
+    "staging/staged-lobby-2d.svelte",
     "avatars/avatar-picker.svelte",
   ];
 
-  it("is used by the join and lobby screens", () => {
+  it("is used by the character and lobby screens", () => {
     for (const surface of allowed) {
       expect(source(surface), surface).toContain("avatars/avatar-animated.svelte");
     }

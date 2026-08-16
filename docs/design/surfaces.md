@@ -8,7 +8,7 @@
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
 | `/`                    | The landing (A1): what this is, the room-code box, a secondary link to the browser with a live count, and the dev-surface index in a closed drawer. Polls `/api/rooms` for the count only - it never lists rooms                          | none       |
 | `/lobby`               | The public room browser (A1 alternative arrival): room cards with title AND host label, capacity meters, lock, phase badge, age, inline per-card password prompt, and the code box repeated at the top. Polls, never sockets              | none       |
-| `/room/[code]`         | Player path: A2 join (nickname, avatar+accent, buzzer sound with local preview, team cards) -> A3 lobby (roster, post-join customization, leader overflow menu) -> A4 buzzer (all states below)                                           | `player`   |
+| `/room/[code]`         | Player path, four stages: A2 character (name, avatar+accent, animated preview, buzzer sound) -> A2 team (staged lobby + team cards) -> A3 lobby (roster, staged view, post-join customization, overflow menus) -> A4 buzzer               | `player`   |
 | `/room/[code]/display` | Projector window (C1): title screen with QR + code, category-reveal, board + clue card, scores strip, interstitials, winner screen, plus the live avatar diorama on the non-clue screens. Default owner of room audio (per-device toggle) | `display`  |
 | `/room/[code]/host`    | C4 console: minimap, ARM (spacebar), judge row (arrows), answer visible, undo, score drawer, pause, DD + Final wizards, manual mode, **mirror mode** (C1b, `?mirror`), dev sim panel                                                      | `host`     |
 
@@ -21,6 +21,7 @@ All three shells apply a theme preset via `themeToStyleAttribute` + `data-effect
 `apps/web/src/lib/room/room-store.ts` defines `RoomStore`: a reactive `view: RoomView` (room phase, roster + teams in the two customization tiers, role-redacted engine `GameState`, content join, per-phone buzz feedback, pending timer hints, wager ranges, pause) plus every action any surface takes (join/identity/team tier; buzz/wagers/final answers; the full host verb set). Components consume ONLY this interface.
 
 - `room-view.ts` also owns the pure derivations: `buzzerStageFor` maps a view to exactly one A4 state (the whole states table is a tested function, not template conditionals), `standingsFor` feeds every score strip.
+- `pre-game-stage.ts` does the same job one level up: `playerRouteStageFor` maps a view plus one local choice ("I'll play alone") to exactly one of `character | team | lobby | playing`. The route sets no screen variable, so the transitions nobody clicks are correct for free - a kick lands you back on the team screen because your `teamId` went null, and the host starting the game moves every phone to the buzzer from wherever it was.
 - **Field names deliberately mirror the M3 room protocol** (`packages/protocol/src/room/roster.ts`, `identity.ts`, `server-messages.ts` in the main tree): `playerId`, `teamId`, `colorId`, `leaderPlayerId`, `locked`, `connected`, `joinedAt`, and the personal quartet `nickname/avatarId/accentId/buzzSoundId`. Wiring the ws store is a mapping, not a rename.
 
 ### Implementation 1: local-sim (`local-sim-store.svelte.ts`) - complete
@@ -101,7 +102,7 @@ Web Audio, pre-decoded buffers, three channels honoring the owner directives: `p
 ## Testing
 
 - `room-store.contract.test.ts`: a full game (teams, wagers, final, undo, overrides, manual mode, late join) through the store's action surface, plus every `buzzerStageFor` mapping. The ws store must pass the same assertions behind a real DO at reconcile.
-- `buzzer-screen.states.test.ts` / `host-console.states.test.ts` / `join-lobby.states.test.ts`: SSR renders (repo pattern) of every A4 state, every console state, the C1b mirror invariant (answers + wager dots NEVER in mirrored markup), and the overflow-menu rule.
+- `buzzer-screen.states.test.ts` / `host-console.states.test.ts` / `pre-game.states.test.ts`: SSR renders (repo pattern) of every A4 state, every console state, the C1b mirror invariant (answers + wager dots NEVER in mirrored markup), the three pre-game screens, and the overflow-menu rule (kick, hand-off, AND team lock all behind "..."). `pre-game.states.test.ts` also drives `playerRouteStageFor` through the unclicked transitions - kick, game start, mid-game arrival.
 - `surfaces-presets.smoke.test.ts`: all four theme presets x all three surfaces render; QR + room code on the title screen.
 - `room-audio.test.ts`: the exclusive-slot drop rule and the sound-check queue against a fake AudioContext.
 - `diorama/wander.test.ts`: the movement rules where they are pure - avatars never leave the pen (including under an absurd frame delta), reduced motion stops them dead, a beat expires, arrivals never stack, and a seed reproduces a layout exactly.
