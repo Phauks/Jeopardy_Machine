@@ -48,6 +48,13 @@ Route `/` gains a **Join** entry (the real landing eventually): room-code box + 
 
 Server-browser conventions we adopt: lock icons for password rooms, capacity fractions, "in progress" dimming (joinable only if late-join is enabled), newest-first ordering, and a code box that always wins (typing a code bypasses the list entirely).
 
+**Amended 2026-08-15 - the list moved off the root, the code box did not.** "Route `/` gains a Join entry" was built literally, and the result was a front door carrying two jobs badly: the room-code box and a full browsable list competed for the same first glance, and the page still had to be the developer index as well. The split now is:
+
+- **`/`** is the real landing: what this is, the code box (still the primary control, still always winning), a secondary link to the browser with a live count, and the dev-surface index demoted into a closed drawer. It never lists rooms - a count is enough to decide whether browsing is worth a tap.
+- **`/lobby`** is the browser, and repeats the code box at the top, because arriving there with a code in hand is an ordinary thing to do. Every convention above lives here: lock, capacity meter, phase badge, age, dimming, newest-first.
+
+Two things the built list got wrong and this one fixes. **Title and host label are different facts** and are typed differently (the name of the game, then who is running it) - rendering the host as a grey continuation of the title is what made the first list unreadable at a glance. And **a password is asked for inside the card it belongs to**, not in a shared field at the top of the page: the secret belongs to one room, and a prompt that has forgotten which room it is about is the classic lobby bug.
+
 ### Abuse posture (a public list on a free service invites it)
 
 - Listing is **opt-in per room**, off by default.

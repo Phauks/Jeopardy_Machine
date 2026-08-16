@@ -11,12 +11,15 @@
   import { prefersReducedMotion } from "svelte/motion";
   import AvatarDiorama from "#lib/diorama/avatar-diorama.svelte";
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
+  import StagedLobby from "#lib/staging/staged-lobby.svelte";
   import { accentById, avatarById, avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import { supportsWebGl } from "#lib/diorama/diorama-environment.ts";
   import { maxDioramaAvatars } from "#lib/diorama/wander.ts";
+  import { stagingThemeById, stagingThemes } from "#lib/staging/staging-theme-registry.ts";
   import { themePresets, retroTvPreset } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
   import type { DioramaOccupant } from "#lib/diorama/diorama-scene.ts";
+  import type { StagingStation } from "#lib/staging/staging-layout.ts";
 
   // Fake players drawn round-robin from the real roster and palette, so the preview exercises
   // the same manifest, the same models, and the same runtime recolor the display does.
@@ -25,11 +28,20 @@
     "Otto", "Pim", "Sol", "Nix", "Fen", "Isla", "Gus", "Vela",
   ];
 
+  const teamNames = ["Sequoia", "Kelp", "Tundra", "Basalt", "Monsoon", "Cinder"];
+
   let count = $state(5);
   let themeId = $state(retroTvPreset.id);
   let winnerScene = $state(false);
   let beat = $state<{ entityId: string; at: number } | null>(null);
   let webGlAvailable = $state(true);
+  // Staged mode: the pre-game lobby, with a control per player so a team switch can be watched
+  // happening. This is the only place the move is reviewable without a room and six phones.
+  let staged = $state(true);
+  let stagingThemeId = $state(stagingThemes[0]?.id ?? "boats");
+  let teamCount = $state(3);
+  /** entityId -> stationId, or absent for "still in the holding area". */
+  let assignments = $state<Record<string, string>>({});
 
   $effect(() => {
     webGlAvailable = supportsWebGl();
@@ -61,8 +73,51 @@
     winnerScene ? players.slice(0, 2).map((player) => player.entityId) : [],
   );
 
+  const stagingTheme = $derived(stagingThemeById(stagingThemeId));
+  const stations: StagingStation[] = $derived(
+    Array.from({ length: teamCount }, (_, index) => {
+      const accent = avatarManifest.accents[index % avatarManifest.accents.length];
+      const stationId = `station-${String(index)}`;
+      return {
+        stationId,
+        label: teamNames[index % teamNames.length] ?? `Team ${String(index + 1)}`,
+        colorHex: accent?.hex ?? "#ffcc00",
+        memberIds: players
+          .filter((player) => assignments[player.entityId] === stationId)
+          .map((player) => player.entityId),
+      };
+    }),
+  );
+  const stagedOccupants = $derived(
+    players.map((player) => ({
+      entityId: player.entityId,
+      label: player.nickname,
+      avatarId: player.avatarId,
+      accentId: player.accentId,
+    })),
+  );
+  const waitingEntityIds = $derived(
+    players
+      .filter((player) => {
+        const stationId = assignments[player.entityId];
+        return stationId === undefined || !stations.some((s) => s.stationId === stationId);
+      })
+      .map((player) => player.entityId),
+  );
+
   function fireBeat(entityId: string): void {
     beat = { entityId, at: Date.now() };
+  }
+
+  /** Cycle a player through the stations and back to the holding area - the visible move. */
+  function cycleStation(entityId: string): void {
+    const current = assignments[entityId];
+    const index = stations.findIndex((station) => station.stationId === current);
+    const next = stations[index + 1];
+    const updated = { ...assignments };
+    if (next === undefined) delete updated[entityId];
+    else updated[entityId] = next.stationId;
+    assignments = updated;
   }
 </script>
 
@@ -72,7 +127,18 @@
 
 <div class="diorama-page" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
   <div class="stage">
-    <AvatarDiorama {occupants} {celebratingEntityIds} {beat} themeKey={theme.id} />
+    {#if staged && !winnerScene}
+      <StagedLobby
+        theme={stagingTheme}
+        {stations}
+        occupants={stagedOccupants}
+        {waitingEntityIds}
+        {beat}
+        themeKey={theme.id}
+      />
+    {:else}
+      <AvatarDiorama {occupants} {celebratingEntityIds} {beat} themeKey={theme.id} />
+    {/if}
     <div class="overlay">
       <h1>{winnerScene ? "Winner" : "Jeopardy Machine"}</h1>
       <p class="line">
@@ -99,9 +165,10 @@
 
     {#if !webGlAvailable}
       <p class="warn" role="status">
-        No WebGL on this browser - the stage above is empty and the display would show its
-        plain 2D lobby. That degradation is the point: the diorama is decoration, never a
-        dependency of play.
+        No WebGL on this browser. In free-wander mode the stage above is empty and the display
+        shows its plain 2D lobby - the diorama is decoration, never a dependency of play. In
+        staged mode you instead get the 2D staged view, because which
+        {stagingTheme.stationNoun} you are on is information rather than scenery.
       </p>
     {/if}
     {#if prefersReducedMotion.current}
@@ -144,12 +211,24 @@
         <button
           type="button"
           class="chip"
-          class:active={!winnerScene}
+          class:active={staged && !winnerScene}
           onclick={() => {
+            staged = true;
             winnerScene = false;
           }}
         >
-          Lobby
+          Staged lobby
+        </button>
+        <button
+          type="button"
+          class="chip"
+          class:active={!staged && !winnerScene}
+          onclick={() => {
+            staged = false;
+            winnerScene = false;
+          }}
+        >
+          Free wander
         </button>
         <button
           type="button"
@@ -163,6 +242,70 @@
         </button>
       </div>
     </div>
+
+    {#if staged && !winnerScene}
+      <div class="row">
+        <span class="row-label">Staging theme</span>
+        <div class="chips">
+          {#each stagingThemes as stagingOption (stagingOption.id)}
+            <button
+              type="button"
+              class="chip"
+              class:active={stagingOption.id === stagingThemeId}
+              title={stagingOption.blurb}
+              onclick={() => {
+                stagingThemeId = stagingOption.id;
+              }}
+            >
+              {stagingOption.label}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div class="row">
+        <label for="team-count">Teams ({teamCount})</label>
+        <input id="team-count" type="range" min="0" max="6" bind:value={teamCount} />
+      </div>
+
+      <div class="row">
+        <span class="row-label">Move someone</span>
+        <div class="chips">
+          {#each players as player (player.entityId)}
+            {@const avatar = avatarById(player.avatarId)}
+            {@const station = stations.find(
+              (entry) => entry.stationId === assignments[player.entityId],
+            )}
+            <button
+              type="button"
+              class="chip beat"
+              onclick={() => {
+                cycleStation(player.entityId);
+              }}
+            >
+              {#if avatar}
+                <AvatarChip {avatar} accent={accentById(player.accentId)} size="20px" />
+              {/if}
+              {player.nickname}
+              <span class="where">{station?.label ?? stagingTheme.holdingAreaNoun}</span>
+            </button>
+          {/each}
+        </div>
+      </div>
+      <p class="note">
+        Tapping a player cycles them through the {stagingTheme.stationNoun}s and back to
+        {stagingTheme.holdingAreaNoun}. The point is the JOURNEY: they walk across rather than
+        teleporting, which is what makes a team switch legible from the back of a hall. Under
+        prefers-reduced-motion they stand on the new spot immediately - the layout survives the
+        freeze, the travel does not.
+      </p>
+      <p class="note">
+        Station colour is the team's accent and nothing else: one geometry description, two
+        material writes per recolour (src/lib/staging/staging-theme.ts). Switching the staging
+        theme above swaps the whole vocabulary - holding area, station shape, seats, and waiting
+        behaviour - from one data file.
+      </p>
+    {/if}
 
     <div class="row">
       <span class="row-label">Buzz beat</span>
@@ -316,6 +459,11 @@
 
   .chip.beat {
     padding-left: 0.3rem;
+  }
+
+  .where {
+    font-size: 0.72rem;
+    color: var(--surface-text-muted);
   }
 
   .chip:focus-visible,

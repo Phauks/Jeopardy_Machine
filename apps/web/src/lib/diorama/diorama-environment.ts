@@ -32,6 +32,16 @@ export type DioramaPalette = {
   backdrop: string;
   /** Rim/accent light, so the theme's accent shows up in the lighting, not just the chips. */
   accent: string;
+  /**
+   * The staged lobby's holding-area surface - the water. Only themes that draw one use it
+   * (src/lib/staging/staging-theme.ts, `holdingSurface`); a clearing leaves the ground bare.
+   */
+  holding: string;
+  /** Neutral station structure: masts, stools, rope. Never the team's colour. */
+  structure: string;
+  /** Nameplate text, and the family stack it is drawn in - both follow the room's theme. */
+  nameplateColor: string;
+  nameplateFont: string;
 };
 
 /**
@@ -67,7 +77,30 @@ export function readDioramaPalette(source: Element): DioramaPalette {
     ground: resolveThemeColor(source, "--board-cell-bg", "#060ce9"),
     backdrop: resolveThemeColor(source, "--surface-page", "#0a0b33"),
     accent: resolveThemeColor(source, "--accent", "#ffcc00"),
+    // Every token below is one of the PLAIN-COLOR tokens (docs/design/theming.md's table).
+    // The derived --surface-* tokens are deliberately not used here: they are color-mix()
+    // expressions with an alpha term, and three's color parser drops alpha silently, which
+    // would give a half-transparent water plane a solid colour nobody chose.
+    //
+    // Water is the theme's category fill over its cell fill: one step deeper than the ground
+    // in every preset, which is exactly what water wants to be, with no water colour invented.
+    holding: resolveThemeColor(source, "--board-category-bg", "#0509c0"),
+    // The theme's deepest colour - masts and stools read as dark timber against any preset.
+    structure: resolveThemeColor(source, "--board-bg", "#06071a"),
+    nameplateColor: resolveThemeColor(source, "--clue-text-color", "#ffffff"),
+    // The chrome font slot is a FAMILY STACK, which is precisely what a canvas 2D context
+    // wants - so a nameplate is set in the same face as the roster it names.
+    nameplateFont: readCustomProperty(source, "--font-chrome", "sans-serif"),
   };
+}
+
+/** Raw custom-property read - correct for non-colors, where resolveThemeColor's trick fails. */
+function readCustomProperty(source: Element, token: string, fallback: string): string {
+  const value = source.ownerDocument.defaultView
+    ?.getComputedStyle(source)
+    .getPropertyValue(token)
+    .trim();
+  return value === undefined || value.length === 0 ? fallback : value;
 }
 
 /**

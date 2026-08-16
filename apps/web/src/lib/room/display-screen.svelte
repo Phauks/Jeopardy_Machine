@@ -11,8 +11,11 @@
   import AvatarDiorama from "#lib/diorama/avatar-diorama.svelte";
   import BoardDisplay from "#lib/board/board-display.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
+  import StagedLobby from "#lib/staging/staged-lobby.svelte";
   import { cellKey } from "@jeopardy/engine/state";
   import { entityDisplayName, standingsFor } from "#lib/room/room-view.ts";
+  import { stagingFromRoom } from "#lib/staging/room-staging.ts";
+  import { stagingThemeById } from "#lib/staging/staging-theme-registry.ts";
   import type { DioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import type { DioramaOccupant } from "#lib/diorama/diorama-scene.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -29,8 +32,13 @@
      * Mirror mode passes "none": a host console must not spin up a second renderer.
      */
     environment?: DioramaEnvironment;
+    /**
+     * Which staging theme the pre-game lobby uses (src/lib/staging/staging-theme-registry.ts).
+     * A theme-document field in waiting, exactly like `environment` above.
+     */
+    stagingThemeId?: string | null;
   };
-  let { store, joinOrigin = null, environment = "studio" }: Props = $props();
+  let { store, joinOrigin = null, environment = "studio", stagingThemeId = null }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -138,6 +146,18 @@
       (game === null || view.phase === "lobby" || dioramaPhases.includes(game.phase)),
   );
 
+  // THE STAGED LOBBY. Before the game the diorama is not scenery, it is the seating chart:
+  // people waiting in the holding area, people aboard their team's station, and a team change
+  // visible as a move (docs/decisions/2026-08-14-room-visibility-and-lobby.md's successor work;
+  // the mechanism is src/lib/staging/). Once play starts the stage goes back to free wandering
+  // behind the interstitials - by then everyone has chosen, and there is nothing to stage.
+  //
+  // Unlike the diorama, the staged view survives a display with no WebGL: it degrades to the
+  // same layout in CSS rather than to nothing, because "which boat am I on" is information.
+  const staged = $derived(view.phase === "lobby");
+  const stagingTheme = $derived(stagingThemeById(stagingThemeId));
+  const roomStaging = $derived(stagingFromRoom(view));
+
   // One avatar per SCORING entity, so teams mode shows teams rather than a duplicate crowd -
   // the same entity vocabulary buzz and winner events speak. A team borrows its avatar from
   // its leader (the face the room already associates with it) and wears the team's color.
@@ -187,13 +207,24 @@
     <!-- Behind the screen's own content, never over it: the QR, the scores, and the winner
          names stay the readable foreground. Sits outside the phase branches below so a
          lobby -> interstitial move does not tear the scene down and re-spawn the crowd. -->
-    <div class="diorama-layer">
-      <AvatarDiorama
-        occupants={dioramaOccupants}
-        {environment}
-        {celebratingEntityIds}
-        beat={dioramaBeat}
-      />
+    <div class="diorama-layer" class:staged>
+      {#if staged}
+        <StagedLobby
+          theme={stagingTheme}
+          stations={roomStaging.stations}
+          occupants={roomStaging.occupants}
+          waitingEntityIds={roomStaging.waitingEntityIds}
+          {environment}
+          beat={dioramaBeat}
+        />
+      {:else}
+        <AvatarDiorama
+          occupants={dioramaOccupants}
+          {environment}
+          {celebratingEntityIds}
+          beat={dioramaBeat}
+        />
+      {/if}
     </div>
   {/if}
 
@@ -341,6 +372,16 @@
     height: 46%;
     z-index: 0;
     pointer-events: none;
+  }
+
+  /* The staged lobby's 2D degradation is a block of cards, not a canvas, so the band lets it
+     sit on the floor of the screen and scroll if a room has more teams than fit. With WebGL
+     up, the scene fills the band exactly as before and none of this applies. */
+  .diorama-layer.staged {
+    display: flex;
+    align-items: flex-end;
+    padding: 0 2vw 1.5vh;
+    overflow-y: auto;
   }
 
   /* Everything the screen actually says sits above the scenery. */
@@ -611,5 +652,126 @@
 
   .display-scores {
     overflow-x: auto;
+  }
+
+  /* ==========================================================================================
+   * COMPACT - the display on a phone.
+   *
+   * This surface was written for one situation: a laptop driving a projector, one fixed pane,
+   * nothing scrolls. That is still what it is FOR. But a host checking their own room from
+   * their hand is an ordinary thing to do, and a projector layout on a phone is not merely
+   * ugly - a fixed, inset-0, overflow-hidden pane simply hides everything past the first
+   * viewport height, so the scores and the staged lobby become unreachable rather than small.
+   *
+   * The breakpoint catches both phone orientations (portrait by width, landscape by height)
+   * and neither a laptop nor a projector. Three things change and nothing else:
+   *   1. the pane becomes a scrolling page,
+   *   2. the type scale gains a WIDTH term - the projector scale is clamped against viewport
+   *      height alone, which is correct across a 720p projector and a 4K TV and wildly wrong
+   *      on a tall narrow screen, where 8vh of numeral does not fit a 60px column,
+   *   3. the stage joins the flow instead of floating over the lower half of it.
+   * ======================================================================================== */
+  @media (max-width: 48rem), (max-height: 26rem) {
+    .display-screen {
+      position: static;
+      min-height: 100dvh;
+      overflow: visible;
+      align-content: start;
+      grid-auto-rows: min-content;
+
+      /* Layout constants from tokens.css, re-clamped for a narrow viewport. Overriding them
+         on this subtree is the sanctioned move - they are app layout constants rather than
+         theme document fields (docs/design/theming.md), and every consumer reads the token. */
+      --board-category-size: clamp(0.6rem, 2.6vw, 1.1rem);
+      --board-value-size: clamp(1.1rem, 6vw, 2.4rem);
+      --clue-text-size: clamp(1.05rem, 4.6vw, 2rem);
+    }
+
+    /* The stage stops being an overlay band and becomes a block after the content, with a
+       definite height (the canvas needs one) and its own scroll (the 2D staged view can be
+       taller than the band when a room has many teams). */
+    .diorama-layer {
+      position: static;
+      order: 2;
+      height: 45vh;
+      min-height: 15rem;
+      pointer-events: auto;
+      overflow-y: auto;
+    }
+
+    .title-screen,
+    .category-reveal,
+    .interstitial,
+    .winner-screen,
+    .board-holder {
+      order: 1;
+    }
+
+    /* ...so nothing needs lifting clear of it any more. */
+    .display-screen.with-diorama .title-screen,
+    .display-screen.with-diorama .interstitial,
+    .display-screen.with-diorama .winner-screen {
+      padding-bottom: 6vh;
+    }
+
+    /* The veil has to stay over the viewport rather than over a scrolled-away box. */
+    .pause-veil {
+      position: fixed;
+    }
+
+    .title-screen {
+      gap: 1.25rem;
+      padding: 2rem 1rem;
+    }
+
+    .qr-holder {
+      /* Against the SHORTER axis: a QR sized off 30vh is taller than a phone's width. */
+      width: min(62vw, 16rem);
+    }
+
+    .game-title {
+      font-size: clamp(2rem, 9vw, 3rem);
+    }
+
+    .room-code {
+      font-size: clamp(2.2rem, 14vw, 4rem);
+    }
+
+    .join-url {
+      font-size: clamp(0.9rem, 4vw, 1.3rem);
+      overflow-wrap: anywhere;
+    }
+
+    .interstitial-title,
+    .winner-names {
+      font-size: clamp(1.6rem, 8vw, 3rem);
+    }
+
+    /* A 6-column board does not become readable by shrinking; it becomes readable by
+       scrolling. The minimum keeps a category header legible and lets the phone pan. */
+    .board-holder {
+      overflow-x: auto;
+      padding: 1rem 0.75rem;
+    }
+
+    .board-holder :global(.board) {
+      min-width: 34rem;
+    }
+
+    /* Scores wrap to many rows on a phone; cap and scroll them rather than pushing the board
+       off the screen. */
+    .display-scores {
+      max-height: 28vh;
+      overflow-y: auto;
+    }
+
+    .category-reveal {
+      grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+      padding: 2rem 1rem;
+    }
+
+    .reveal-card {
+      min-height: 6rem;
+    }
   }
 </style>

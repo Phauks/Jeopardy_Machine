@@ -60,26 +60,45 @@
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
+  // ?staging=<theme-id> previews a staging theme, the same dev affordance the player route
+  // carries. Both become theme-document fields (staging-theme-registry.ts writes out the
+  // schema line); neither ever ships in a link we print.
+  const stagingThemeId = $derived(page.url.searchParams.get("staging"));
 </script>
 
 <svelte:head>
   <title>Display - Room {roomCode}</title>
+  <!-- The display is not only a projector. A host checking the room from their hand must not
+       get a broken page, so this route is responsive down to a phone (display-screen.svelte's
+       compact block) and carries the same viewport meta the player route does. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
 <svelte:window onpointerdown={primeAudio} />
 
 <div class="display-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <DisplayScreen {store} />
+  <DisplayScreen {store} {stagingThemeId} />
   {#if !audioReady}
     <p class="audio-hint">Click anywhere to enable room audio on this device</p>
   {/if}
 </div>
 
 <style>
+  /* A projector window is a fixed pane that never scrolls. A phone is not, so the shell drops
+     out of fixed positioning at the same breakpoint the screen inside it goes compact - a
+     fixed, inset-0 shell would trap the page at exactly one viewport height and hide
+     everything below the fold. */
   .display-shell {
     position: fixed;
     inset: 0;
     background: var(--page-bg);
+  }
+
+  @media (max-width: 48rem), (max-height: 26rem) {
+    .display-shell {
+      position: static;
+      min-height: 100dvh;
+    }
   }
 
   .audio-hint {

@@ -20,25 +20,30 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
 - Room full / game over / bad code -> clear friendly error, not a spinner.
 
-**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md). The site root carries a **Join** section - room-code box, password field, and the list of live **public** rooms (title, host label, players/capacity, lock, phase badge, age). Rooms are private by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
+**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md; split across two routes 2026-08-15). The site root `/` carries the room-code box and a link to `/lobby`, which lists live **public** rooms (title, host label, players/capacity, lock, phase badge, age, inline password prompt). Rooms are **private** by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
 
 - **The code box always wins**: a complete typed code bypasses the list entirely (someone holding a code came to use it, not to browse). The list dims while a code is typed.
 - **Password rooms** show a lock. The password is a shared room secret shouted across the hall or printed on a table tent - never an account (boundary 2.2 stands). It travels in the join message, never in the URL, and a wrong one is refused _on the same socket_ so the phone can just try again; too many wrong tries close the connection.
 - **A room in progress** shows "Playing" and is dimmed - whether it actually accepts an arrival is the late-join setting's business, answered by the room itself, not by the list.
 - The list is a **browse surface, not a live room**: it polls, it is briefly cached, and it is capped (pagination deliberately deferred). A stale row can never open a dead room - the room refuses.
 
-### A2. Join (one screen, <15 seconds)
+### A2. Join (two screens, still <15 seconds)
 
-Single screen: nickname field + (if enabled) pick-your-buzzer-sound (tap to preview locally) + color/emoji pick + **Join**.
+**Amended 2026-08-15.** This was specified as one screen and built as one, and the identity half ended up as three squeezed lines above a grid of team cards - the only moment in the product that is about the PLAYER, given the least room on the page. It is two screens now, and the second one exists because the team choice needs the staged lobby beside it (docs/decisions/2026-08-15-staged-lobby.md). Both are short; the count of taps to play is unchanged.
 
-- Team mode, host-premade teams: tap your team's card.
-- Team mode, self-organize: join an existing team card or "+ new team" (creating a team makes you its **leader** - see "Teams & leadership" below).
-- Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix.
-- On join: session token minted and kept in `sessionStorage`; wake-lock requested; phone registered in lobby.
+**A2a - character.** The animated walk-cycle preview at the top (it moves - the identity moment), then name, the avatar grid with accent swatches, and pick-your-buzzer-sound (tap to preview locally). Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix. Continuing takes your seat in the room **without a team**.
+
+**A2b - team** (teams mode only, and skipped for a mid-game arrival, whose engine seat already exists). You are now standing in the staged lobby's holding area - in the water, with the boats theme - and the projector shows you there. Then:
+
+- Host-premade or already-created teams: tap your team's station in the staged view, or its card. You walk across and board it, visibly.
+- Self-organize: "start a new team" (creating a team makes you its **leader** - see "Teams & leadership" below).
+- "Play on my own instead" is always available; an unteamed player is seated as a solo team of one at start-game.
+
+On join: session token minted and kept in `sessionStorage`; wake-lock requested; phone registered in lobby.
 
 ### A3. Lobby
 
-"You're in as **Lorax** 🌲 on **Team Sequoia**" + live roster + game title card in the event's theme.
+"You're in as **Lorax** on **Team Sequoia**" + the staged lobby (you on your team's station, anyone still choosing in the holding area) + live roster + game title card in the event's theme. The stations stay tappable here: changing your mind before the host starts is allowed, and it is the same visible move it was on A2b.
 
 - Buzzer practice: a disarmed demo button; pressing plays _local_ feedback only (no room sound spam). Host may run an official sound check (see C3).
 - Waiting state is explicit: "Waiting for the host to start."
@@ -180,7 +185,7 @@ Two customization tiers that never collide:
 **Leadership mechanics:**
 
 - Creating a team makes you its leader (crown affordance on your card). Host-premade teams: leader = first joiner, until changed.
-- Leader powers, all from the phone lobby screen: rename team, pick team color + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly). **Kick and hand-off live behind a per-member "..." overflow menu** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name.
+- Leader powers, all from the phone lobby screen: rename team, pick team color + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly), and **lock** the team. **Kick and hand-off live behind a per-member "..." overflow menu, and the lock behind the team's own "..."** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name or as a switch on the card.
 - Kicked players return to team selection (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list).
 - **Leader disconnect**: after a grace period (missed heartbeats), leadership auto-passes to the longest-tenured connected member; if the original leader returns they rejoin as a regular member.
 - **Host supremacy is unchanged** (guiding principle 4): the host console can rename/kick/merge/reassign leaders over any team decision, and sees a feed entry for kicks (abuse visibility). Team self-governance reduces host workload; it never gates the host.

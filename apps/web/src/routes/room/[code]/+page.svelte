@@ -1,16 +1,27 @@
 <script lang="ts">
-  // The player path (/room/CODE): A2 join -> A3 lobby -> A4 buzzer, one route whose stage
-  // derives from room-store state. MOCK MODE until the M3 reconcile: the store is a local
-  // simulation seeded from the fixture roster - each tab is its own isolated room (see
-  // docs/design/surfaces.md). Players never see accounts, installs, or prompts here - the
-  // room code in the URL is the entire join flow (guiding principle 3).
+  // The player path (/room/CODE): the whole pre-game journey, then the buzzer.
+  //
+  //   character -> team -> lobby -> playing
+  //
+  // Which one is showing is `playerRouteStageFor` and nothing else (#lib/room/pre-game-stage.ts)
+  // - a pure function of room state plus one local choice. Nothing here sets a screen variable,
+  // which is what makes the unclicked transitions correct for free: a kick puts you back on the
+  // team screen because your teamId went null, and the host starting the game puts every phone
+  // on the buzzer wherever it happened to be.
+  //
+  // MOCK MODE until the M3 reconcile: the store is a local simulation seeded from the fixture
+  // roster - each tab is its own isolated room (docs/design/surfaces.md). Players never see
+  // accounts, installs, or prompts here - the room code in the URL is the entire join flow
+  // (guiding principle 3).
   import { onDestroy } from "svelte";
   import { browser } from "$app/env";
   import { page } from "$app/state";
   import BuzzerScreen from "#lib/room/buzzer-screen.svelte";
-  import JoinScreen from "#lib/room/join-screen.svelte";
+  import CharacterScreen from "#lib/room/character-screen.svelte";
   import LobbyScreen from "#lib/room/lobby-screen.svelte";
+  import TeamScreen from "#lib/room/team-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { playerRouteStageFor } from "#lib/room/pre-game-stage.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
@@ -25,6 +36,10 @@
     store.destroy();
   });
 
+  // The only piece of screen state on this route, and it is a CHOICE rather than a position:
+  // "I do not want a team". Everything else is derived (see pre-game-stage.ts for why).
+  let soloAccepted = $state(false);
+
   // Local-only audio on the phone: previews and personal buzz feedback (never room audio -
   // the display route owns the room channel). Primed lazily from the first user gesture.
   const localAudio = new RoomAudio({ enabled: false });
@@ -33,15 +48,17 @@
     localAudio.playLocalPreview(soundId);
   }
 
-  // Dev affordance shared by the play surfaces: ?theme=modern-flat previews any preset
-  // (theme documents attach per game at M5; the query never ships in links we print).
+  // Dev affordances shared by the play surfaces: ?theme=<preset-id> previews any preset, and
+  // ?staging=<theme-id> previews a staging theme (both become theme-document fields at M5/M7;
+  // neither ever ships in a link we print).
   const theme = $derived(
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
+  const stagingThemeId = $derived(page.url.searchParams.get("staging"));
 
   const view = $derived(store.view);
-  const joined = $derived(view.myPlayerId !== null);
+  const stage = $derived(playerRouteStageFor(view, { soloAccepted }));
 </script>
 
 <svelte:head>
@@ -49,24 +66,32 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
-<div
-  class="room-shell"
-  style={themeToStyleAttribute(theme)}
-  data-effects={theme.effectsLevel}
->
-  {#if !joined}
-    <JoinScreen
+<div class="room-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
+  {#if stage === "character"}
+    <CharacterScreen
       {roomCode}
       roster={view.roster}
       teamsMode={view.teamsMode}
-      onJoin={(request) => {
+      lateJoin={view.phase !== "lobby"}
+      onConfirm={(choice) => {
         localAudio.prime();
-        store.join(request);
+        // Deliberately joined WITHOUT a team: the next screen is where the team is picked, and
+        // it needs you already standing in the holding area for the choice to be a visible
+        // move rather than an appearance out of nowhere.
+        store.join(choice);
       }}
       onPreviewSound={previewSound}
     />
-  {:else if view.phase === "lobby"}
-    <LobbyScreen {store} onPreviewSound={previewSound} />
+  {:else if stage === "team"}
+    <TeamScreen
+      {store}
+      {stagingThemeId}
+      onPlaySolo={() => {
+        soloAccepted = true;
+      }}
+    />
+  {:else if stage === "lobby"}
+    <LobbyScreen {store} {stagingThemeId} onPreviewSound={previewSound} />
   {:else}
     <BuzzerScreen
       {store}
@@ -74,7 +99,10 @@
         // The pressing phone's private feedback: in teams mode the room hears the TEAM sound
         // from the display; this local click is what the presser feels regardless.
         localAudio.prime();
-        localAudio.playLocalPreview(view.roster.players.find((entry) => entry.playerId === view.myPlayerId)?.buzzSoundId ?? null);
+        localAudio.playLocalPreview(
+          view.roster.players.find((entry) => entry.playerId === view.myPlayerId)?.buzzSoundId ??
+            null,
+        );
       }}
     />
   {/if}

@@ -6,15 +6,20 @@
   import AvatarAnimated from "#lib/avatars/avatar-animated.svelte";
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
   import IdentitySheet from "#lib/room/identity-sheet.svelte";
+  import StagedLobby from "#lib/staging/staged-lobby.svelte";
   import TeamCard from "#lib/room/team-card.svelte";
   import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
+  import { stagingFromRoom } from "#lib/staging/room-staging.ts";
+  import { stagingThemeById } from "#lib/staging/staging-theme-registry.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
 
   type Props = {
     store: RoomStore;
+    /** Staging theme id; a theme-document field in waiting (staging-theme-registry.ts). */
+    stagingThemeId?: string | null;
     onPreviewSound?: ((soundId: string) => void) | null;
   };
-  let { store, onPreviewSound = null }: Props = $props();
+  let { store, stagingThemeId = null, onPreviewSound = null }: Props = $props();
 
   let sheetOpen = $state(false);
   let practiceFlash = $state(false);
@@ -28,6 +33,11 @@
   );
   const leadsTeam = $derived(myTeam !== null && myTeam.leaderPlayerId === me?.playerId);
   const unteamedPlayers = $derived(view.roster.players.filter((player) => player.teamId === null));
+  // The same staged picture the projector is showing, on the phone that is in it. Tappable,
+  // because changing your mind before the game starts is allowed and is exactly the move the
+  // staging exists to make visible (docs/decisions/2026-08-15-staged-lobby.md).
+  const stagingTheme = $derived(stagingThemeById(stagingThemeId));
+  const staging = $derived(stagingFromRoom(view));
 
   function practiceBuzz(): void {
     practiceFlash = true;
@@ -97,6 +107,18 @@
   <p class="waiting-line" role="status">Waiting for the host to start...</p>
 
   {#if view.teamsMode}
+    <div class="stage">
+      <StagedLobby
+        theme={stagingTheme}
+        stations={staging.stations}
+        occupants={staging.occupants}
+        waitingEntityIds={staging.waitingEntityIds}
+        selectedStationId={myTeam?.teamId ?? null}
+        onSelectStation={(stationId) => {
+          store.joinTeam(stationId);
+        }}
+      />
+    </div>
     <div class="team-grid">
       {#each view.roster.teams as team (team.teamId)}
         <TeamCard
@@ -110,6 +132,9 @@
           onHandOff={(playerId) => {
             store.handOffLeadership(playerId);
           }}
+          onToggleLock={(locked) => {
+            store.updateTeam({ locked }, team.teamId);
+          }}
           onEditSelf={() => {
             sheetOpen = true;
           }}
@@ -118,7 +143,8 @@
     </div>
     {#if unteamedPlayers.length > 0}
       <p class="unteamed-line">
-        Solo: {unteamedPlayers.map((player) => player.nickname).join(", ")}
+        Still in {stagingTheme.holdingAreaNoun}:
+        {unteamedPlayers.map((player) => player.nickname).join(", ")}
       </p>
     {/if}
   {:else}
@@ -234,6 +260,10 @@
     color: var(--surface-text-muted);
     text-align: center;
     margin: 0;
+  }
+
+  .stage {
+    min-height: 12rem;
   }
 
   .team-grid {
