@@ -1,23 +1,31 @@
 <script lang="ts">
-  // The room instrument panel: create rooms, connect through the single origin, and probe
-  // describing it three milestones ago). Three columns, by owner direction:
+  // The room instrument panel: create rooms, connect through the single origin, manage a live
+  // room, and probe the guardrails.
   //
-  //   left   - Rooms:      create, and every room THIS TAB made, with delete + connect
-  //   middle - Connection: socket/room state, join controls, action probes, the DO inspector
-  //   right  - Log:        full height, filterable, compact or verbose bodies
+  // The layout is PANELS (owner direction 2026-08-14) - each one a component under ./panels,
+  // so the arrangement can be rearranged without touching a line of probe logic. This file
+  // owns every piece of state and every fetch; the panels render and call back.
   //
-  // plus a Lobby panel (auto-refreshing, with the registry's health stated out loud) and a
-  // clearly separated Test area for the refusal probes - assertions, not controls.
+  //   left   - Rooms:         create, and every room THIS TAB made, with delete + connect
+  //          - Room settings: change a LIVE room (listing, caps, spectators, streamer mode,
+  //                           password) through either door, with the broadcast visible
+  //          - Lobby:         the public list, auto-refreshing, registry health in words
+  //   middle - Connection:    socket/room state, join controls, action probes, DO inspector
+  //   right  - Log:           full height, filterable, compact or verbose bodies
+  //   below  - Test area:     the refusal probes, with Run all
   //
   // Single origin, always: rooms connect to wss://<this page's origin>/room/<CODE>/ws and the
-  // web Worker forwards to the DO over the cross-script binding. The old direct-realtime-origin
-  // toggle is DELETED (docs/decisions/2026-08-13-single-origin-binding.md, 2026-08-14). vite
-  // dev cannot serve rooms at all - it has no binding - and the page says so instead of
-  // failing quietly; use the single-origin wrangler loop (docs/DEVELOPMENT.md).
+  // web Worker forwards to the DO over the cross-script binding (docs/decisions/2026-08-13-
+  // single-origin-binding.md). vite dev cannot serve rooms at all - it has no binding - and
+  // the page says so instead of failing quietly.
   //
   // /dev/* routes are never linked from product UI.
-  import DoInspector from "#lib/dev/harness/do-inspector.svelte";
-  import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
+  import ConnectionPanel from "./panels/connection-panel.svelte";
+  import LobbyPanel from "./panels/lobby-panel.svelte";
+  import LogPanel from "./panels/log-panel.svelte";
+  import RoomSettingsPanel from "./panels/room-settings-panel.svelte";
+  import RoomsPanel from "./panels/rooms-panel.svelte";
+  import TestAreaPanel from "./panels/test-area-panel.svelte";
   import { limits } from "@jeopardy/protocol/limits";
   import { protocolVersion } from "@jeopardy/protocol/envelope";
   import { generateRoomCode } from "@jeopardy/protocol/room/create";
@@ -26,35 +34,40 @@
   import { recallRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
   import { sampleGameDefinition } from "#lib/hotseat/sample-game.ts";
-  import { formatRoomAge } from "#lib/lobby/room-age.ts";
   import { summarizeRegistryStatus } from "#lib/lobby/registry-status.ts";
   import {
     appendLogEntry,
-    filterLog,
-    formatLogLine,
-    logLimit,
     logToText,
     stampNow,
   } from "#lib/dev/harness/harness-log.ts";
   import {
-    describeLobbyPresence,
     forgetSessionRoom,
-    formatCountdown,
-    lobbyPresence,
     markSessionRoomClosed,
     rememberSessionRoom,
+    updateSessionRoomSettings,
   } from "#lib/dev/harness/session-rooms.ts";
   import {
     describeObservation,
     judgeProbe,
+    probeBlocker,
     refusalProbes,
+    summarizeProbeRun,
   } from "#lib/dev/harness/refusal-probes.ts";
-  import type { LogDirection, LogEntry, LogFilter } from "#lib/dev/harness/harness-log.ts";
-  import type { ProbeId, ProbeObservation } from "#lib/dev/harness/refusal-probes.ts";
+  import type { LogDirection, LogEntry } from "#lib/dev/harness/harness-log.ts";
+  import type { ProbeId, ProbeObservation, ProbeRunOutcome } from "#lib/dev/harness/refusal-probes.ts";
   import type { SessionRoom } from "#lib/dev/harness/session-rooms.ts";
   import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
-  import type { RoomInspection } from "@jeopardy/protocol/room/diagnostics";
+  import type {
+    RoomInspection,
+    UpdateRoomSettingsResponse,
+  } from "@jeopardy/protocol/room/diagnostics";
+  import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
   import type { LobbyListing } from "@jeopardy/protocol/room/registry";
+  import type { ConnectionState, ConnectionTarget } from "./panels/connection-panel.svelte";
+  import type { LogView } from "./panels/log-panel.svelte";
+  import type { CreateForm } from "./panels/rooms-panel.svelte";
+  import type { SettingsDraft } from "./panels/room-settings-panel.svelte";
+  import type { ProbeState } from "./panels/test-area-panel.svelte";
 
   // The lobby panel watches; it does not play. One minute (owner direction) rather than the
   // product's limits.lobby.listingRefreshMs, which paces a room full of phones deciding where
@@ -74,9 +87,7 @@
   // ---- log ---------------------------------------------------------------------------------
 
   let log = $state<LogEntry[]>([]);
-  let logFilter = $state<LogFilter>("all");
-  let compactBodies = $state(true);
-  const visibleLog = $derived(filterLog(log, logFilter));
+  const logView = $state<LogView>({ filter: "all", compact: true });
 
   function append(dir: LogDirection, text: string): void {
     log = appendLogEntry(log, { at: stampNow(), dir, text });
@@ -85,22 +96,27 @@
   // ---- rooms this tab created ---------------------------------------------------------------
 
   let sessionRooms = $state<SessionRoom[]>([]);
-  let roomCode = $state("");
-  let newRoomVisibility = $state<"public" | "unlisted">("public");
-  let newRoomTitle = $state("Harness room");
-  let newRoomHostLabel = $state("Harness");
-  let newRoomPassword = $state("");
-  let newRoomSource = $state<"sample" | "compact">("sample");
   let creating = $state(false);
-  // The password THIS harness presents when joining (prefilled from creation or the lobby).
-  let joinPassword = $state("");
+  const createForm = $state<CreateForm>({
+    listing: "public",
+    source: "sample",
+    title: "Harness room",
+    hostLabel: "Harness",
+    password: "",
+    maxPlayers: limits.room.playerSoftCap,
+    maxSpectators: limits.room.spectatorSoftCap,
+    spectatorsAllowed: true,
+    hideJoinCode: false,
+  });
+  // Where this tab is pointed: the code it connects to and the password it presents.
+  const target = $state<ConnectionTarget>({ code: "", password: "" });
 
-  const selectedRoom = $derived(sessionRooms.find((room) => room.code === roomCode) ?? null);
+  const selectedRoom = $derived(sessionRooms.find((room) => room.code === target.code) ?? null);
 
   // The hotseat sample game as a REAL definition payload (the same document the editor will
   // send from "Host this game"), or the compact board the bots and workerd suites use.
   function gamePayload(): Record<string, unknown> {
-    if (newRoomSource === "compact") {
+    if (createForm.source === "compact") {
       return { kind: "compact", rounds: [{ columns: 3, rows: 3 }], hasFinalClue: false };
     }
     return { kind: "definition", body: sampleGameDefinition.body };
@@ -115,10 +131,14 @@
         body: JSON.stringify({
           game: gamePayload(),
           seed: `harness-${String(Date.now())}`,
-          visibility: newRoomVisibility,
-          title: newRoomTitle,
-          hostLabel: newRoomHostLabel,
-          ...(newRoomPassword !== "" && { password: newRoomPassword }),
+          listing: createForm.listing,
+          title: createForm.title,
+          hostLabel: createForm.hostLabel,
+          maxPlayers: createForm.maxPlayers,
+          maxSpectators: createForm.maxSpectators,
+          spectatorsAllowed: createForm.spectatorsAllowed,
+          hideJoinCode: createForm.hideJoinCode,
+          ...(createForm.password !== "" && { password: createForm.password }),
         }),
       });
       if (response.status === 503) {
@@ -137,22 +157,20 @@
       // them from the screen is what "creating a room deletes a previously created room" was.
       sessionRooms = rememberSessionRoom(sessionRooms, {
         code: body.code,
-        title: newRoomTitle,
-        hostLabel: newRoomHostLabel,
-        visibility: body.visibility,
-        hasPassword: body.hasPassword,
+        settings: body.settings,
         hostToken: body.hostToken,
-        password: newRoomPassword,
+        password: createForm.password,
         createdAt: Date.now(),
         expiresAt: body.expiresAt,
         registry: body.registry,
         closedAt: null,
       });
-      roomCode = body.code;
-      joinPassword = newRoomPassword;
+      target.code = body.code;
+      target.password = createForm.password;
+      syncSettingsDraft(body.settings, createForm.password);
       append(
         "info",
-        `room ${body.code} created (${body.visibility}${body.hasPassword ? ", password" : ", open"}) - expires ${new Date(body.expiresAt).toLocaleTimeString()} - ${summarizeRegistryStatus(body.registry)}`,
+        `room ${body.code} created (${body.settings.listing}, ${body.settings.entry}, ${String(body.settings.maxPlayers)}p/${String(body.settings.maxSpectators)}s) - expires ${new Date(body.expiresAt).toLocaleTimeString()} - ${summarizeRegistryStatus(body.registry)}`,
       );
       if (body.registry.status !== "ok") {
         append(
@@ -193,10 +211,82 @@
     }
   }
 
+  // ---- room settings ---------------------------------------------------------------------
+  //
+  // Both doors land in the same place inside the DO (applyRoomSettings), which is exactly why
+  // the harness offers both: a divergence between them is a bug this panel can catch.
+
+  const settingsDraft = $state<SettingsDraft>({
+    door: "http",
+    maxPlayers: limits.room.playerSoftCap,
+    maxSpectators: limits.room.spectatorSoftCap,
+    title: "",
+    hostLabel: "",
+    password: "",
+  });
+  let settingsBusy = $state(false);
+  let settingsResult = $state<string | null>(null);
+
+  function syncSettingsDraft(settings: RoomSettings, password: string): void {
+    settingsDraft.maxPlayers = settings.maxPlayers;
+    settingsDraft.maxSpectators = settings.maxSpectators;
+    settingsDraft.title = settings.title;
+    settingsDraft.hostLabel = settings.hostLabel;
+    settingsDraft.password = password;
+  }
+
+  async function applySettings(patch: RoomSettingsPatch): Promise<void> {
+    const room = selectedRoom;
+    if (room === null) return;
+    // What this tab now believes the shared secret is, so the join field keeps working: a
+    // cleared password is an open room, a set one is what was just typed.
+    const password = patch.password === undefined ? undefined : (patch.password ?? "");
+    if (settingsDraft.door === "socket") {
+      sendJson({ type: "update-room-settings", settings: patch }, "update-room-settings");
+      // The answer is the BROADCAST (and an error message if the room refuses), so nothing is
+      // assumed here - trackServerMessage adopts whatever comes back.
+      if (password !== undefined) target.password = password;
+      return;
+    }
+    settingsBusy = true;
+    try {
+      const response = await fetch(`/api/rooms/${room.code}`, {
+        method: "PATCH",
+        headers: { [hostTokenHeader]: room.hostToken, "content-type": "application/json" },
+        body: JSON.stringify({ settings: patch }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | UpdateRoomSettingsResponse
+        | { error?: string }
+        | null;
+      if (!response.ok) {
+        const reason = body !== null && "error" in body ? body.error : String(response.status);
+        settingsResult = `refused: ${String(reason)}`;
+        append("err", `settings ${room.code} refused: ${String(reason)}`);
+        return;
+      }
+      const updated = body as UpdateRoomSettingsResponse;
+      sessionRooms = updateSessionRoomSettings(sessionRooms, room.code, {
+        settings: updated.settings,
+        ...(password !== undefined && { password }),
+      });
+      if (password !== undefined) target.password = password;
+      syncSettingsDraft(updated.settings, password ?? room.password);
+      settingsResult = `applied · ${updated.settings.listing} · ${updated.settings.entry} · ${String(updated.settings.maxPlayers)}p/${String(updated.settings.maxSpectators)}s · code ${updated.settings.hideJoinCode ? "hidden" : "visible"} · ${summarizeRegistryStatus(updated.registry)}`;
+      append("info", `settings ${room.code}: ${settingsResult}`);
+      void refreshLobby();
+      void inspectRoom();
+    } catch (error) {
+      settingsResult = error instanceof Error ? error.message : String(error);
+    } finally {
+      settingsBusy = false;
+    }
+  }
+
   // ---- the public lobby ----------------------------------------------------------------------
   //
   // Only PUBLIC rooms can ever be listed: Durable Objects have no enumeration API, so the list
-  // is exactly the D1 registry projection, and unlisted rooms deliberately have no row to find
+  // is exactly the D1 registry projection, and private rooms deliberately have no row to find
   // (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
 
   let lobby = $state<LobbyListing | null>(null);
@@ -239,68 +329,66 @@
   // the URL and the password from sessionStorage, which is where the lobby left it.
   $effect(() => {
     const fromLobby = new URL(globalThis.location.href).searchParams.get("code");
-    if (fromLobby === null || roomCode !== "") return;
-    roomCode = fromLobby.toUpperCase();
-    joinPassword = recallRoomPassword(roomCode);
-    append("info", `arrived from the lobby with room ${roomCode}`);
+    if (fromLobby === null || target.code !== "") return;
+    target.code = fromLobby.toUpperCase();
+    target.password = recallRoomPassword(target.code);
+    append("info", `arrived from the lobby with room ${target.code}`);
   });
 
   // ---- connection lifecycle -------------------------------------------------------------------
 
   let socket = $state<WebSocket | null>(null);
-  let phase = $state<"disconnected" | "connecting" | "open">("disconnected");
-  let joinedRole = $state<string | null>(null);
-  let roomLifecycle = $state<string | null>(null);
-  let roomPaused = $state(false);
-  let rosterCounts = $state<{ players: number; teams: number } | null>(null);
-  let sessionToken = $state<string | null>(null);
-  let sentCount = $state(0);
-  let receivedCount = $state(0);
-  let openedAt = $state<number | null>(null);
-  let lastActivityAt = $state<number | null>(null);
-  let autoReconnect = $state(false);
+  const connection = $state<ConnectionState>({
+    phase: "disconnected",
+    joinedRole: null,
+    roomLifecycle: null,
+    paused: false,
+    rosterCounts: null,
+    sessionToken: null,
+    sent: 0,
+    received: 0,
+    openedAt: null,
+    lastActivityAt: null,
+    autoReconnect: false,
+    settings: null,
+  });
   let reconnectAttempt = 0;
-
-  function seconds(fromMs: number | null): string {
-    if (fromMs === null) return "-";
-    return `${((now - fromMs) / 1000).toFixed(0)}s`;
-  }
 
   function connect(): void {
     disconnect();
     try {
-      const url = roomWebSocketUrl(roomCode);
-      phase = "connecting";
+      const url = roomWebSocketUrl(target.code);
+      connection.phase = "connecting";
       append("info", `connecting to ${url}`);
       const ws = new WebSocket(url);
       ws.addEventListener("open", () => {
-        phase = "open";
-        openedAt = Date.now();
-        lastActivityAt = Date.now();
+        connection.phase = "open";
+        connection.openedAt = Date.now();
+        connection.lastActivityAt = Date.now();
         reconnectAttempt = 0;
         append("info", "open - the room answers only after a join or resume message");
       });
       ws.addEventListener("message", (event) => {
-        receivedCount += 1;
-        lastActivityAt = Date.now();
+        connection.received += 1;
+        connection.lastActivityAt = Date.now();
         const data = String(event.data);
         trackServerMessage(data);
         append("in", data);
       });
       ws.addEventListener("close", (event) => {
-        phase = "disconnected";
-        openedAt = null;
-        joinedRole = null;
+        connection.phase = "disconnected";
+        connection.openedAt = null;
+        connection.joinedRole = null;
         append(
           "info",
           `closed (code ${String(event.code)}${event.reason ? `, reason "${event.reason}"` : ""})`,
         );
-        if (autoReconnect && reconnectAttempt < 3) {
+        if (connection.autoReconnect && reconnectAttempt < 3) {
           reconnectAttempt += 1;
           const delay = 500 * 2 ** reconnectAttempt;
           append("info", `auto-reconnect ${String(reconnectAttempt)}/3 in ${String(delay)}ms`);
           setTimeout(() => {
-            if (phase === "disconnected") connect();
+            if (connection.phase === "disconnected") connect();
           }, delay);
         }
       });
@@ -312,7 +400,7 @@
       );
       socket = ws;
     } catch (error) {
-      phase = "disconnected";
+      connection.phase = "disconnected";
       append("err", error instanceof Error ? error.message : String(error));
     }
   }
@@ -326,27 +414,36 @@
     if (!parsed.ok) return;
     const message = parsed.message;
     if (message.type === "welcome") {
-      joinedRole = message.role;
-      sessionToken = message.sessionToken;
+      connection.joinedRole = message.role;
+      connection.sessionToken = message.sessionToken;
     }
     if (message.type === "snapshot") {
-      roomLifecycle = message.phase;
-      roomPaused = message.paused;
-      rosterCounts = {
+      connection.roomLifecycle = message.phase;
+      connection.paused = message.paused;
+      connection.rosterCounts = {
         players: message.roster.players.length,
         teams: message.roster.teams.length,
       };
     }
     if (message.type === "roster") {
-      rosterCounts = {
+      connection.rosterCounts = {
         players: message.roster.players.length,
         teams: message.roster.teams.length,
       };
     }
-    if (message.type === "paused") roomPaused = message.paused;
+    if (message.type === "paused") connection.paused = message.paused;
+    // The broadcast IS the answer to a settings change (and the one a display reacts to), so
+    // the session row adopts it whichever door sent the patch.
+    if (message.type === "room-settings") {
+      connection.settings = message.settings;
+      sessionRooms = updateSessionRoomSettings(sessionRooms, target.code, {
+        settings: message.settings,
+      });
+      settingsResult = `broadcast · ${message.settings.listing} · ${message.settings.entry} · code ${message.settings.hideJoinCode ? "hidden" : "visible"}`;
+    }
     if (message.type === "room-closed") {
-      roomLifecycle = `closed (${message.reason})`;
-      sessionRooms = markSessionRoomClosed(sessionRooms, roomCode, Date.now());
+      connection.roomLifecycle = `closed (${message.reason})`;
+      sessionRooms = markSessionRoomClosed(sessionRooms, target.code, Date.now());
     }
     // A refusal or error may be the answer a running probe is waiting for.
     if (message.type === "refused") {
@@ -361,7 +458,7 @@
     reconnectAttempt = 3; // a deliberate disconnect should not fight the user
     socket?.close(1000, "user disconnect");
     socket = null;
-    joinedRole = null;
+    connection.joinedRole = null;
   }
 
   function simulateDrop(): void {
@@ -373,13 +470,13 @@
   // ---- send helpers ---------------------------------------------------------------------------
 
   function sendRaw(raw: string, label?: string): void {
-    if (socket === null || phase !== "open") {
+    if (socket === null || connection.phase !== "open") {
       append("err", "not connected");
       return;
     }
     socket.send(raw);
-    sentCount += 1;
-    lastActivityAt = Date.now();
+    connection.sent += 1;
+    connection.lastActivityAt = Date.now();
     append("out", label === undefined ? raw : `${label}: ${raw}`);
   }
 
@@ -450,14 +547,18 @@
 
   // ---- test area: refusal probes ----------------------------------------------------------------
 
-  type ProbeState = { verdict: "pass" | "fail" | null; actual: string | null; running: boolean };
   let probeStates = $state<Record<string, ProbeState>>({});
-  // Which probe is waiting on the main socket's next refusal/error frame.
-  let pendingProbe: ProbeId | null = null;
+  let runningAll = $state(false);
+  let runSummary = $state<string | null>(null);
+  // Which probe is waiting on the main socket's next refusal/error frame, and how to hand the
+  // verdict back to a Run-all loop that is awaiting it.
+  let pendingProbe: { id: ProbeId; settle: (observed: ProbeObservation) => void } | null = null;
 
-  function probeState(id: ProbeId): ProbeState {
-    return probeStates[id] ?? { verdict: null, actual: null, running: false };
-  }
+  const probeContext = $derived({
+    socketOpen: connection.phase === "open",
+    joinedRole: connection.joinedRole,
+    hasPasswordRoom: selectedRoom !== null && selectedRoom.settings.entry === "password",
+  });
 
   function beginProbe(id: ProbeId): void {
     probeStates = { ...probeStates, [id]: { verdict: null, actual: null, running: true } };
@@ -470,106 +571,175 @@
     append(verdict === "pass" ? "info" : "err", `probe ${id}: ${verdict.toUpperCase()} - ${actual}`);
   }
 
+  function skipProbe(id: ProbeId, reason: string): void {
+    probeStates = { ...probeStates, [id]: { verdict: "skip", actual: reason, running: false } };
+    append("info", `probe ${id}: SKIPPED - ${reason}`);
+  }
+
   // Frames arriving on the MAIN socket settle whichever probe armed itself last.
   function settleProbe(observed: ProbeObservation): void {
-    if (pendingProbe === null) return;
-    const id = pendingProbe;
+    const pending = pendingProbe;
+    if (pending === null) return;
     pendingProbe = null;
-    finishProbe(id, observed);
+    pending.settle(observed);
   }
 
-  function armSocketProbe(id: ProbeId, send: () => void): void {
-    beginProbe(id);
-    pendingProbe = id;
-    send();
-    // No answer at all is itself a failure - the room owes every refusal a frame.
-    setTimeout(() => {
-      if (pendingProbe === id) {
-        pendingProbe = null;
-        finishProbe(id, {});
-      }
-    }, 3000);
-  }
-
-  // Connection-level probe: its own socket, because the point is what happens to a connection
-  // that should never have been accepted.
-  function probeUncreatedRoom(): void {
-    const code = generateRoomCode();
-    beginProbe("uncreated-room");
-    append("info", `probing uncreated room ${code} - EXPECTING a no-such-room refusal`);
-    try {
-      const ws = new WebSocket(roomWebSocketUrl(code));
-      let settled = false;
-      const settle = (observed: ProbeObservation) => {
-        if (settled) return;
-        settled = true;
-        finishProbe("uncreated-room", observed);
-      };
-      ws.addEventListener("message", (event) => {
-        const parsed = parseRoomServerMessage(String(event.data));
-        settle(
-          parsed.ok && parsed.message.type === "refused"
-            ? { type: "refused", reason: parsed.message.reason }
-            : { type: String(event.data).slice(0, 60) },
-        );
-        ws.close();
-      });
-      ws.addEventListener("close", (event) => settle({ closeCode: event.code }));
-      ws.addEventListener("error", () => settle({}));
-    } catch (error) {
-      finishProbe("uncreated-room", { type: error instanceof Error ? error.message : "threw" });
+  // One probe, as a promise: Run all needs to await each in turn, because several of these
+  // share the single socket and a parallel burst would let one settle another's frame.
+  function runProbe(id: ProbeId): Promise<void> {
+    if (id === "uncreated-room") return probeUncreatedRoom();
+    if (id === "wrong-password") return probeWrongPassword();
+    if (id === "stale-version") {
+      return armSocketProbe(id, () =>
+        sendRaw(JSON.stringify({ version: protocolVersion + 1, type: "sync" }), "stale version"),
+      );
     }
-  }
-
-  // Wrong password on a SEPARATE socket: a refused join must leave no trace in the room, and
-  // running it on the main connection would risk spending this tab's own attempt budget.
-  function probeWrongPassword(): void {
-    const room = selectedRoom;
-    if (room === null || !room.hasPassword) return;
-    beginProbe("wrong-password");
-    try {
-      const ws = new WebSocket(roomWebSocketUrl(room.code));
-      let settled = false;
-      const settle = (observed: ProbeObservation) => {
-        if (settled) return;
-        settled = true;
-        finishProbe("wrong-password", observed);
-        ws.close();
-      };
-      ws.addEventListener("open", () => {
-        ws.send(
-          JSON.stringify({
-            version: protocolVersion,
-            type: "join",
-            role: "player",
-            nickname: "Wrong Password Probe",
-            password: `definitely-not-${room.password}`,
-          }),
-        );
-      });
-      ws.addEventListener("message", (event) => {
-        const parsed = parseRoomServerMessage(String(event.data));
-        if (!parsed.ok) return;
-        settle({ type: parsed.message.type, reason: "reason" in parsed.message ? parsed.message.reason : undefined });
-      });
-      ws.addEventListener("error", () => settle({}));
-    } catch (error) {
-      finishProbe("wrong-password", { type: error instanceof Error ? error.message : "threw" });
+    if (id === "malformed-json") {
+      return armSocketProbe(id, () => sendRaw("{not json", "malformed"));
     }
-  }
-
-  function probeRateLimit(): void {
-    // The HOST is exempt from the message-rate cap by design (it authenticated with the
-    // creation token and legitimately bursts), so this probe only means anything as a player
-    // or spectator - the button is disabled for a host connection.
-    armSocketProbe("rate-limit-burst", () => {
+    if (id === "oversized-payload") {
+      return armSocketProbe(id, () =>
+        sendJson(
+          {
+            type: "sync",
+            ext: { "com.example.filler": "x".repeat(limits.wire.clientMessageMaxBytes * 2) },
+          },
+          "oversized",
+        ),
+      );
+    }
+    // rate-limit-burst: the HOST is exempt from the message-rate cap by design, which is why
+    // probeBlocker refuses to run this one as host rather than reporting a false failure.
+    return armSocketProbe(id, () => {
       for (let index = 0; index < limits.wire.clientMessagesPerSecondMax + 5; index += 1) {
         sendJson({ type: "sync" }, "burst");
       }
     });
   }
 
-  let customJson = $state(`{ "version": ${String(protocolVersion)}, "type": "sync" }`);
+  function armSocketProbe(id: ProbeId, send: () => void): Promise<void> {
+    beginProbe(id);
+    return new Promise((resolve) => {
+      const settle = (observed: ProbeObservation) => {
+        finishProbe(id, observed);
+        resolve();
+      };
+      pendingProbe = { id, settle };
+      send();
+      // No answer at all is itself a failure - the room owes every refusal a frame.
+      setTimeout(() => {
+        if (pendingProbe?.id === id) {
+          pendingProbe = null;
+          settle({});
+        }
+      }, 3000);
+    });
+  }
+
+  // Connection-level probe: its own socket, because the point is what happens to a connection
+  // that should never have been accepted.
+  function probeUncreatedRoom(): Promise<void> {
+    const code = generateRoomCode();
+    beginProbe("uncreated-room");
+    append("info", `probing uncreated room ${code} - EXPECTING a no-such-room refusal`);
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (observed: ProbeObservation) => {
+        if (settled) return;
+        settled = true;
+        finishProbe("uncreated-room", observed);
+        resolve();
+      };
+      try {
+        const ws = new WebSocket(roomWebSocketUrl(code));
+        ws.addEventListener("message", (event) => {
+          const parsed = parseRoomServerMessage(String(event.data));
+          settle(
+            parsed.ok && parsed.message.type === "refused"
+              ? { type: "refused", reason: parsed.message.reason }
+              : { type: String(event.data).slice(0, 60) },
+          );
+          ws.close();
+        });
+        ws.addEventListener("close", (event) => settle({ closeCode: event.code }));
+        ws.addEventListener("error", () => settle({}));
+      } catch (error) {
+        settle({ type: error instanceof Error ? error.message : "threw" });
+      }
+    });
+  }
+
+  // Wrong password on a SEPARATE socket: a refused join must leave no trace in the room, and
+  // running it on the main connection would risk spending this tab's own attempt budget.
+  function probeWrongPassword(): Promise<void> {
+    const room = selectedRoom;
+    if (room === null || room.settings.entry !== "password") return Promise.resolve();
+    beginProbe("wrong-password");
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (observed: ProbeObservation) => {
+        if (settled) return;
+        settled = true;
+        finishProbe("wrong-password", observed);
+        resolve();
+      };
+      try {
+        const ws = new WebSocket(roomWebSocketUrl(room.code));
+        ws.addEventListener("open", () => {
+          ws.send(
+            JSON.stringify({
+              version: protocolVersion,
+              type: "join",
+              role: "player",
+              nickname: "Wrong Password Probe",
+              password: `definitely-not-${room.password}`,
+            }),
+          );
+        });
+        ws.addEventListener("message", (event) => {
+          const parsed = parseRoomServerMessage(String(event.data));
+          if (!parsed.ok) return;
+          settle({
+            type: parsed.message.type,
+            ...("reason" in parsed.message && { reason: parsed.message.reason }),
+          });
+          ws.close();
+        });
+        ws.addEventListener("error", () => settle({}));
+      } catch (error) {
+        settle({ type: error instanceof Error ? error.message : "threw" });
+      }
+    });
+  }
+
+  // Run all: SEQUENTIAL, skipping what this tab cannot currently perform, and finishing with
+  // one line a reader can act on (owner request 2026-08-14).
+  async function runAllProbes(): Promise<void> {
+    runningAll = true;
+    runSummary = null;
+    const outcomes: ProbeRunOutcome[] = [];
+    try {
+      for (const probe of refusalProbes) {
+        const blocker = probeBlocker(probe.id, probeContext);
+        if (blocker !== null) {
+          skipProbe(probe.id, blocker);
+          outcomes.push({ id: probe.id, verdict: "skip" });
+          continue;
+        }
+        // Sequential on purpose: these share one socket (see runProbe).
+        // oxlint-disable-next-line no-await-in-loop
+        await runProbe(probe.id);
+        const verdict = probeStates[probe.id]?.verdict;
+        outcomes.push({ id: probe.id, verdict: verdict === "pass" ? "pass" : "fail" });
+      }
+      runSummary = summarizeProbeRun(outcomes);
+      append("info", `run all: ${runSummary}`);
+    } finally {
+      runningAll = false;
+    }
+  }
+
+  const customJson = $state({ text: `{ "version": ${String(protocolVersion)}, "type": "sync" }` });
 </script>
 
 <svelte:head>
@@ -587,524 +757,96 @@
   </header>
 
   <div class="grid items-start gap-4 lg:grid-cols-3">
-    <!-- ==================== LEFT: rooms ==================== -->
     <div class="flex flex-col gap-4">
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <h2 class="font-bold">Create a room</h2>
-        <p class="text-xs opacity-70">
-          Creation is explicit - connecting to a code never creates a room.
-        </p>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          listing
-          <select class="border px-2 py-1" bind:value={newRoomVisibility}>
-            <option value="public">public (shows in the lobby)</option>
-            <option value="unlisted">unlisted (code only)</option>
-          </select>
-        </label>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          game
-          <select class="border px-2 py-1" bind:value={newRoomSource}>
-            <option value="sample">sample game definition (authored clues)</option>
-            <option value="compact">compact 3x3 board (no content)</option>
-          </select>
-        </label>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          title
-          <input
-            class="w-48 border px-2 py-1"
-            maxlength={limits.room.roomTitleMaxLength}
-            bind:value={newRoomTitle}
-          />
-        </label>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          host label
-          <input
-            class="w-48 border px-2 py-1"
-            maxlength={limits.room.hostLabelMaxLength}
-            bind:value={newRoomHostLabel}
-          />
-        </label>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          password
-          <input
-            class="w-48 border px-2 py-1"
-            placeholder="(open room)"
-            maxlength={limits.room.roomPasswordMaxLength}
-            bind:value={newRoomPassword}
-          />
-        </label>
-        <button class="border px-3 py-1" disabled={creating} onclick={createRoom}>
-          {creating ? "Creating..." : "Create room"}
-        </button>
-      </section>
+      <RoomsPanel
+        form={createForm}
+        {creating}
+        onCreate={createRoom}
+        rooms={sessionRooms}
+        {lobby}
+        {now}
+        selectedCode={target.code}
+        onUse={(room) => {
+          target.code = room.code;
+          target.password = room.password;
+          syncSettingsDraft(room.settings, room.password);
+        }}
+        onConnect={(room) => {
+          target.code = room.code;
+          target.password = room.password;
+          syncSettingsDraft(room.settings, room.password);
+          connect();
+        }}
+        onDelete={(room) => void deleteRoom(room)}
+        onForget={(room) => {
+          sessionRooms = forgetSessionRoom(sessionRooms, room.code);
+        }}
+      />
 
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <h2 class="font-bold">Rooms this tab created ({sessionRooms.length})</h2>
-        {#if sessionRooms.length === 0}
-          <p class="text-sm opacity-70">None yet. Creating a room adds a row here; it never
-            replaces the previous one.</p>
-        {/if}
-        <ul class="flex flex-col gap-2">
-          {#each sessionRooms as room (room.code)}
-            {@const presence = lobbyPresence(room, lobby)}
-            <li class="flex flex-col gap-1 rounded-sm border p-2 text-sm">
-              <div class="flex flex-wrap items-baseline gap-2">
-                <strong class="text-base">{room.code}</strong>
-                <span class="opacity-70">{room.title}</span>
-                <span class="opacity-70">
-                  {room.visibility}{room.hasPassword ? " · locked" : " · open"}
-                </span>
-              </div>
-              <div class="flex flex-wrap gap-2 text-xs">
-                <span data-presence={presence}>{describeLobbyPresence(presence)}</span>
-                <span class="opacity-70">created {formatRoomAge(room.createdAt, now)}</span>
-                <span class="opacity-70">
-                  expires in {formatCountdown(room.expiresAt - now)}
-                </span>
-              </div>
-              {#if room.registry.status !== "ok"}
-                <p class="text-xs">
-                  Not written to the registry ({room.registry.reason}) - this room exists and
-                  can be joined by code, but it cannot appear in the lobby.
-                </p>
-              {/if}
-              <div class="flex flex-wrap gap-2">
-                <button
-                  class="border px-2 py-0.5 text-xs"
-                  onclick={() => {
-                    roomCode = room.code;
-                    joinPassword = room.password;
-                  }}
-                >
-                  Use
-                </button>
-                <button
-                  class="border px-2 py-0.5 text-xs"
-                  onclick={() => {
-                    roomCode = room.code;
-                    joinPassword = room.password;
-                    connect();
-                  }}
-                >
-                  Connect
-                </button>
-                <button
-                  class="border px-2 py-0.5 text-xs"
-                  disabled={room.closedAt !== null}
-                  onclick={() => deleteRoom(room)}
-                >
-                  {room.closedAt === null ? "Delete (close room)" : "Closed"}
-                </button>
-                <button
-                  class="border px-2 py-0.5 text-xs"
-                  onclick={() => {
-                    sessionRooms = forgetSessionRoom(sessionRooms, room.code);
-                  }}
-                >
-                  Forget row
-                </button>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      </section>
+      <RoomSettingsPanel
+        room={selectedRoom}
+        broadcast={connection.settings}
+        {inspection}
+        draft={settingsDraft}
+        busy={settingsBusy}
+        result={settingsResult}
+        joinedAsHost={connection.joinedRole === "host"}
+        onApply={(patch) => void applySettings(patch)}
+      />
 
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-bold">Public lobby ({lobby?.rooms.length ?? 0})</h2>
-          <span class="text-xs opacity-70">
-            auto-refresh in {secondsToRefresh}s
-          </span>
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="border px-2 py-0.5 text-sm" disabled={lobbyLoading} onclick={refreshLobby}>
-            {lobbyLoading ? "Refreshing..." : "Refresh now"}
-          </button>
-          <span class="text-xs opacity-70">
-            GET /api/rooms · every {lobbyAutoRefreshMs / 1000}s
-          </span>
-        </div>
-        {#if lobby !== null}
-          <RegistryStatusLine status={lobby.registry} />
-        {/if}
-        {#if lobby !== null && lobby.rooms.length === 0}
-          <p class="text-sm opacity-70">
-            No public rooms live. Unlisted rooms are invisible here by design - a DO cannot be
-            enumerated, and an unlisted room writes no registry row.
-          </p>
-        {/if}
-        <ul class="flex flex-col gap-1 text-sm">
-          {#each lobby?.rooms ?? [] as room (room.code)}
-            <li class="flex flex-wrap items-center gap-2 rounded-sm border p-2">
-              <strong>{room.code}</strong>
-              <span class="opacity-70">{room.title}</span>
-              <span class="text-xs opacity-70">
-                {room.phase} · {room.playerCount}/{room.playerCap}{room.hasPassword
-                  ? " · locked"
-                  : ""}
-              </span>
-              <button
-                class="border px-2 py-0.5 text-xs"
-                onclick={() => {
-                  roomCode = room.code;
-                  connect();
-                }}
-              >
-                Join this room
-              </button>
-            </li>
-          {/each}
-        </ul>
-      </section>
+      <LobbyPanel
+        {lobby}
+        loading={lobbyLoading}
+        {secondsToRefresh}
+        refreshIntervalMs={lobbyAutoRefreshMs}
+        onRefresh={() => void refreshLobby()}
+        onJoin={(code) => {
+          target.code = code;
+          connect();
+        }}
+      />
     </div>
 
-    <!-- ==================== MIDDLE: connection + room state ==================== -->
     <div class="flex flex-col gap-4">
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <h2 class="font-bold">Connection</h2>
-        <div class="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-          <span>mode: <strong>same-origin</strong></span>
-          <span>socket: <strong>{phase}</strong></span>
-          <span>role: <strong>{joinedRole ?? "-"}</strong></span>
-          <span>room: <strong>{roomLifecycle ?? "-"}</strong></span>
-          <span>uptime: {seconds(openedAt)}</span>
-          <span>idle: {seconds(lastActivityAt)}</span>
-          <span>sent {sentCount} · recv {receivedCount}</span>
-          <span>token: {sessionToken === null ? "-" : `${sessionToken.slice(0, 6)}...`}</span>
-          <span>paused: {roomPaused ? "yes" : "no"}</span>
-          <span>
-            roster: {rosterCounts === null
-              ? "-"
-              : `${rosterCounts.players} players · ${rosterCounts.teams} teams`}
-          </span>
-          {#if rttStats}
-            <span class="col-span-2">
-              rtt ({rttStats.count}): min {rttStats.min.toFixed(1)}ms · avg
-              {rttStats.avg.toFixed(1)}ms · max {rttStats.max.toFixed(1)}ms
-            </span>
-          {/if}
-        </div>
-        <div class="flex flex-wrap items-center gap-2">
-          <label class="text-sm" for="room-code">Room code</label>
-          <input
-            id="room-code"
-            class="w-24 border px-2 py-1 uppercase"
-            bind:value={roomCode}
-            maxlength={limits.room.roomCodeLength}
-          />
-          <button
-            class="border px-3 py-1"
-            disabled={roomCode.length !== limits.room.roomCodeLength}
-            onclick={connect}>Connect</button
-          >
-          <button class="border px-3 py-1" disabled={phase !== "open"} onclick={disconnect}>
-            Disconnect
-          </button>
-          <button class="border px-3 py-1" disabled={phase !== "open"} onclick={simulateDrop}>
-            Simulate drop
-          </button>
-          <label class="flex items-center gap-1 text-sm">
-            <input type="checkbox" bind:checked={autoReconnect} />
-            auto-reconnect
-          </label>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <h2 class="font-bold">Join</h2>
-        <p class="text-xs opacity-70">The room answers nothing until you join or resume.</p>
-        <label class="flex items-center justify-between gap-2 text-sm">
-          room password
-          <input
-            class="w-48 border px-2 py-1"
-            placeholder="(none)"
-            maxlength={limits.room.roomPasswordMaxLength}
-            bind:value={joinPassword}
-          />
-        </label>
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open" || selectedRoom === null}
-            onclick={() =>
-              sendJson({ type: "join", role: "host", hostToken: selectedRoom?.hostToken }, "join host")}
-          >
-            Join as host
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open"}
-            onclick={() =>
-              sendJson(
-                {
-                  type: "join",
-                  role: "player",
-                  nickname: "Harness Tester",
-                  ...(joinPassword !== "" && { password: joinPassword }),
-                },
-                "join player",
-              )}
-          >
-            Join as player
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open"}
-            onclick={() =>
-              sendJson(
-                {
-                  type: "join",
-                  role: "spectator",
-                  ...(joinPassword !== "" && { password: joinPassword }),
-                },
-                "join spectator",
-              )}
-          >
-            Join as spectator
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open"}
-            onclick={() =>
-              sendJson(
-                {
-                  type: "join",
-                  role: "display",
-                  ...(joinPassword !== "" && { password: joinPassword }),
-                },
-                "join display",
-              )}
-          >
-            Join as display
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open" || sessionToken === null}
-            onclick={() => sendJson({ type: "resume", sessionToken }, "resume")}
-          >
-            Resume with token
-          </button>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <h2 class="font-bold">Actions</h2>
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "host"}
-            onclick={() => sendJson({ type: "action", action: { type: "start-game" } }, "start-game")}
-          >
-            Start game
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "host"}
-            onclick={() =>
-              sendJson({ type: "action", action: { type: "select-cell", category: 0, row: 0 } }, "select-cell")}
-          >
-            Select cell 0,0
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "host"}
-            onclick={() => sendJson({ type: "action", action: { type: "arm-buzzers" } }, "arm")}
-          >
-            Arm buzzers
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "player"}
-            onclick={() => sendJson({ type: "action", action: { type: "buzz" } }, "buzz")}
-          >
-            Buzz
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "host"}
-            onclick={() =>
-              sendJson({ type: "action", action: { type: "judge", verdict: "correct" } }, "judge correct")}
-          >
-            Judge correct
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole !== "host"}
-            onclick={() => sendJson({ type: "set-pause", paused: !roomPaused }, "set-pause")}
-          >
-            {roomPaused ? "Resume room" : "Pause room"}
-          </button>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={joinedRole === null}
-            onclick={() => sendJson({ type: "sync" }, "sync")}
-          >
-            Sync snapshot
-          </button>
-          <button class="border px-3 py-1 text-sm" disabled={phase !== "open"} onclick={sendPing}>
-            Ping (hibernation check)
-          </button>
-        </div>
-        <p class="text-xs opacity-70">
-          Hibernation check: let idle exceed ~10s, then Ping - the pong comes from the runtime
-          auto-response (the DO never wakes), and a follow-up Sync proves state survived.
-        </p>
-        <textarea class="border p-2 font-mono text-xs" rows="2" bind:value={customJson}></textarea>
-        <div>
-          <button
-            class="border px-3 py-1 text-sm"
-            disabled={phase !== "open"}
-            onclick={() => sendRaw(customJson, "custom")}
-          >
-            Send custom frame
-          </button>
-        </div>
-      </section>
-
-      <section class="flex flex-col gap-2 rounded-sm border p-3">
-        <div class="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 class="font-bold">DO inspector</h2>
-          <button
-            class="border px-2 py-0.5 text-xs"
-            disabled={inspecting || selectedRoom === null}
-            onclick={inspectRoom}
-          >
-            {inspecting ? "Reading..." : "Refresh"}
-          </button>
-        </div>
-        <DoInspector {inspection} {now} error={inspectionError} />
-      </section>
+      <ConnectionPanel
+        {connection}
+        {target}
+        {now}
+        {rttStats}
+        {selectedRoom}
+        {inspection}
+        {inspectionError}
+        {inspecting}
+        {customJson}
+        onConnect={connect}
+        onDisconnect={disconnect}
+        onSimulateDrop={simulateDrop}
+        onSend={sendJson}
+        onSendRaw={sendRaw}
+        onPing={sendPing}
+        onInspect={() => void inspectRoom()}
+      />
     </div>
 
-    <!-- ==================== RIGHT: log ==================== -->
-    <section class="flex max-h-[85vh] min-h-80 flex-col gap-2 rounded-sm border p-3 lg:sticky lg:top-4">
-      <div class="flex flex-wrap items-center gap-2">
-        <h2 class="font-bold">
-          Log ({visibleLog.length}/{log.length}{log.length >= logLimit ? ", capped" : ""})
-        </h2>
-        <select class="border px-2 py-0.5 text-sm" bind:value={logFilter}>
-          <option value="all">all</option>
-          <option value="sent">sent</option>
-          <option value="received">received</option>
-          <option value="errors">errors</option>
-        </select>
-        <label class="flex items-center gap-1 text-sm">
-          <input type="checkbox" bind:checked={compactBodies} />
-          compact
-        </label>
-        <button
-          class="border px-2 py-0.5 text-sm"
-          disabled={log.length === 0}
-          onclick={() => {
-            log = [];
-          }}>Clear</button
-        >
-        <button
-          class="border px-2 py-0.5 text-sm"
-          disabled={log.length === 0}
-          onclick={async () => {
-            await navigator.clipboard.writeText(logToText(log));
-            append("info", "log copied to clipboard (verbose)");
-          }}>Copy</button
-        >
-      </div>
-      <pre class="flex-1 overflow-auto border p-2 text-xs">{#each visibleLog as entry, index (index)}{formatLogLine(entry, compactBodies)}
-{/each}</pre>
-    </section>
+    <LogPanel
+      {log}
+      view={logView}
+      onClear={() => {
+        log = [];
+      }}
+      onCopy={async () => {
+        await navigator.clipboard.writeText(logToText(log));
+        append("info", "log copied to clipboard (verbose)");
+      }}
+    />
   </div>
 
-  <!-- ==================== TEST AREA ==================== -->
-  <section class="flex flex-col gap-2 rounded-sm border-2 border-dashed p-3">
-    <h2 class="font-bold">Test area - refusal probes</h2>
-    <p class="text-xs opacity-70">
-      These are assertions, not controls: each one asks the room to say NO and checks that it
-      said no in the right way. A PASS here means the guardrail holds. They are separated from
-      the normal controls on purpose - a green failure-probe is not an error.
-    </p>
-    <ul class="grid gap-2 md:grid-cols-2">
-      {#each refusalProbes as probe (probe.id)}
-        {@const state = probeState(probe.id)}
-        <li class="flex flex-col gap-1 rounded-sm border p-2 text-sm">
-          <div class="flex flex-wrap items-baseline gap-2">
-            <strong>{probe.label}</strong>
-            {#if state.running}
-              <span class="text-xs">running...</span>
-            {:else if state.verdict !== null}
-              <span
-                class="border px-2 text-xs font-bold"
-                class:bg-green-100={state.verdict === "pass"}
-                class:bg-red-100={state.verdict === "fail"}
-                data-verdict={state.verdict}
-              >
-                {state.verdict.toUpperCase()}
-              </span>
-            {/if}
-          </div>
-          <span class="text-xs opacity-70">expected: {probe.expected}</span>
-          <span class="text-xs opacity-70">actual: {state.actual ?? "not run"}</span>
-          <span class="text-xs opacity-70">{probe.because}</span>
-          {#if probe.id === "uncreated-room"}
-            <button class="w-fit border px-2 py-0.5 text-xs" onclick={probeUncreatedRoom}>Run</button>
-          {:else if probe.id === "wrong-password"}
-            <button
-              class="w-fit border px-2 py-0.5 text-xs"
-              disabled={selectedRoom === null || !selectedRoom.hasPassword}
-              onclick={probeWrongPassword}
-            >
-              Run (needs a password room this tab created)
-            </button>
-          {:else if probe.id === "stale-version"}
-            <button
-              class="w-fit border px-2 py-0.5 text-xs"
-              disabled={phase !== "open"}
-              onclick={() =>
-                armSocketProbe("stale-version", () =>
-                  sendRaw(
-                    JSON.stringify({ version: protocolVersion + 1, type: "sync" }),
-                    "stale version",
-                  ),
-                )}
-            >
-              Run
-            </button>
-          {:else if probe.id === "malformed-json"}
-            <button
-              class="w-fit border px-2 py-0.5 text-xs"
-              disabled={phase !== "open"}
-              onclick={() => armSocketProbe("malformed-json", () => sendRaw("{not json", "malformed"))}
-            >
-              Run
-            </button>
-          {:else if probe.id === "oversized-payload"}
-            <button
-              class="w-fit border px-2 py-0.5 text-xs"
-              disabled={phase !== "open"}
-              onclick={() =>
-                armSocketProbe("oversized-payload", () =>
-                  sendJson(
-                    {
-                      type: "sync",
-                      ext: {
-                        "com.example.filler": "x".repeat(limits.wire.clientMessageMaxBytes * 2),
-                      },
-                    },
-                    "oversized",
-                  ),
-                )}
-            >
-              Run
-            </button>
-          {:else}
-            <button
-              class="w-fit border px-2 py-0.5 text-xs"
-              disabled={phase !== "open" || joinedRole === "host" || joinedRole === null}
-              onclick={probeRateLimit}
-            >
-              Run (join as player/spectator - the host is exempt by design)
-            </button>
-          {/if}
-        </li>
-      {/each}
-    </ul>
-  </section>
+  <TestAreaPanel
+    states={probeStates}
+    context={probeContext}
+    {runningAll}
+    summary={runSummary}
+    onRun={(id) => void runProbe(id)}
+    onRunAll={() => void runAllProbes()}
+  />
 </main>

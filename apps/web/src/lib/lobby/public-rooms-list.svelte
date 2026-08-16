@@ -23,7 +23,7 @@
 
 {#if rooms.length === 0}
   <p class="rounded-sm border border-dashed p-4 text-sm opacity-70">
-    No public rooms right now. Rooms are unlisted by default - hosts opt in - so a quiet list
+    No public rooms right now. Rooms are private by default - hosts opt in - so a quiet list
     is the normal state. Have a code? Type it above.
   </p>
 {:else}

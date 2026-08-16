@@ -1,9 +1,10 @@
 // Room lifecycle per docs/decisions/2026-08-13-single-origin-binding.md: creation is an
 // explicit typed RPC, connecting never creates, expired rooms answer no-such-room and free
 // their code. M3 exit-criteria coverage: create / join / refuse-uncreated / expiry alarm.
-import { runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
+import { env, runDurableObjectAlarm, runInDurableObject, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { limits } from "@jeopardy/protocol/limits";
+import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import {
   connectBot,
@@ -15,8 +16,34 @@ import {
   uniqueCode,
   upgradeToRoom,
 } from "./helpers.ts";
-import type { RoomMeta } from "../src/room/storage.ts";
+import type { AlarmSchedule, RoomMeta } from "../src/room/storage.ts";
 import type { GameRoomDO } from "../src/index.ts";
+
+/**
+ * Poll the DO's stored empty-room deadline until it satisfies `predicate`, and answer it.
+ * Polling rather than sleeping because the arm/cancel happens inside a socket lifecycle
+ * event: the test must not guess how long that takes, only that it does.
+ */
+async function waitForEmptyDeadline(
+  code: string,
+  predicate: (deadline: number | null) => boolean,
+  timeoutMs = 5000,
+): Promise<number> {
+  const giveUpAt = Date.now() + timeoutMs;
+  for (;;) {
+    // oxlint-disable-next-line no-await-in-loop
+    const deadline = await runInDurableObject(roomStub(code), async (_instance, state) => {
+      const schedule = await state.storage.get<AlarmSchedule>("schedule");
+      return schedule?.emptyRoomAt ?? null;
+    });
+    if (predicate(deadline)) return deadline ?? 0;
+    if (Date.now() > giveUpAt) {
+      throw new Error(`empty-room deadline never satisfied the predicate (last: ${String(deadline)})`);
+    }
+    // oxlint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
 
 describe("explicit room creation", () => {
   it("refuses WebSocket upgrades for a code nobody created (no-such-room, close 4404)", async () => {
@@ -142,6 +169,73 @@ describe("expiry alarm", () => {
     // ...and reusable: a fresh create on the same code succeeds (fresh host token).
     const recreated = await initializeRoom(code);
     expect(recreated.hostToken).not.toBe(hostToken);
+  });
+
+  it("closes a room whose last participant left, once the grace elapses", async () => {
+    const code = uniqueCode();
+    const now = Date.now();
+    await env.DB.prepare(
+      `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+         player_cap, created_at, last_seen_at, expires_at, ended_at)
+       VALUES (?, 'Empty suite', '', 'public', 0, 'lobby', 0, ?, ?, ?, ?, NULL)`,
+    )
+      .bind(code, limits.room.playerSoftCap, now, now, now + limits.room.idleExpiryMs)
+      .run();
+    const { hostToken } = await initializeRoom(code, undefined, "empty-suite", {
+      listing: "public",
+      title: "Empty suite",
+    });
+    const host = await connectHost(code, hostToken);
+
+    // Everyone leaves. The room is NOT closed yet - the grace window is the entire point,
+    // because "everyone left" and "the venue's Wi-Fi hiccuped" look identical at first.
+    host.socket.close(1000, "left the venue");
+    const armed = await waitForEmptyDeadline(code, (deadline) => deadline !== null);
+    expect(armed).toBeGreaterThan(Date.now());
+    expect(armed).toBeLessThanOrEqual(Date.now() + limits.room.emptyRoomGraceMs);
+
+    // Fast-forward the deadline and fire the one runtime alarm.
+    await runInDurableObject(roomStub(code), async (instance: GameRoomDO, state) => {
+      const schedule = await state.storage.get<AlarmSchedule>("schedule");
+      if (schedule === undefined) throw new Error("no schedule");
+      schedule.emptyRoomAt = Date.now() - 1000;
+      await state.storage.put("schedule", schedule);
+      (instance as unknown as { room: undefined }).room = undefined;
+    });
+    expect(await runDurableObjectAlarm(roomStub(code))).toBe(true);
+
+    // The room is over and the lobby says so. The storage wipe stays with the IDLE alarm, so
+    // the code is still spent and a host who comes back still finds the state.
+    const response = await roomStub(code).fetch("https://do/diagnostics", {
+      headers: { [hostTokenHeader]: hostToken },
+    });
+    expect(((await response.json()) as { lifecycle: string }).lifecycle).toBe("ended");
+    const row = await env.DB.prepare(`SELECT phase, ended_at FROM rooms WHERE code = ?`)
+      .bind(code)
+      .first<{ phase: string; ended_at: number | null }>();
+    expect(row?.phase).toBe("ended");
+    expect(row?.ended_at).not.toBeNull();
+  });
+
+  it("cancels the empty-room countdown the moment anyone reconnects", async () => {
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code);
+    const host = await connectHost(code, hostToken);
+
+    host.socket.close(1000, "phone slept");
+    expect(await waitForEmptyDeadline(code, (deadline) => deadline !== null)).toBeGreaterThan(0);
+
+    // A whole room losing its Wi-Fi and coming back must keep its game. Cancelling on CONNECT
+    // rather than on join is deliberate: a socket still choosing a nickname is not an
+    // abandoned room either.
+    const returning = new TestClient(await upgradeToRoom(code));
+    await waitForEmptyDeadline(code, (deadline) => deadline === null);
+
+    // ...and the alarm, when it does fire, finds nothing to close.
+    expect(await runDurableObjectAlarm(roomStub(code))).toBe(true);
+    returning.send({ type: "join", role: "host", hostToken });
+    expect((await returning.waitFor("welcome")).role).toBe("host");
+    expect((await returning.waitFor("snapshot")).phase).toBe("lobby");
   });
 
   it("does not expire an active room: the alarm re-arms against fresh activity", async () => {

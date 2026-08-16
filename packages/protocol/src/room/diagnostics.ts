@@ -16,8 +16,8 @@
 // wire state: nothing subscribes, nothing patches, and a stale reading is harmless.
 import { z } from "zod";
 import { registryStatusSchema } from "./registry.ts";
+import { roomSettingsSchema } from "./room-settings.ts";
 import { roomCodeSchema, roomPhaseSchema } from "./server-messages.ts";
-import { roomVisibilitySchema } from "./visibility.ts";
 
 // How a host proves itself to the ops endpoints. A header, not a query parameter: room links
 // are pasted, logged and screenshotted, and the host token is the room's strongest secret -
@@ -41,18 +41,40 @@ export type ConnectionCensus = z.infer<typeof connectionCensusSchema>;
 // runtime alarm always sits at the earliest `dueAt`; seeing the whole book is how a timer
 // that never fired stops being a mystery.
 export const alarmEntrySchema = z.strictObject({
-  source: z.enum(["engine-timer", "team-succession", "idle-expiry"]),
+  // `empty-room` is the grace timer a room starts when its last participant disconnects -
+  // separate from `idle-expiry`, which measures dormancy in an OCCUPIED room. Seeing both in
+  // one book is how "why did my room disappear" answers itself.
+  source: z.enum(["engine-timer", "team-succession", "idle-expiry", "empty-room"]),
   // Timer kind, team id, or "room" - a label, never an identity.
   label: z.string().max(60),
   dueAt: z.int().positive(),
 });
 
+// The participant census, split by the two budgets the room enforces separately
+// (docs/decisions/2026-08-14-room-controls-and-staging.md). Players are counted from the
+// ROSTER (a seat survives a dropped phone; `connected` is how many are on a socket right now),
+// spectators from live CONNECTIONS (they hold no seat by design). Displays are counted in
+// `connections` above and belong to neither budget - the projector is the host's own screen.
+export const participantCensusSchema = z.strictObject({
+  players: z.strictObject({
+    seated: z.int().nonnegative(),
+    connected: z.int().nonnegative(),
+    max: z.int().positive(),
+  }),
+  spectators: z.strictObject({
+    connected: z.int().nonnegative(),
+    max: z.int().nonnegative(),
+    allowed: z.boolean(),
+  }),
+});
+export type ParticipantCensus = z.infer<typeof participantCensusSchema>;
+
 export const roomDiagnosticsSchema = z.strictObject({
   code: roomCodeSchema,
   lifecycle: roomPhaseSchema,
-  visibility: roomVisibilitySchema,
-  title: z.string().max(120),
-  hostLabel: z.string().max(120),
+  // The live room controls, exactly as every connected client sees them (room-settings.ts).
+  // No secret is reachable from here: `entry` says a password exists, never what it is.
+  settings: roomSettingsSchema,
   // The one password fact that is ever public (registry.ts) - true/false, never the hash.
   hasPassword: z.boolean(),
   // Unix ms. `expiresAt` is derived (lastActivityAt + the idle-expiry limit), so the gap
@@ -63,6 +85,7 @@ export const roomDiagnosticsSchema = z.strictObject({
   paused: z.boolean(),
   stateVersion: z.int().nonnegative(),
   connections: connectionCensusSchema,
+  participants: participantCensusSchema,
   roster: z.strictObject({
     players: z.int().nonnegative(),
     connected: z.int().nonnegative(),
@@ -104,6 +127,17 @@ export const roomInspectionSchema = z.strictObject({
   registryRow: z.union([registryRowStateSchema, z.null()]),
 });
 export type RoomInspection = z.infer<typeof roomInspectionSchema>;
+
+// Body of PATCH /api/rooms/<CODE> (host-authenticated): the settings AFTER the edit, plus what
+// the lobby row write made of it - a room that just went public and could not be listed must
+// say so in the same breath, exactly as creation does. The password never travels back; a
+// cleared or replaced secret shows up only as `settings.entry`.
+export const updateRoomSettingsResponseSchema = z.strictObject({
+  code: roomCodeSchema,
+  settings: roomSettingsSchema,
+  registry: registryStatusSchema,
+});
+export type UpdateRoomSettingsResponse = z.infer<typeof updateRoomSettingsResponseSchema>;
 
 // Body of DELETE /api/rooms/<CODE> (host-authenticated): the room is closed, everyone got the
 // polite screen, and the lobby row is gone. `registry` reports the row deletion the same way

@@ -17,24 +17,32 @@
 // - "schedule": AlarmSchedule - the multiplexed alarm book (engine timers, leadership
 //               succession, room expiry); the ONE runtime alarm is always min() of these
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { RosterEntry, TeamDoc } from "@jeopardy/protocol/room/roster";
-import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
 import type { GameActionType } from "@jeopardy/engine/actions";
 import type { StoredRoomPassword } from "./password.ts";
 
 export type RoomLifecycle = "lobby" | "active" | "ended";
 
+// The host-tunable room controls as they are STORED. Everything the wire's RoomSettings
+// carries except the two derived/echoed parts: `entry` (a function of the password below) and
+// the title/host label (stored beside them on the meta, because the registry row wants them
+// as their own columns). Building the wire shape from these three is roomSettingsPayload().
+export type StoredRoomSettings = Omit<RoomSettings, "entry" | "title" | "hostLabel">;
+
 export type RoomMeta = {
   code: string;
   hostToken: string;
-  // Listing + entry, the two independent axes of docs/decisions/2026-08-14-room-visibility-
-  // and-lobby.md. `visibility` decides whether the registry row is browsable; `password` is
-  // the salted hash of the shared room secret (null = an open room). The hash lives HERE and
-  // only here - the registry row carries has_password and nothing else, so the lobby can
-  // never be used as a password oracle.
-  visibility: RoomVisibility;
+  // The live room controls (docs/decisions/2026-08-14-room-controls-and-staging.md): listing,
+  // the two participant budgets, the spectator switch, streamer mode. Every one is editable
+  // after creation through the host-only update-room-settings message / PATCH endpoint, so
+  // this object CHANGES over a room's life - unlike setup, which is frozen at creation.
+  settings: StoredRoomSettings;
   title: string;
   hostLabel: string;
+  // The salted hash of the shared room secret (null = an open room), and the entire truth of
+  // the entry axis. The hash lives HERE and only here - the registry row carries has_password
+  // and nothing else, so the lobby can never be used as a password oracle.
   password: StoredRoomPassword | null;
   createdAt: number;
   // Bumped (coalesced - see the DO's touchActivity) on connects and messages; expiry
@@ -83,15 +91,28 @@ export type AlarmSchedule = {
   engineTimers: Record<string, EngineTimerEntry>;
   // Keyed by teamId.
   successions: Record<string, SuccessionEntry>;
+  // When a room that has ZERO connected participants closes itself, or null while anyone is
+  // attached. Deliberately a SECOND deadline rather than a shorter idle expiry: idle asks
+  // "has this occupied room gone quiet" (2h - a dinner break), empty asks "did everyone
+  // leave" (15min - abandoned rooms must stop squatting on codes and lobby slots). Set when
+  // the last connection closes, cleared the moment anyone connects again, which is what makes
+  // a whole room losing its Wi-Fi survivable (docs/decisions/2026-08-14-room-controls-and-
+  // staging.md).
+  emptyRoomAt: number | null;
 };
 
-export const emptySchedule: AlarmSchedule = { engineTimers: {}, successions: {} };
+export const emptySchedule: AlarmSchedule = {
+  engineTimers: {},
+  successions: {},
+  emptyRoomAt: null,
+};
 
 /**
- * The next moment the DO must wake: earliest scheduled entry or the idle expiry. A PAUSED
- * room contributes no engine timers - that is what the freeze means; leadership succession
- * and idle expiry keep running, because phones still drop and rooms still age while a host
- * holds the room.
+ * The next moment the DO must wake: earliest scheduled entry, the empty-room grace, or the
+ * idle expiry. A PAUSED room contributes no engine timers - that is what the freeze means;
+ * leadership succession, the empty-room grace and idle expiry keep running, because phones
+ * still drop and rooms still age while a host holds the room. (A paused room that empties out
+ * still closes: pause protects a clue in progress, not a room nobody is in.)
  */
 export function nextWakeAt(schedule: AlarmSchedule, meta: RoomMeta, idleExpiryMs: number): number {
   let earliest = meta.lastActivityAt + idleExpiryMs;
@@ -103,7 +124,23 @@ export function nextWakeAt(schedule: AlarmSchedule, meta: RoomMeta, idleExpiryMs
   for (const entry of Object.values(schedule.successions)) {
     earliest = Math.min(earliest, entry.dueAt);
   }
+  if (schedule.emptyRoomAt !== null) earliest = Math.min(earliest, schedule.emptyRoomAt);
   return earliest;
+}
+
+/**
+ * The wire shape of the room's settings, assembled from the three places the DO keeps them:
+ * the tunable controls, the listing text, and the password (which IS the entry axis). One
+ * function so the join reply, the change broadcast, the inspector and the HTTP response can
+ * never describe the same room differently.
+ */
+export function roomSettingsPayload(meta: RoomMeta): RoomSettings {
+  return {
+    ...meta.settings,
+    entry: meta.password === null ? "open" : "password",
+    title: meta.title,
+    hostLabel: meta.hostLabel,
+  };
 }
 
 /** Strip secrets from a stored roster entry for the wire (protocol RosterEntry shape). */

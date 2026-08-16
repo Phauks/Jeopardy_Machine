@@ -17,7 +17,7 @@
 import { limits } from "@jeopardy/protocol/limits";
 import type { RegistryRowState } from "@jeopardy/protocol/room/diagnostics";
 import type { RegistryStatus, RoomSummary } from "@jeopardy/protocol/room/registry";
-import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
+import type { RoomListing } from "@jeopardy/protocol/room/visibility";
 
 // The sliver of D1 this module uses, typed structurally for the same reason App.Platform is
 // (src/app.d.ts): pulling @cloudflare/workers-types into a DOM-lib SvelteKit app trades a few
@@ -38,8 +38,10 @@ export type RoomRegistration = {
   code: string;
   title: string;
   hostLabel: string;
-  visibility: RoomVisibility;
+  listing: RoomListing;
   hasPassword: boolean;
+  // The room's own settings.maxPlayers - what the lobby fraction must mean (registry.ts).
+  playerCap: number;
   createdAt: number;
   expiresAt: number;
 };
@@ -48,7 +50,7 @@ type RoomRow = {
   code: string;
   title: string;
   host_label: string;
-  visibility: string;
+  listing: string;
   has_password: number;
   phase: string;
   player_count: number;
@@ -61,13 +63,13 @@ type RoomRow = {
 // A code is reusable once its room expires (single-origin decision doc, lifecycle), so the
 // insert must be able to land on a stale row for the same code - upsert, not insert.
 const upsertSql = `INSERT INTO rooms
-  (code, title, host_label, visibility, has_password, phase, player_count, player_cap,
+  (code, title, host_label, listing, has_password, phase, player_count, player_cap,
    created_at, last_seen_at, expires_at, ended_at)
   VALUES (?, ?, ?, ?, ?, 'lobby', 0, ?, ?, ?, ?, NULL)
   ON CONFLICT(code) DO UPDATE SET
     title = excluded.title,
     host_label = excluded.host_label,
-    visibility = excluded.visibility,
+    listing = excluded.listing,
     has_password = excluded.has_password,
     phase = 'lobby',
     player_count = 0,
@@ -80,10 +82,10 @@ const upsertSql = `INSERT INTO rooms
 // Live public rooms, newest first. Liveness is asserted here rather than trusted: a room the
 // DO stopped reporting on delists itself when its expiry deadline passes, and `ended` rooms
 // never appear even if the sweep has not run yet.
-const listSql = `SELECT code, title, host_label, visibility, has_password, phase,
+const listSql = `SELECT code, title, host_label, listing, has_password, phase,
     player_count, player_cap, created_at, last_seen_at, expires_at
   FROM rooms
-  WHERE visibility = 'public'
+  WHERE listing = 'public'
     AND ended_at IS NULL
     AND phase IN ('lobby', 'active')
     AND expires_at > ?
@@ -99,7 +101,7 @@ const deleteSql = `DELETE FROM rooms WHERE code = ?`;
 
 // One room's row as the inspector reads it (the DO's own belief is fetched separately, and
 // the point is comparing the two).
-const rowStateSql = `SELECT visibility, phase, player_count, expires_at, ended_at
+const rowStateSql = `SELECT listing, phase, player_count, expires_at, ended_at
   FROM rooms
   WHERE code = ?`;
 
@@ -117,9 +119,9 @@ export function registerRoom(
       registration.code,
       registration.title,
       registration.hostLabel,
-      registration.visibility,
+      registration.listing,
       registration.hasPassword ? 1 : 0,
-      limits.room.playerSoftCap,
+      registration.playerCap,
       registration.createdAt,
       registration.createdAt,
       registration.expiresAt,
@@ -160,7 +162,7 @@ export async function readRegistryRow(
   now: number,
 ): Promise<RegistryRowState | null> {
   const { results } = await database.prepare(rowStateSql).bind(code).all<{
-    visibility: string;
+    listing: string;
     phase: string;
     player_count: number;
     expires_at: number;
@@ -173,7 +175,7 @@ export async function readRegistryRow(
     // Exactly the listing query's predicate, restated against one row: "would the lobby show
     // this?" is the question the harness asks, and it must not drift from listSql above.
     listed:
-      row.visibility === "public" &&
+      row.listing === "public" &&
       row.ended_at === null &&
       (phase === "lobby" || phase === "active") &&
       row.expires_at > now,
@@ -228,7 +230,7 @@ function toRoomSummary(row: RoomRow): RoomSummary {
     code: row.code,
     title: row.title,
     hostLabel: row.host_label,
-    visibility: row.visibility === "public" ? "public" : "unlisted",
+    listing: row.listing === "public" ? "public" : "private",
     hasPassword: row.has_password !== 0,
     phase: row.phase === "active" ? "active" : row.phase === "ended" ? "ended" : "lobby",
     playerCount: row.player_count,

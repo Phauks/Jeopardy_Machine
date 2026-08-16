@@ -14,7 +14,7 @@ const rooms: RoomSummary[] = [
     code: "BQKX7",
     title: "Pub quiz night",
     hostLabel: "Board Game Club",
-    visibility: "public",
+    listing: "public",
     hasPassword: true,
     phase: "lobby",
     playerCount: 7,
@@ -26,7 +26,7 @@ const rooms: RoomSummary[] = [
     code: "MJ4TZ",
     title: "Environment trivia",
     hostLabel: "",
-    visibility: "public",
+    listing: "public",
     hasPassword: false,
     phase: "active",
     playerCount: 24,
@@ -67,12 +67,12 @@ describe("public rooms list", () => {
     expect(body).not.toContain("MJ4TZ");
   });
 
-  it("explains an empty lobby instead of showing nothing (unlisted is the default)", () => {
+  it("explains an empty lobby instead of showing nothing (private is the default)", () => {
     const empty = render(PublicRoomsList, {
       props: { rooms: [], fetchedAt, onSelect: () => undefined },
     });
     expect(empty.body).toContain("No public rooms right now");
-    expect(empty.body).toContain("unlisted by default");
+    expect(empty.body).toContain("private by default");
   });
 
   it("steps back when a typed code wins: every row is disabled", () => {

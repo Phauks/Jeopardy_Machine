@@ -48,7 +48,7 @@ describe("the DO inspector", () => {
     expect(diagnostics).toMatchObject({
       code,
       lifecycle: "lobby",
-      visibility: "unlisted",
+      settings: { listing: "private", entry: "open" },
       hasPassword: false,
       paused: false,
     });
@@ -83,7 +83,7 @@ describe("the DO inspector", () => {
     const code = uniqueCode();
     const password = "shout-this-across-the-hall";
     const { hostToken } = await initializeRoom(code, authoredGame, "diagnostics-suite", {
-      visibility: "public",
+      listing: "public",
       title: "Inspector suite",
       password,
     });
@@ -110,8 +110,9 @@ describe("the DO inspector", () => {
     // ...while the facts an operator needs are all there.
     const diagnostics = JSON.parse(raw) as RoomDiagnostics;
     expect(diagnostics.hasPassword).toBe(true);
-    expect(diagnostics.visibility).toBe("public");
-    expect(diagnostics.title).toBe("Inspector suite");
+    expect(diagnostics.settings.listing).toBe("public");
+    expect(diagnostics.settings.entry).toBe("password");
+    expect(diagnostics.settings.title).toBe("Inspector suite");
   });
 
   it("is host-only: no token, a wrong token, and an uncreated room all refuse", async () => {
@@ -130,14 +131,14 @@ describe("closing a room over the ops endpoint", () => {
     const code = uniqueCode();
     const now = Date.now();
     await env.DB.prepare(
-      `INSERT INTO rooms (code, title, host_label, visibility, has_password, phase, player_count,
+      `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
          player_cap, created_at, last_seen_at, expires_at, ended_at)
        VALUES (?, 'Closing suite', '', 'public', 0, 'lobby', 0, ?, ?, ?, ?, NULL)`,
     )
       .bind(code, limits.room.playerSoftCap, now, now, now + limits.room.idleExpiryMs)
       .run();
     const { hostToken } = await initializeRoom(code, undefined, "close-suite", {
-      visibility: "public",
+      listing: "public",
       title: "Closing suite",
     });
     const host = await connectHost(code, hostToken);

@@ -53,7 +53,7 @@ const liveRow = {
   code: "BQKX7",
   title: "Pub quiz night",
   host_label: "Board Game Club",
-  visibility: "public",
+  listing: "public",
   has_password: 1,
   phase: "active",
   player_count: 12,
@@ -71,17 +71,21 @@ describe("registering a room", () => {
       code: "BQKX7",
       title: "Robert'); DROP TABLE rooms;--",
       hostLabel: "Board Game Club",
-      visibility: "public",
+      listing: "public",
       hasPassword: true,
+      playerCap: 24,
       createdAt: 1_760_000_000_000,
       expiresAt: 1_760_007_200_000,
     });
     const call = database.calls[0];
     expect(call?.sql).not.toContain("DROP TABLE");
     expect(call?.values).toContain("Robert'); DROP TABLE rooms;--");
-    // Booleans become D1's 0/1, and the cap comes from the limits module, not the caller.
+    // Booleans become D1's 0/1...
     expect(call?.values).toContain(1);
-    expect(call?.values).toContain(limits.room.playerSoftCap);
+    // ...and the cap stored is the ROOM's own maxPlayers, which is what the lobby fraction
+    // has to mean - not the product limit it happens to sit under.
+    expect(call?.values).toContain(24);
+    expect(call?.values).not.toContain(limits.room.playerSoftCap);
   });
 
   it("upserts, because an expired room's code is reusable", () => {
@@ -96,7 +100,7 @@ describe("listing public rooms", () => {
   it("asks only for live public rooms, newest first, and maps rows to the wire shape", async () => {
     const database = fakeDatabase([[liveRow]]);
     const rooms = await listPublicRooms(database, 1_760_000_100_000);
-    expect(database.calls[0]?.sql).toContain("visibility = 'public'");
+    expect(database.calls[0]?.sql).toContain("listing = 'public'");
     expect(database.calls[0]?.sql).toContain("ended_at IS NULL");
     expect(database.calls[0]?.sql).toContain("expires_at > ?");
     expect(database.calls[0]?.sql).toContain("ORDER BY created_at DESC");
@@ -105,7 +109,7 @@ describe("listing public rooms", () => {
         code: "BQKX7",
         title: "Pub quiz night",
         hostLabel: "Board Game Club",
-        visibility: "public",
+        listing: "public",
         hasPassword: true,
         phase: "active",
         playerCount: 12,
@@ -161,13 +165,13 @@ describe("reading one room's row (the inspector's second opinion)", () => {
     });
   });
 
-  it("calls an ended, expired, or unlisted room not-listed without hiding the row", async () => {
+  it("calls an ended, expired, or private room not-listed without hiding the row", async () => {
     const database = fakeDatabase([
       [{ ...liveRow, ended_at: 1_760_000_090_000 }],
       [{ ...liveRow, ended_at: null, expires_at: 1 }],
-      [{ ...liveRow, ended_at: null, visibility: "unlisted" }],
+      [{ ...liveRow, ended_at: null, listing: "private" }],
     ]);
-    // One pass per canned row above: ended, expired, unlisted.
+    // One pass per canned row above: ended, expired, private.
     for (const attempt of [0, 1, 2]) {
       // oxlint-disable-next-line no-await-in-loop
       const row = await readRegistryRow(database, "BQKX7", 1_760_000_100_000);
@@ -226,7 +230,7 @@ describe("schema drift gate", () => {
       "code",
       "title",
       "host_label",
-      "visibility",
+      "listing",
       "has_password",
       "phase",
       "player_count",

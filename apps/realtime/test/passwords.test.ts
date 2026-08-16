@@ -10,11 +10,11 @@ import { connectHost, initializeRoom, TestClient, uniqueCode, upgradeToRoom } fr
 
 const password = "sequoia-2026";
 
-async function openRoom(listing: { password?: string; visibility?: "public" | "unlisted" } = {}) {
+async function openRoom(options: { password?: string; listing?: "public" | "private" } = {}) {
   const code = uniqueCode();
   const { hostToken } = await initializeRoom(code, undefined, "password-suite", {
-    ...listing,
-    ...(listing.visibility === "public" && { title: "Password suite" }),
+    ...options,
+    ...(options.listing === "public" && { title: "Password suite" }),
   });
   return { code, hostToken };
 }

@@ -30,6 +30,7 @@ import { limits } from "@jeopardy/protocol/limits";
 import { createRoomRequestSchema, generateSecretToken } from "@jeopardy/protocol/room/create";
 import { parseRoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
+import { updateRoomSettingsRequestSchema } from "@jeopardy/protocol/room/room-settings";
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
 import { clueContentFor, resolveCellContent, resolveFinalContent } from "./room/content.ts";
@@ -37,8 +38,18 @@ import { buildRoomDiagnostics } from "./room/diagnostics.ts";
 import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
 import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
-import { deleteRegistryRow, endRegistryRow, touchRegistryRow } from "./room/registry-writer.ts";
-import { emptySchedule, nextWakeAt, toWireRosterEntry } from "./room/storage.ts";
+import {
+  deleteRegistryRow,
+  endRegistryRow,
+  relistRegistryRow,
+  touchRegistryRow,
+} from "./room/registry-writer.ts";
+import {
+  emptySchedule,
+  nextWakeAt,
+  roomSettingsPayload,
+  toWireRosterEntry,
+} from "./room/storage.ts";
 import type { GameAction } from "@jeopardy/engine/actions";
 import type { GameEvent } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
@@ -49,7 +60,8 @@ import type { RoomClientMessage } from "@jeopardy/protocol/room/client-messages"
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
 import type { RoomRole } from "@jeopardy/protocol/room/identity";
 import type { RosterPayload, TeamDoc } from "@jeopardy/protocol/room/roster";
-import type { RegistrySnapshot } from "./room/registry-writer.ts";
+import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
+import type { RegistryListing, RegistrySnapshot } from "./room/registry-writer.ts";
 import type {
   AlarmSchedule,
   RenameLog,
@@ -429,7 +441,15 @@ export class GameRoomDO extends Server {
       const meta: RoomMeta = {
         code: this.name,
         hostToken: generateSecretToken(),
-        visibility: body.data.visibility,
+        // Opening positions, not commitments: every one of these is editable while the room
+        // runs (handleUpdateRoomSettings), which is why they live on meta rather than setup.
+        settings: {
+          listing: body.data.listing,
+          maxPlayers: body.data.maxPlayers,
+          maxSpectators: body.data.maxSpectators,
+          spectatorsAllowed: body.data.spectatorsAllowed,
+          hideJoinCode: body.data.hideJoinCode,
+        },
         title: body.data.title ?? "",
         hostLabel: body.data.hostLabel ?? "",
         password,
@@ -464,7 +484,13 @@ export class GameRoomDO extends Server {
       );
       await this.rescheduleAlarm();
       return Response.json(
-        { hostToken: meta.hostToken, expiresAt: now + limits.room.idleExpiryMs },
+        {
+          hostToken: meta.hostToken,
+          expiresAt: now + limits.room.idleExpiryMs,
+          // The settings the server actually recorded, so the create route echoes truth
+          // rather than re-deriving it from the body it happened to send.
+          settings: roomSettingsPayload(meta),
+        },
         { status: 201 },
       );
     }
@@ -511,6 +537,24 @@ export class GameRoomDO extends Server {
       }
       await this.closeRoom(room);
       return Response.json({ closed: true, code: room.meta.code });
+    }
+    if (request.method === "POST" && url.pathname === "/settings") {
+      // The host changing the room from a surface that holds no socket (the harness's Room
+      // settings panel over PATCH /api/rooms/<CODE>, later the console when it is offline).
+      // Identical body to the update-room-settings client message, applied through the same
+      // function, so the two doors cannot drift into meaning different things.
+      const room = await this.load();
+      if (room === null) return Response.json({ error: "no-such-room" }, { status: 404 });
+      if (!this.hostTokenMatches(request, room)) {
+        return Response.json({ error: "bad-host-token" }, { status: 403 });
+      }
+      const body = updateRoomSettingsRequestSchema.safeParse(
+        await request.json().catch(() => null),
+      );
+      if (!body.success) return Response.json({ error: "bad-request" }, { status: 400 });
+      const applied = await this.applyRoomSettings(room, body.data.settings);
+      if (!applied.ok) return Response.json({ error: applied.reason }, { status: 409 });
+      return Response.json({ code: room.meta.code, settings: roomSettingsPayload(room.meta) });
     }
     if (request.method === "GET" && url.pathname === "/registry-snapshot") {
       // Ops/debug + the registry reconcile story: what this DO believes about itself right
@@ -566,6 +610,14 @@ export class GameRoomDO extends Server {
       return;
     }
     await this.touchActivity();
+    // Somebody is here again: cancel the empty-room countdown. Deliberately on CONNECT rather
+    // than on join - a phone that reconnected and is still choosing a nickname is not an
+    // abandoned room, and a whole venue coming back from a Wi-Fi outage must keep its game.
+    if (room.schedule.emptyRoomAt !== null) {
+      room.schedule.emptyRoomAt = null;
+      await this.persist("schedule");
+      await this.rescheduleAlarm();
+    }
     // No server hello: the client's first move is join or resume; welcome answers it.
   }
 
@@ -641,6 +693,8 @@ export class GameRoomDO extends Server {
         return this.handleSetPause(connection, attachment, incoming.paused);
       case "expire-timer":
         return this.handleExpireTimer(connection, attachment);
+      case "update-room-settings":
+        return this.handleUpdateRoomSettings(connection, attachment, incoming);
       case "close-room":
         return this.handleCloseRoom(connection, attachment);
       default:
@@ -648,10 +702,14 @@ export class GameRoomDO extends Server {
   }
 
   override async onClose(connection: Connection<Attachment>): Promise<void> {
-    const attachment = connection.state;
-    if (attachment === null || attachment.playerId === null) return;
     const room = await this.load();
     if (room === null) return;
+    // Runs for EVERY close, whatever the role and whether or not the socket ever joined: the
+    // empty-room grace is about the room having nobody in it, and a host console closing its
+    // tab empties a room exactly as thoroughly as the last phone leaving.
+    await this.noteDeparture(connection.id);
+    const attachment = connection.state;
+    if (attachment === null || attachment.playerId === null) return;
     const entry = room.roster[attachment.playerId];
     if (entry === undefined) return;
     if (this.seatHasOtherConnections(attachment.playerId, connection.id)) return;
@@ -670,6 +728,25 @@ export class GameRoomDO extends Server {
     await this.persist("roster", "schedule");
     await this.rescheduleAlarm();
     this.broadcastRoster();
+  }
+
+  // A connection went away: if it was the last one, start the empty-room countdown. The room
+  // is NOT closed here - a grace window is the whole point, because "everyone left" and "the
+  // venue's Wi-Fi hiccuped" look identical for the first few minutes (docs/decisions/
+  // 2026-08-14-room-controls-and-staging.md).
+  private async noteDeparture(closingConnectionId: string): Promise<void> {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    // An already-ended room needs no countdown: it is over, and the idle alarm owns the wipe.
+    if (room.meta.lifecycle === "ended" || room.schedule.emptyRoomAt !== null) return;
+    for (const other of this.getConnections<Attachment>()) {
+      // The closing socket may still be enumerated during its own close event, so it is
+      // excluded by id rather than trusted to have disappeared already.
+      if (other.id !== closingConnectionId) return;
+    }
+    room.schedule.emptyRoomAt = Date.now() + limits.room.emptyRoomGraceMs;
+    await this.persist("schedule");
+    await this.rescheduleAlarm();
   }
 
   private seatHasOtherConnections(playerId: string, exceptConnectionId: string): boolean {
@@ -724,10 +801,25 @@ export class GameRoomDO extends Server {
         sessionToken: null,
       });
       this.sendSnapshot(connection, { role: "host", playerId: null });
+      this.sendRoomSettings(connection);
       return;
     }
 
     if (message.role === "display" || message.role === "spectator") {
+      // The SPECTATOR budget, independent of the player one (docs/decisions/2026-08-14-room-
+      // controls-and-staging.md): an audience must never be able to fill a room the players
+      // came to play in, and each refusal says which door it was. Displays are exempt - the
+      // projector is the host's own screen, not a member of the audience.
+      if (message.role === "spectator") {
+        if (!room.meta.settings.spectatorsAllowed) {
+          this.refuse(connection, "spectators-not-allowed", roomCloseCodes.joinRefused);
+          return;
+        }
+        if (this.spectatorCount() >= room.meta.settings.maxSpectators) {
+          this.refuse(connection, "spectators-full", roomCloseCodes.roomFull);
+          return;
+        }
+      }
       connection.setState({ role: message.role, playerId: null });
       this.send(connection, {
         type: "welcome",
@@ -737,6 +829,7 @@ export class GameRoomDO extends Server {
         sessionToken: null,
       });
       this.sendSnapshot(connection, { role: message.role, playerId: null });
+      this.sendRoomSettings(connection);
       return;
     }
 
@@ -745,7 +838,13 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "rejected", "players join with a nickname");
       return;
     }
-    if (Object.keys(room.roster).length >= limits.room.playerHardCap) {
+    // The host's own cap first (it is the one they set and the one the lobby advertises), then
+    // the operational hard cap nobody can lift. Both answer room-full: a phone turned away
+    // does not care which ceiling it hit, only that this room has no seat for it.
+    if (
+      Object.keys(room.roster).length >=
+      Math.min(room.meta.settings.maxPlayers, limits.room.playerHardCap)
+    ) {
       this.refuse(connection, "room-full", roomCloseCodes.roomFull);
       return;
     }
@@ -914,6 +1013,20 @@ export class GameRoomDO extends Server {
       sessionToken,
     });
     this.sendSnapshot(connection, { role: "player", playerId });
+    this.sendRoomSettings(connection);
+  }
+
+  // Every accepted join ends with the room's settings, so no surface has to ask: a phone knows
+  // immediately whether to show the code, and a display that joined mid-stream paints the
+  // right screen on its first frame rather than after the next host edit.
+  private sendRoomSettings(connection: Connection<Attachment>): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    this.send(connection, {
+      type: "room-settings",
+      settings: roomSettingsPayload(room.meta),
+      at: Date.now(),
+    });
   }
 
   private async handleResume(
@@ -1498,13 +1611,16 @@ export class GameRoomDO extends Server {
   // The close itself, shared by the host's close-room message and the token-authenticated
   // /close RPC (the harness's per-room Delete). One body so the two doors cannot drift into
   // meaning different things.
-  private async closeRoom(room: LoadedRoom): Promise<void> {
+  private async closeRoom(
+    room: LoadedRoom,
+    reason: "host-closed" | "expired" = "host-closed",
+  ): Promise<void> {
     room.meta.lifecycle = "ended";
     await this.persist("meta");
     await endRegistryRow(this.env.DB, room.meta.code, Date.now());
     for (const other of this.getConnections<Attachment>()) {
-      this.send(other, { type: "room-closed", reason: "host-closed" });
-      other.close(roomCloseCodes.roomClosed, "host closed the room");
+      this.send(other, { type: "room-closed", reason });
+      other.close(roomCloseCodes.roomClosed, reason);
     }
   }
 
@@ -1512,6 +1628,122 @@ export class GameRoomDO extends Server {
     for (const connection of this.getConnections<Attachment>()) {
       if (connection.state !== null) this.send(connection, payload);
     }
+  }
+
+  // ---- room settings --------------------------------------------------------------------------
+
+  // Apply a host's settings patch: validate against the room as it stands, mutate, persist,
+  // tell EVERYONE, and re-project the lobby row. One implementation for both doors (the
+  // update-room-settings message and the /settings RPC) - docs/decisions/2026-08-14-room-
+  // controls-and-staging.md.
+  //
+  // Two refusals, and both are about not surprising people:
+  // - going PUBLIC without a title would put an unnamed row in a server browser (the create
+  //   path refuses the same thing);
+  // - lowering a cap BELOW the people already inside would either eject them or leave the room
+  //   permanently over its own limit. Nobody is ever kicked by a settings edit; the host
+  //   lowers the number after they leave, or kicks deliberately.
+  private async applyRoomSettings(
+    room: LoadedRoom,
+    patch: RoomSettingsPatch,
+  ): Promise<{ ok: true } | { ok: false; reason: "title-required" | "below-current" }> {
+    const meta = room.meta;
+    const title = patch.title ?? meta.title;
+    if ((patch.listing ?? meta.settings.listing) === "public" && title === "") {
+      return { ok: false, reason: "title-required" };
+    }
+    if (patch.maxPlayers !== undefined && patch.maxPlayers < Object.keys(room.roster).length) {
+      return { ok: false, reason: "below-current" };
+    }
+    if (patch.maxSpectators !== undefined && patch.maxSpectators < this.spectatorCount()) {
+      return { ok: false, reason: "below-current" };
+    }
+
+    if (patch.listing !== undefined) meta.settings.listing = patch.listing;
+    if (patch.maxPlayers !== undefined) meta.settings.maxPlayers = patch.maxPlayers;
+    if (patch.maxSpectators !== undefined) meta.settings.maxSpectators = patch.maxSpectators;
+    if (patch.spectatorsAllowed !== undefined) {
+      meta.settings.spectatorsAllowed = patch.spectatorsAllowed;
+    }
+    if (patch.hideJoinCode !== undefined) meta.settings.hideJoinCode = patch.hideJoinCode;
+    if (patch.title !== undefined) meta.title = patch.title;
+    if (patch.hostLabel !== undefined) meta.hostLabel = patch.hostLabel;
+    if (patch.password !== undefined) {
+      // Changing the shared secret NEVER disconnects anyone already inside: the password is
+      // the door, not a session (docs/decisions/2026-08-14-room-controls-and-staging.md). It
+      // decides who may come in from now on, and the old one stops working the instant this
+      // lands.
+      meta.password = patch.password === null ? null : await hashRoomPassword(patch.password);
+    }
+    await this.persist("meta");
+    this.broadcastRoomSettings();
+    // Turning spectators off, or shrinking the audience, must not silently keep serving the
+    // people it now excludes - and going private must leave the lobby at once rather than at
+    // the next sweep.
+    await this.syncRegistryListing(room);
+    return { ok: true };
+  }
+
+  private async handleUpdateRoomSettings(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+    message: Extract<RoomClientMessage, { type: "update-room-settings" }>,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "room settings are host-only");
+      return;
+    }
+    const applied = await this.applyRoomSettings(room, message.settings);
+    if (!applied.ok) {
+      this.sendError(
+        connection,
+        "rejected",
+        applied.reason === "title-required"
+          ? "a public room needs a title - it is the row people read in the lobby"
+          : "a cap cannot be set below the participants already in the room",
+      );
+    }
+  }
+
+  // Every connection, joined or not: a socket still choosing a role has already been handed
+  // the room code, and a display that has not finished joining must not paint a code that is
+  // now hidden.
+  private broadcastRoomSettings(): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    const payload = {
+      type: "room-settings",
+      settings: roomSettingsPayload(room.meta),
+      at: Date.now(),
+    };
+    for (const connection of this.getConnections<Attachment>()) this.send(connection, payload);
+  }
+
+  // The lobby row's listing facts, pushed on a settings change. Forced past the coalescing
+  // window on purpose: "this room is no longer public" is exactly the write a browser must
+  // never read late.
+  private async syncRegistryListing(room: LoadedRoom): Promise<void> {
+    const listing: RegistryListing = {
+      code: room.meta.code,
+      listing: room.meta.settings.listing,
+      title: room.meta.title,
+      hostLabel: room.meta.hostLabel,
+      hasPassword: room.meta.password !== null,
+      playerCap: room.meta.settings.maxPlayers,
+      lastSeenAt: Date.now(),
+    };
+    await relistRegistryRow(this.env.DB, listing);
+  }
+
+  /** Spectators hold no roster seat, so their budget is counted from live connections. */
+  private spectatorCount(): number {
+    let count = 0;
+    for (const connection of this.getConnections<Attachment>()) {
+      if (connection.state?.role === "spectator") count += 1;
+    }
+    return count;
   }
 
   // ---- alarms -----------------------------------------------------------------------------
@@ -1537,6 +1769,24 @@ export class GameRoomDO extends Server {
       // web Worker's sweep collects the row on expires_at anyway (registry-writer.ts).
       await deleteRegistryRow(this.env.DB, code);
       return;
+    }
+
+    // Empty-room expiry: the second, much shorter deadline (limits.room.emptyRoomGraceMs).
+    // Idle expiry above protects a room that is OCCUPIED but dormant; this one answers
+    // "everyone left" and hands the code back to the pool sooner. It CLOSES the room (ended
+    // lifecycle, lobby row marked ended) rather than wiping storage: the wipe stays with the
+    // idle alarm, so a host who comes back to a room that emptied out still finds its state
+    // and its code still spent. A reconnect before this point cleared the deadline in
+    // onConnect, which is why the check is re-made here against live connections too.
+    if (room.schedule.emptyRoomAt !== null && room.schedule.emptyRoomAt <= now) {
+      room.schedule.emptyRoomAt = null;
+      const stillEmpty = [...this.getConnections<Attachment>()].length === 0;
+      await this.persist("schedule");
+      if (stillEmpty) {
+        await this.closeRoom(room, "expired");
+        await this.rescheduleAlarm();
+        return;
+      }
     }
 
     // Engine timers: dispatch every due expiry action. Stale ones (the phase moved on, an

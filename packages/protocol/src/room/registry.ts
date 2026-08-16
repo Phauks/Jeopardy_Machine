@@ -18,19 +18,22 @@
 import { z } from "zod";
 import { limits } from "../limits.ts";
 import { roomCodeSchema, roomPhaseSchema } from "./server-messages.ts";
-import { hostLabelSchema, roomTitleSchema, roomVisibilitySchema } from "./visibility.ts";
+import { hostLabelSchema, roomListingSchema, roomTitleSchema } from "./visibility.ts";
 
 export const roomSummarySchema = z.strictObject({
   code: roomCodeSchema,
   title: roomTitleSchema,
   // Empty string = the host did not name themselves; the lobby simply omits the byline.
   hostLabel: hostLabelSchema.or(z.literal("")),
-  visibility: roomVisibilitySchema,
+  listing: roomListingSchema,
   hasPassword: z.boolean(),
   // Only lobby/active rooms are ever listed; `ended` appears in the type because the row
   // outlives the transition by one write (the sweep and the phase filter drop it).
   phase: roomPhaseSchema,
   playerCount: z.int().nonnegative(),
+  // The room's OWN `settings.maxPlayers`, not the product limit: "7/24" in the lobby has to
+  // mean the door this host actually set, or the fraction lies to everyone reading it. It
+  // moves when the host retunes the cap (room-settings.ts).
   playerCap: z.int().positive(),
   // Unix ms. `createdAt` drives newest-first ordering and the "age" column; `lastSeenAt` is
   // how fresh the projection is - a row whose DO went quiet ages visibly instead of lying.

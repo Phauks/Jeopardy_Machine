@@ -14,11 +14,13 @@
 // | clue-content | to each connection when a clue opens (and with a snapshot while one is      |
 // |              | open); role-redacted - see clueContentSchema                                |
 // | paused       | broadcast when the host freezes/resumes the room                            |
+// | room-settings| to a joining connection, and broadcast on every host edit                   |
 // | room-closed  | broadcast (or to one connection, for a kick), then those connections close  |
 // | error        | to the offending connection only                                            |
 //
 // Close codes (WebSocket application range): 4404 no-such-room, 4401 bad token, 4409 room
-// full, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
+// full (players AND spectators - both budgets are "this room has no space for you"), 4403
+// join refused, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
 import { z } from "zod";
 import { mediaRefSchema } from "../content/media-ref.ts";
 import { extensionBagSchema } from "../ext.ts";
@@ -30,6 +32,7 @@ import {
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { roomSettingsSchema } from "./room-settings.ts";
 import { rosterPayloadSchema, teamIdSchema } from "./roster.ts";
 
 const envelopeFields = {
@@ -46,7 +49,15 @@ export const refusalReasonSchema = z.enum([
   // The friendly bad-code error of user-flows A1; also what an expired room's code answers
   // (creation is explicit - connecting never creates, decision doc 2026-08-13).
   "no-such-room",
+  // The PLAYER budget is spent (settings.maxPlayers, itself bounded by limits.room).
   "room-full",
+  // The two spectator refusals, deliberately distinct from room-full and from each other
+  // (docs/decisions/2026-08-14-room-controls-and-staging.md): a spectator turned away must be
+  // able to say WHY - "the audience is full, try again in a minute" and "this host does not
+  // allow spectators at all" are different screens and different advice. Neither ever consumes
+  // a player seat, which is the entire point of the two budgets.
+  "spectators-full",
+  "spectators-not-allowed",
   "bad-host-token",
   "bad-session-token",
   "late-join-disabled",
@@ -228,6 +239,17 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     paused: z.boolean(),
     at: z.number().int().nonnegative(),
   }),
+  // The room's own settings, sent to a connection when it joins and broadcast to EVERYONE on
+  // every host edit (docs/decisions/2026-08-14-room-controls-and-staging.md). Broadcast rather
+  // than polled because the strictest requirement is instantaneous: a join code that just
+  // became hidden must vanish from the projector at once, not at the next refresh, or streamer
+  // mode is decoration. Carries no secret - `entry` says a password exists, never what it is.
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("room-settings"),
+    settings: roomSettingsSchema,
+    at: z.number().int().nonnegative(),
+  }),
   z.strictObject({
     ...envelopeFields,
     type: z.literal("room-closed"),
@@ -289,7 +311,8 @@ export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResu
 
 // WebSocket close codes paired with `refused`/`room-closed` (documented here so both ends
 // share one table; 4xxx is the application range the runtime passes through untouched).
-// Room-level refusals (no-such-room, bad tokens, room-full, late-join-disabled) close the
+// Room-level refusals (no-such-room, bad tokens, room-full, the spectator budget refusals,
+// late-join-disabled) close the
 // socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
 // phone keeps its socket and retries the join with another team card. PASSWORD refusals
 // (password-required, bad-password) behave like the team ones - retry on the same socket -

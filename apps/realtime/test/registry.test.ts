@@ -13,6 +13,7 @@ import {
   deleteRegistryRow,
   endRegistryRow,
   registryWriterStatements,
+  relistRegistryRow,
   touchRegistryRow,
 } from "../src/room/registry-writer.ts";
 import {
@@ -31,10 +32,12 @@ import type { GameRoomDO } from "../src/index.ts";
 type RoomRow = {
   code: string;
   title: string;
-  visibility: string;
+  host_label: string;
+  listing: string;
   has_password: number;
   phase: string;
   player_count: number;
+  player_cap: number;
   expires_at: number;
   ended_at: number | null;
 };
@@ -42,16 +45,16 @@ type RoomRow = {
 // Stands in for the web Worker's create route, which is what really inserts the row (this
 // Worker only ever updates one). Keeping the insert here in test-land is the honest shape:
 // the DO must never conjure a row for a room the registry never heard of.
-async function seedRow(code: string, options: { visibility?: string; hasPassword?: boolean } = {}) {
+async function seedRow(code: string, options: { listing?: string; hasPassword?: boolean } = {}) {
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO rooms (code, title, host_label, visibility, has_password, phase, player_count,
+    `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
        player_cap, created_at, last_seen_at, expires_at, ended_at)
      VALUES (?, 'Registry suite', 'Suite', ?, ?, 'lobby', 0, ?, ?, ?, ?, NULL)`,
   )
     .bind(
       code,
-      options.visibility ?? "public",
+      options.listing ?? "public",
       options.hasPassword === true ? 1 : 0,
       limits.room.playerSoftCap,
       now,
@@ -78,9 +81,34 @@ describe("the DO's registry statements against the real schema", () => {
     });
     const row = await readRow(code);
     expect(row).toMatchObject({ phase: "active", player_count: 7, expires_at: 1_760_007_200_000 });
-    // Listing facts belong to the create route; a live room must never rewrite them.
+    // Listing facts belong to the create route and the SETTINGS write; an ordinary touch (a
+    // roster count, a phase change) must never rewrite them.
     expect(row?.title).toBe("Registry suite");
-    expect(row?.visibility).toBe("public");
+    expect(row?.listing).toBe("public");
+  });
+
+  it("relists a room whose host changed its settings - listing, text, lock and cap", async () => {
+    const code = uniqueCode();
+    await seedRow(code);
+    await relistRegistryRow(env.DB, {
+      code,
+      listing: "private",
+      title: "Renamed room",
+      hostLabel: "New byline",
+      hasPassword: true,
+      playerCap: 12,
+      lastSeenAt: 1_760_000_000_000,
+    });
+    const row = await readRow(code);
+    expect(row).toMatchObject({
+      listing: "private",
+      title: "Renamed room",
+      host_label: "New byline",
+      has_password: 1,
+      player_cap: 12,
+    });
+    // A relist is not a lifecycle write: the phase and the roster count belong to `touch`.
+    expect(row?.phase).toBe("lobby");
   });
 
   it("never conjures a row for a room the registry never heard of", async () => {

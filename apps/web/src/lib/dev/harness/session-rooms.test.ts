@@ -11,17 +11,30 @@ import {
   markSessionRoomClosed,
   rememberSessionRoom,
   sessionRoomsMax,
+  updateSessionRoomSettings,
 } from "./session-rooms.ts";
 import type { SessionRoom } from "./session-rooms.ts";
 import type { LobbyListing } from "@jeopardy/protocol/room/registry";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
+
+function settings(overrides: Partial<RoomSettings> = {}): RoomSettings {
+  return {
+    listing: "public",
+    entry: "open",
+    maxPlayers: 100,
+    maxSpectators: 50,
+    spectatorsAllowed: true,
+    hideJoinCode: false,
+    title: "Harness room",
+    hostLabel: "Harness",
+    ...overrides,
+  };
+}
 
 function room(code: string, overrides: Partial<SessionRoom> = {}): SessionRoom {
   return {
     code,
-    title: `Room ${code}`,
-    hostLabel: "Harness",
-    visibility: "public",
-    hasPassword: false,
+    settings: settings(),
     hostToken: "0".repeat(32),
     password: "",
     createdAt: 1_760_000_000_000,
@@ -40,7 +53,7 @@ function listing(codes: string[], registry: LobbyListing["registry"] = { status:
       code,
       title: `Room ${code}`,
       hostLabel: "",
-      visibility: "public" as const,
+      listing: "public" as const,
       hasPassword: false,
       phase: "lobby" as const,
       playerCount: 0,
@@ -59,11 +72,11 @@ describe("remembering rooms this tab created", () => {
 
   it("replaces only a row for the SAME code (an expired code can be drawn again)", () => {
     const rooms = rememberSessionRoom(
-      rememberSessionRoom([], room("AAAAA", { title: "first" })),
-      room("AAAAA", { title: "second" }),
+      rememberSessionRoom([], room("AAAAA", { settings: settings({ title: "first" }) })),
+      room("AAAAA", { settings: settings({ title: "second" }) }),
     );
     expect(rooms).toHaveLength(1);
-    expect(rooms[0]?.title).toBe("second");
+    expect(rooms[0]?.settings.title).toBe("second");
   });
 
   it("bounds the list so a stuck loop cannot grow it forever", () => {
@@ -90,10 +103,10 @@ describe("is this room actually in the lobby?", () => {
     expect(lobbyPresence(room("AAAAA"), listing(["BBBBB"]))).toBe("missing");
   });
 
-  it("never calls an unlisted room missing - it has no row by design", () => {
-    expect(lobbyPresence(room("AAAAA", { visibility: "unlisted" }), listing([]))).toBe(
-      "unlisted-by-design",
-    );
+  it("never calls a private room missing - it has no row by design", () => {
+    expect(
+      lobbyPresence(room("AAAAA", { settings: settings({ listing: "private" }) }), listing([])),
+    ).toBe("private-by-design");
   });
 
   it("blames the registry, not the room, when the registry cannot answer", () => {
@@ -115,6 +128,42 @@ describe("is this room actually in the lobby?", () => {
     expect(describeLobbyPresence("missing")).toBe("NOT in lobby");
     expect(describeLobbyPresence("listed")).toBe("in lobby");
     expect(describeLobbyPresence("unknown")).toBe("lobby not checked");
+  });
+});
+
+describe("adopting a settings change", () => {
+  it("takes the SERVER's answer, and leaves every other row alone", () => {
+    const rooms = rememberSessionRoom(rememberSessionRoom([], room("AAAAA")), room("BBBBB"));
+    const updated = updateSessionRoomSettings(rooms, "AAAAA", {
+      settings: settings({ listing: "private", entry: "password", maxPlayers: 8 }),
+      password: "sequoia-2026",
+    });
+    const changed = updated.find((entry) => entry.code === "AAAAA");
+    expect(changed?.settings.listing).toBe("private");
+    expect(changed?.settings.maxPlayers).toBe(8);
+    // The tab's own copy of the shared secret follows, so joining stays one click.
+    expect(changed?.password).toBe("sequoia-2026");
+    expect(updated.find((entry) => entry.code === "BBBBB")?.settings.listing).toBe("public");
+  });
+
+  it("keeps the stored password when a change did not touch it", () => {
+    const rooms = [room("AAAAA", { password: "old-secret" })];
+    const updated = updateSessionRoomSettings(rooms, "AAAAA", {
+      settings: settings({ hideJoinCode: true }),
+    });
+    expect(updated[0]?.password).toBe("old-secret");
+    expect(updated[0]?.settings.hideJoinCode).toBe(true);
+  });
+
+  // A room that just went private must stop being called "NOT in lobby": the presence verdict
+  // reads the CURRENT settings, which is the whole reason they live on the row.
+  it("changes the lobby verdict with the listing it just adopted", () => {
+    const before = room("AAAAA");
+    expect(lobbyPresence(before, listing([]))).toBe("missing");
+    const updated = updateSessionRoomSettings([before], "AAAAA", {
+      settings: settings({ listing: "private" }),
+    });
+    expect(lobbyPresence(updated[0] ?? before, listing([]))).toBe("private-by-design");
   });
 });
 

@@ -23,6 +23,7 @@ import {
 } from "#lib/server/room-registry.ts";
 import type { RegistryDatabase } from "#lib/server/room-registry.ts";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { LobbyListing, RegistryStatus } from "@jeopardy/protocol/room/registry";
 import type { RequestHandler } from "@sveltejs/kit";
 
@@ -57,7 +58,13 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       }),
     );
     if (response.status === 201) {
-      const initialized = (await response.json()) as { hostToken: string; expiresAt: number };
+      const initialized = (await response.json()) as {
+        hostToken: string;
+        expiresAt: number;
+        // The settings the DO actually recorded - the caps it applied, the entry axis it
+        // derived - rather than a second reading of the body we happened to send.
+        settings: RoomSettings;
+      };
       // The registry write is deliberately AFTER the room exists and deliberately
       // best-effort: a D1 hiccup may cost the room its lobby row, never its existence. The
       // DO re-reports itself on its next transition, so drift heals on its own - but the
@@ -65,10 +72,11 @@ export const POST: RequestHandler = async ({ request, platform }) => {
       // showed up" from a mystery into a sentence.
       const registry = await recordInRegistry(platform?.env.DB, {
         code,
-        title: body.title ?? "",
-        hostLabel: body.hostLabel ?? "",
-        visibility: body.visibility,
-        hasPassword: body.password !== undefined,
+        title: initialized.settings.title,
+        hostLabel: initialized.settings.hostLabel,
+        listing: initialized.settings.listing,
+        hasPassword: initialized.settings.entry === "password",
+        playerCap: initialized.settings.maxPlayers,
         createdAt: Date.now(),
         expiresAt: initialized.expiresAt,
       });
@@ -77,8 +85,7 @@ export const POST: RequestHandler = async ({ request, platform }) => {
           code,
           hostToken: initialized.hostToken,
           expiresAt: initialized.expiresAt,
-          visibility: body.visibility,
-          hasPassword: body.password !== undefined,
+          settings: initialized.settings,
           registry,
         } satisfies CreateRoomResponse,
         { status: 201 },

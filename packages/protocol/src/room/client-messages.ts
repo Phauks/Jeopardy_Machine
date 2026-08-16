@@ -25,6 +25,7 @@
 // | leave           | anyone joined (explicit exit; a dropped socket is NOT a leave)        |
 // | set-pause       | host only (freezes the room and parks every running timer)            |
 // | expire-timer    | host only ("skip the wait": fires whichever timer the room is on)     |
+// | update-room-settings | host only (listing, caps, spectators, streamer mode, password)   |
 // | close-room      | host only (ends the room for everyone - the polite screen everywhere) |
 import { z } from "zod";
 import { extensionBagSchema } from "../ext.ts";
@@ -38,6 +39,7 @@ import {
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { roomSettingsPatchSchema } from "./room-settings.ts";
 import { teamIdSchema } from "./roster.ts";
 import { roomPasswordSchema } from "./visibility.ts";
 
@@ -136,6 +138,16 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   // time), so this is a host convenience over the same path rather than a new authority -
   // the host may already relay each *-timeout action by name (authority.ts).
   z.strictObject({ ...envelopeFields, type: z.literal("expire-timer") }),
+  // Change the ROOM (not the game): listing, caps, spectators, streamer mode, password, title.
+  // Sparse - only the named fields move - and answered by a `room-settings` broadcast to
+  // everyone, because the whole point is that a display reacts to the change immediately
+  // (docs/decisions/2026-08-14-room-controls-and-staging.md). The same patch shape rides
+  // PATCH /api/rooms/<CODE> for hosts holding a token but no socket.
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("update-room-settings"),
+    settings: roomSettingsPatchSchema,
+  }),
   // End the room for everyone: every connection gets room-closed(host-closed) and closes.
   z.strictObject({ ...envelopeFields, type: z.literal("close-room") }),
 ]);
