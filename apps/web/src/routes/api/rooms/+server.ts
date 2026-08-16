@@ -77,6 +77,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
         listing: initialized.settings.listing,
         hasPassword: initialized.settings.entry === "password",
         playerCap: initialized.settings.maxPlayers,
+        spectatorCap: initialized.settings.maxSpectators,
+        spectatorsAllowed: initialized.settings.spectatorsAllowed,
         createdAt: Date.now(),
         expiresAt: initialized.expiresAt,
       });

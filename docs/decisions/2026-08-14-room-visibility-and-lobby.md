@@ -36,7 +36,9 @@ Boundary check against guiding principle 3 (players never log in): a room passwo
 
 A D1 table written by the room-creation route and updated over the room's life:
 
-`rooms(code PK, title, host_label, listing, has_password, phase, player_count, player_cap, created_at, last_seen_at, expires_at, ended_at)`
+`rooms(code PK, title, host_label, listing, has_password, phase, player_count, player_cap, spectator_count, spectator_cap, spectators_allowed, created_at, last_seen_at, expires_at, ended_at)`
+
+> **Spectator columns added 2026-08-16** (the reconcile between this milestone and the room-controls one): the room's second budget is projected too, so a lobby card can say who is WATCHING beside who is playing. `spectator_count` is the only registry number the web Worker cannot compute - a spectator holds no roster seat, so only the DO can count one, and it rides the ordinary `touch`. `spectators_allowed: 0` is a distinct fact from a full audience and renders as no spectator line at all rather than an empty one. The wire fields on `roomSummarySchema` are OPTIONAL for exactly that reason: absent means "this server does not report spectators", which is not the same as zero. Batched into `0001_create_rooms.sql` (which already drops and recreates) rather than a `0002`, because the listing rename had not been applied anywhere yet - one owner re-apply covers both (docs/cloudflare-setup.md 2a).
 
 - **Written on create**, refreshed by the DO on meaningful transitions (lobby -> active, roster count changes, close/expiry). Registry rows are a _projection_: the DO stays the source of truth, the row is a cache for browsing. A stale row can never let someone into a dead room - the DO refuses on connect regardless.
 - **Password verification lives in the DO, never in the registry**: the row stores only `has_password` (for the lock icon); the DO stores a salted hash and checks it during join. Wrong password = a join refusal, with rate limiting per connection, so the lobby list can never be used as an oracle.

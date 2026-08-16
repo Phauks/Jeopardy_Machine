@@ -25,6 +25,10 @@ export type RegistrySnapshot = {
   code: string;
   phase: "lobby" | "active" | "ended";
   playerCount: number;
+  // Spectators hold no roster seat - they are live connections and nothing else - so this DO
+  // is the ONLY thing that can count them. Reported on every touch beside the roster count,
+  // because the lobby's audience line is exactly as perishable as its player fraction.
+  spectatorCount: number;
   lastSeenAt: number;
   expiresAt: number;
 };
@@ -39,6 +43,10 @@ export type RegistryListing = {
   hostLabel: string;
   hasPassword: boolean;
   playerCap: number;
+  // The second budget travels with the first: turning spectators off, or retuning their
+  // ceiling, changes the lobby row's audience line the same instant it changes the door.
+  spectatorCap: number;
+  spectatorsAllowed: boolean;
   lastSeenAt: number;
 };
 
@@ -46,7 +54,7 @@ export type RegistryListing = {
 // has no row (unapplied migration, failed insert) must not resurrect itself as a ghost row
 // with a fabricated title.
 const touchSql = `UPDATE rooms
-  SET phase = ?, player_count = ?, last_seen_at = ?, expires_at = ?
+  SET phase = ?, player_count = ?, spectator_count = ?, last_seen_at = ?, expires_at = ?
   WHERE code = ?`;
 
 // The one write that touches LISTING facts, and the only reason a live room ever may: the
@@ -55,7 +63,8 @@ const touchSql = `UPDATE rooms
 // leave a browsable door onto a room its host just closed to strangers - and a retuned
 // `maxPlayers` must move the "7/24" fraction with it or the lobby lies about capacity.
 const relistSql = `UPDATE rooms
-  SET listing = ?, title = ?, host_label = ?, has_password = ?, player_cap = ?, last_seen_at = ?
+  SET listing = ?, title = ?, host_label = ?, has_password = ?, player_cap = ?,
+    spectator_cap = ?, spectators_allowed = ?, last_seen_at = ?
   WHERE code = ?`;
 
 const endSql = `UPDATE rooms SET phase = 'ended', ended_at = ?, last_seen_at = ? WHERE code = ?`;
@@ -74,6 +83,7 @@ export async function touchRegistryRow(
       .bind(
         snapshot.phase,
         snapshot.playerCount,
+        snapshot.spectatorCount,
         snapshot.lastSeenAt,
         snapshot.expiresAt,
         snapshot.code,
@@ -103,6 +113,8 @@ export async function relistRegistryRow(
         listing.hostLabel,
         listing.hasPassword ? 1 : 0,
         listing.playerCap,
+        listing.spectatorCap,
+        listing.spectatorsAllowed ? 1 : 0,
         listing.lastSeenAt,
         listing.code,
       )

@@ -58,6 +58,9 @@ const liveRow = {
   phase: "active",
   player_count: 12,
   player_cap: limits.room.playerSoftCap,
+  spectator_count: 3,
+  spectator_cap: limits.room.spectatorSoftCap,
+  spectators_allowed: 1,
   created_at: 1_760_000_000_000,
   last_seen_at: 1_760_000_060_000,
   expires_at: 1_760_007_200_000,
@@ -74,6 +77,8 @@ describe("registering a room", () => {
       listing: "public",
       hasPassword: true,
       playerCap: 24,
+      spectatorCap: 40,
+      spectatorsAllowed: true,
       createdAt: 1_760_000_000_000,
       expiresAt: 1_760_007_200_000,
     });
@@ -86,6 +91,41 @@ describe("registering a room", () => {
     // has to mean - not the product limit it happens to sit under.
     expect(call?.values).toContain(24);
     expect(call?.values).not.toContain(limits.room.playerSoftCap);
+    // The second budget rides along, and a fresh room starts with nobody watching: the count
+    // is the DO's to report, because a spectator is a connection and holds no roster seat.
+    expect(call?.values).toContain(40);
+    expect(call?.sql).toContain("spectator_count, spectator_cap, spectators_allowed");
+  });
+
+  it("stores 'spectators off' as a real fact rather than a zero ceiling", async () => {
+    const database = fakeDatabase();
+    await registerRoom(database, {
+      code: "BQKX7",
+      title: "Staff rehearsal",
+      hostLabel: "",
+      listing: "private",
+      hasPassword: false,
+      playerCap: 8,
+      spectatorCap: limits.room.spectatorSoftCap,
+      spectatorsAllowed: false,
+      createdAt: 1,
+      expiresAt: 2,
+    });
+    // ...spectators_allowed is the LAST bound flag before the timestamps; a cap of zero and a
+    // host who allows no audience are different rows and read as different lobby lines.
+    expect(database.calls[0]?.values).toEqual([
+      "BQKX7",
+      "Staff rehearsal",
+      "",
+      "private",
+      0,
+      8,
+      limits.room.spectatorSoftCap,
+      0,
+      1,
+      1,
+      2,
+    ]);
   });
 
   it("upserts, because an expired room's code is reusable", () => {
@@ -114,10 +154,22 @@ describe("listing public rooms", () => {
         phase: "active",
         playerCount: 12,
         playerCap: limits.room.playerSoftCap,
+        spectatorCount: 3,
+        spectatorCap: limits.room.spectatorSoftCap,
+        spectatorsAllowed: true,
         createdAt: 1_760_000_000_000,
         lastSeenAt: 1_760_000_060_000,
       },
     ]);
+  });
+
+  it("reports a row's spectator budget, including 'no audience allowed'", async () => {
+    const database = fakeDatabase([[{ ...liveRow, spectator_count: 0, spectators_allowed: 0 }]]);
+    const [room] = await listPublicRooms(database, 1);
+    // Zero watching is a REPORTED zero, never an absent field: the lobby renders "0" for a
+    // room nobody is watching and nothing at all for a server that does not report it.
+    expect(room?.spectatorCount).toBe(0);
+    expect(room?.spectatorsAllowed).toBe(false);
   });
 
   it("clamps the listing cap to the operational limit - a caller cannot lift it", async () => {
@@ -235,6 +287,9 @@ describe("schema drift gate", () => {
       "phase",
       "player_count",
       "player_cap",
+      "spectator_count",
+      "spectator_cap",
+      "spectators_allowed",
       "created_at",
       "last_seen_at",
       "expires_at",

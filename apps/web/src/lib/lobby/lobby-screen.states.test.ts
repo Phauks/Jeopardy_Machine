@@ -182,10 +182,11 @@ describe("room card", () => {
     const withoutSpectators = render(RoomCard, { props: { room: lobbyRoom, ...cardProps } });
     expect(withoutSpectators.body).not.toContain("watching");
 
-    // The shape the room-controls work is adding upstream; read structurally, not by schema.
+    // Real schema fields since the 2026-08-16 reconcile - the registry projects the room's
+    // own spectator budget, so a card either has the facts or the server never reported them.
     const withSpectators = render(RoomCard, {
       props: {
-        room: { ...lobbyRoom, spectatorCount: 3, spectatorCap: 20 } as RoomSummary,
+        room: { ...lobbyRoom, spectatorCount: 3, spectatorCap: 20 },
         ...cardProps,
       },
     });
@@ -204,7 +205,7 @@ describe("capacity readers", () => {
 
   it("treats an absent spectator count as 'unknown', never as zero", () => {
     expect(spectatorSeats(lobbyRoom)).toBeNull();
-    expect(spectatorSeats({ ...lobbyRoom, spectatorCount: 0 } as RoomSummary)).toEqual({
+    expect(spectatorSeats({ ...lobbyRoom, spectatorCount: 0 })).toEqual({
       count: 0,
       cap: null,
       fraction: null,
@@ -213,7 +214,7 @@ describe("capacity readers", () => {
   });
 
   it("hides spectators entirely when the host disallowed them", () => {
-    const room = { ...lobbyRoom, spectatorCount: 4, spectatorsAllowed: false } as RoomSummary;
+    const room: RoomSummary = { ...lobbyRoom, spectatorCount: 4, spectatorsAllowed: false };
     expect(spectatorSeats(room)).toBeNull();
   });
 

@@ -41,6 +41,31 @@ describe("room summary (the lobby row)", () => {
     }
   });
 
+  it("carries the spectator budget beside the player one, when the server reports it", () => {
+    const withSpectators = {
+      ...summary,
+      spectatorCount: 3,
+      spectatorCap: limits.room.spectatorSoftCap,
+      spectatorsAllowed: true,
+    };
+    expect(roomSummarySchema.parse(withSpectators)).toEqual(withSpectators);
+    // Spectators off is a fact worth carrying: "no audience allowed" and "audience full" are
+    // different sentences in the lobby.
+    expect(
+      roomSummarySchema.parse({ ...summary, spectatorCount: 0, spectatorsAllowed: false }),
+    ).toMatchObject({ spectatorsAllowed: false });
+  });
+
+  it("keeps the spectator fields OPTIONAL - absent is not zero", () => {
+    // A row written before the spectator columns existed (or a server that predates them)
+    // still parses, and parses WITHOUT inventing an empty audience: the lobby renders no
+    // spectator line at all rather than "0 watching".
+    const parsed = roomSummarySchema.parse(summary);
+    expect(parsed.spectatorCount).toBeUndefined();
+    expect(parsed.spectatorsAllowed).toBeUndefined();
+    expect(roomSummarySchema.safeParse({ ...summary, spectatorCount: -1 }).success).toBe(false);
+  });
+
   it("holds the room-code shape and the room phase vocabulary", () => {
     expect(roomSummarySchema.safeParse({ ...summary, code: "bqkx7" }).success).toBe(false);
     expect(roomSummarySchema.safeParse({ ...summary, phase: "playing" }).success).toBe(false);

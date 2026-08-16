@@ -185,6 +185,9 @@ export class GameRoomDO extends Server {
       code: room.meta.code,
       phase: room.meta.lifecycle,
       playerCount: Object.keys(room.roster).length,
+      // Counted from live connections, not the roster - a spectator never takes a seat, which
+      // is the entire reason the two budgets exist (packages/protocol/src/room/room-settings.ts).
+      spectatorCount: this.spectatorCount(),
       lastSeenAt: Date.now(),
       expiresAt: room.meta.lastActivityAt + limits.room.idleExpiryMs,
     };
@@ -1733,6 +1736,8 @@ export class GameRoomDO extends Server {
       hostLabel: room.meta.hostLabel,
       hasPassword: room.meta.password !== null,
       playerCap: room.meta.settings.maxPlayers,
+      spectatorCap: room.meta.settings.maxSpectators,
+      spectatorsAllowed: room.meta.settings.spectatorsAllowed,
       lastSeenAt: Date.now(),
     };
     await relistRegistryRow(this.env.DB, listing);

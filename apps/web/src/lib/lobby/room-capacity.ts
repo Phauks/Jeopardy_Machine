@@ -1,24 +1,13 @@
 // How full a listed room is, as a lobby row needs to say it.
 //
-// FORWARD-COMPATIBILITY, deliberately: the room-controls work in progress
-// (docs/decisions/2026-08-14-room-visibility-and-lobby.md's successor) is adding host-facing
-// settings - spectator seats among them - to `roomSummarySchema` in
-// packages/protocol/src/room/registry.ts. This module does not edit that schema and does not
-// wait for it: it reads the new fields STRUCTURALLY and renders them only when the wire
-// actually carries them. A listing from today's server produces a players-only row; a listing
-// from tomorrow's produces a row with the spectator line, and no component changes in between.
-//
-// The cast is confined to this file on purpose. Everywhere else in the lobby UI the shapes
-// below are ordinary typed values, so when the protocol grows the fields the only edit here is
-// deleting the cast.
+// The spectator fields were read structurally through a local cast while the room-controls
+// half of this milestone was still adding them to `roomSummarySchema`; they landed at the
+// 2026-08-16 reconcile and the cast is gone. What survives the cast is the RULE it existed to
+// protect: the wire's spectator fields are OPTIONAL, absent means "this server does not report
+// spectators", and absent is NOT zero. A row with no audience renders no line at all; a row
+// with `spectatorCount: 0` renders "0" - a room nobody is watching is a fact, and pretending
+// every server reports one would invent an empty audience for rooms that never mentioned it.
 import type { RoomSummary } from "@jeopardy/protocol/room/registry";
-
-/** The fields being added upstream. Optional here because today's wire has none of them. */
-type PendingRoomSummaryFields = {
-  spectatorCount?: number;
-  spectatorCap?: number;
-  spectatorsAllowed?: boolean;
-};
 
 export type SeatCount = {
   count: number;
@@ -47,11 +36,9 @@ export function playerSeats(room: RoomSummary): SeatCount {
  * which is different from "zero watching" and must render as nothing rather than as "0".
  */
 export function spectatorSeats(room: RoomSummary): SeatCount | null {
-  const pending = room as RoomSummary & PendingRoomSummaryFields;
-  if (pending.spectatorsAllowed === false) return null;
-  if (typeof pending.spectatorCount !== "number") return null;
-  const cap = typeof pending.spectatorCap === "number" ? pending.spectatorCap : null;
-  return seatCount(pending.spectatorCount, cap);
+  if (room.spectatorsAllowed === false) return null;
+  if (room.spectatorCount === undefined) return null;
+  return seatCount(room.spectatorCount, room.spectatorCap ?? null);
 }
 
 /**

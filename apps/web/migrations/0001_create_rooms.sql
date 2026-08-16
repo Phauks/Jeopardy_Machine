@@ -17,6 +17,10 @@
 -- applied this file MUST re-apply it and will lose the rows it had (dead rooms, all of them).
 -- The runbook says so out loud: docs/cloudflare-setup.md 2a.
 --
+-- REWRITTEN AGAIN 2026-08-16 (the reconcile): the spectator columns below. Batched into THIS
+-- file rather than a 0002 because the rename above has not been applied anywhere yet - one
+-- re-apply covers both edits, which is one interruption of the owner instead of two.
+--
 -- Apply: wrangler d1 migrations apply jeopardy-machine --remote -c apps/web/wrangler.jsonc
 -- (docs/cloudflare-setup.md section 2c; --local for the dev loop, docs/DEVELOPMENT.md).
 
@@ -36,6 +40,15 @@ CREATE TABLE rooms (
   -- The ROOM's own settings.maxPlayers, not the product limit: "7/24" in the lobby has to mean
   -- the door this host actually set, and it moves when they retune it.
   player_cap INTEGER NOT NULL,
+  -- The spectator budget, kept STRICTLY separate from the player one (room-settings.ts): a
+  -- stream audience must never crowd out the people who came to play, and the lobby says so in
+  -- its own line. Counted from live connections rather than the roster, because a spectator
+  -- holds no seat - so the DO is the only thing that can report it (registry-writer.ts touch).
+  spectator_count INTEGER NOT NULL DEFAULT 0,
+  spectator_cap INTEGER NOT NULL DEFAULT 0,
+  -- 0 = this host allows no audience at all, which the lobby renders as no spectator line
+  -- rather than as an empty one - a different fact from "the audience is full".
+  spectators_allowed INTEGER NOT NULL DEFAULT 1 CHECK (spectators_allowed IN (0, 1)),
   -- Unix ms throughout, matching the wire and the DO's clock.
   created_at INTEGER NOT NULL,
   -- Refreshed by the DO on meaningful transitions; how the lobby tells a live room from a

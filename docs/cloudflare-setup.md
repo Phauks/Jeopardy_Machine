@@ -47,7 +47,14 @@ npx wrangler d1 migrations apply jeopardy-machine --remote -c apps/web/wrangler.
 
 Both Workers bind this database (web writes/reads, the room DO reports its own transitions - see the decision's addendum), but the migration is applied **once**, through the web config that owns the schema.
 
-> **RE-APPLY REQUIRED (2026-08-14).** `0001_create_rooms.sql` was **rewritten in place**, not extended: the listing axis became `public` / `private` (docs/decisions/2026-08-14-room-controls-and-staging.md), so the column is now `listing` and its CHECK constraint moved with it. The file starts with `DROP TABLE IF EXISTS rooms`, which is the honest edit for a product with no users and rooms that live hours - but it means an environment that already ran §2a must run it **again**, and will lose every row it had. Those rows are lobby projections of rooms that expired long ago; no game, code, or player state lives in D1. Wrangler records migrations as applied, so force the re-run in whichever way you prefer:
+> **RE-APPLY REQUIRED (2026-08-14, extended 2026-08-16 - ONE re-apply covers both).** `0001_create_rooms.sql` was **rewritten in place**, not extended, twice:
+>
+> 1. the listing axis became `public` / `private` (docs/decisions/2026-08-14-room-controls-and-staging.md), so the column is now `listing` and its CHECK constraint moved with it;
+> 2. the room's **spectator budget** joined the projection at the reconcile - `spectator_count`, `spectator_cap`, `spectators_allowed` - so the lobby card can show who is watching beside who is playing.
+>
+> The full column list the table now carries: `code, title, host_label, listing, has_password, phase, player_count, player_cap, spectator_count, spectator_cap, spectators_allowed, created_at, last_seen_at, expires_at, ended_at`.
+>
+> The file starts with `DROP TABLE IF EXISTS rooms`, which is the honest edit for a product with no users and rooms that live hours - but it means an environment that already ran §2a must run it **again**, and will lose every row it had. Those rows are lobby projections of rooms that expired long ago; no game, code, or player state lives in D1. Wrangler records migrations as applied, so force the re-run in whichever way you prefer:
 >
 > ```sh
 > # simplest: drop the recorded migration and apply again
@@ -60,7 +67,7 @@ Both Workers bind this database (web writes/reads, the room DO reports its own t
 >   --file apps/web/migrations/0001_create_rooms.sql
 > ```
 >
-> Do the same with `--local` for the dev loop (docs/DEVELOPMENT.md). Skipping it leaves the lobby broken in the loud way rather than the silent one: `GET /api/rooms` will report `{"status":"unavailable","reason":"error"}` with `no such column: listing` in `detail`, and room creation and joining keep working throughout.
+> Do the same with `--local` for the dev loop (docs/DEVELOPMENT.md). Skipping it leaves the lobby broken in the loud way rather than the silent one: `GET /api/rooms` will report `{"status":"unavailable","reason":"error"}` with `no such column: listing` (or `no such column: spectator_count`) in `detail`, and room creation and joining keep working throughout.
 
 If the migration is never applied, nothing breaks: `POST /api/rooms` still creates rooms and every join still works - `GET /api/rooms` just answers an empty lobby. Rooms are usable by code from day one; the lobby is the thing that switches on here.
 
@@ -173,7 +180,7 @@ Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate
 - [ ] `wrangler login` done locally
 - [ ] workers.dev subdomain claimed
 - [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name); the same id is bound in apps/realtime/wrangler.jsonc since 2026-08-14
-- [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-14**: `0001_create_rooms.sql` was rewritten (listing axis renamed to public/private) and drops the table it recreates
+- [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-16**: `0001_create_rooms.sql` was rewritten twice (listing axis renamed to public/private, then the spectator columns added) and drops the table it recreates - one re-apply covers both
 - [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
 - [ ] realtime deployed, then web; echo page verified
 - [ ] (optional) scoped API token added to agent environment

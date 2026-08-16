@@ -42,6 +42,11 @@ export type RoomRegistration = {
   hasPassword: boolean;
   // The room's own settings.maxPlayers - what the lobby fraction must mean (registry.ts).
   playerCap: number;
+  // The second budget, from the same settings object. The COUNT is not here: a room being
+  // created has no connections yet, and only the DO can ever see one (spectators hold no
+  // roster seat), so the count arrives with the first touch.
+  spectatorCap: number;
+  spectatorsAllowed: boolean;
   createdAt: number;
   expiresAt: number;
 };
@@ -55,6 +60,9 @@ type RoomRow = {
   phase: string;
   player_count: number;
   player_cap: number;
+  spectator_count: number;
+  spectator_cap: number;
+  spectators_allowed: number;
   created_at: number;
   last_seen_at: number;
   expires_at: number;
@@ -64,8 +72,9 @@ type RoomRow = {
 // insert must be able to land on a stale row for the same code - upsert, not insert.
 const upsertSql = `INSERT INTO rooms
   (code, title, host_label, listing, has_password, phase, player_count, player_cap,
+   spectator_count, spectator_cap, spectators_allowed,
    created_at, last_seen_at, expires_at, ended_at)
-  VALUES (?, ?, ?, ?, ?, 'lobby', 0, ?, ?, ?, ?, NULL)
+  VALUES (?, ?, ?, ?, ?, 'lobby', 0, ?, 0, ?, ?, ?, ?, ?, NULL)
   ON CONFLICT(code) DO UPDATE SET
     title = excluded.title,
     host_label = excluded.host_label,
@@ -74,6 +83,9 @@ const upsertSql = `INSERT INTO rooms
     phase = 'lobby',
     player_count = 0,
     player_cap = excluded.player_cap,
+    spectator_count = 0,
+    spectator_cap = excluded.spectator_cap,
+    spectators_allowed = excluded.spectators_allowed,
     created_at = excluded.created_at,
     last_seen_at = excluded.last_seen_at,
     expires_at = excluded.expires_at,
@@ -83,7 +95,8 @@ const upsertSql = `INSERT INTO rooms
 // DO stopped reporting on delists itself when its expiry deadline passes, and `ended` rooms
 // never appear even if the sweep has not run yet.
 const listSql = `SELECT code, title, host_label, listing, has_password, phase,
-    player_count, player_cap, created_at, last_seen_at, expires_at
+    player_count, player_cap, spectator_count, spectator_cap, spectators_allowed,
+    created_at, last_seen_at, expires_at
   FROM rooms
   WHERE listing = 'public'
     AND ended_at IS NULL
@@ -122,6 +135,8 @@ export function registerRoom(
       registration.listing,
       registration.hasPassword ? 1 : 0,
       registration.playerCap,
+      registration.spectatorCap,
+      registration.spectatorsAllowed ? 1 : 0,
       registration.createdAt,
       registration.createdAt,
       registration.expiresAt,
@@ -235,6 +250,12 @@ function toRoomSummary(row: RoomRow): RoomSummary {
     phase: row.phase === "active" ? "active" : row.phase === "ended" ? "ended" : "lobby",
     playerCount: row.player_count,
     playerCap: row.player_cap,
+    // Always emitted from a row this repository read: the columns exist (the migration is the
+    // schema), so a listing from THIS server always carries the spectator facts. The wire
+    // fields stay optional for servers that predate them, never for rows we just read.
+    spectatorCount: row.spectator_count,
+    spectatorCap: row.spectator_cap,
+    spectatorsAllowed: row.spectators_allowed !== 0,
     createdAt: row.created_at,
     lastSeenAt: row.last_seen_at,
   };
