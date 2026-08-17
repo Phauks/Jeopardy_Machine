@@ -65,6 +65,8 @@ export class RoomAudio {
   private loaded = new Set<string>();
   /** The looping music source, if any. Music lives outside the exclusive room slot. */
   private musicSource: AudioBufferSourceNode | null = null;
+  /** What the music channel is playing or fetching - makes playMusic idempotent (see below). */
+  private musicId: string | null = null;
   /** context.currentTime until which the exclusive room slot is occupied. */
   private slotBusyUntil = 0;
   /** Sound-check serialization point (the one sanctioned queue). */
@@ -265,16 +267,28 @@ export class RoomAudio {
    * Which track fills the lobby slot is one manifest field (`lobbyTrack.id`), which in turn is
    * one row in tools/audio-bake/src/sources.mjs. Today's is a PLACEHOLDER: the owner has not
    * picked the signature track yet (docs/content/media-and-sounds.md section 9, round 4).
+   *
+   * IDEMPOTENT by id: asking for the track already playing (or already being fetched) does
+   * nothing. Callers are reactive - the display drives this off a room phase that re-evaluates
+   * on every roster change - and a lobby track that restarted from the top each time somebody
+   * joined would be worse than no lobby track at all.
    */
   async playMusic(soundId: string): Promise<boolean> {
     const context = this.context;
     if (!this.enabled || context === null) return false;
+    if (this.musicId === soundId) return true;
     const entry = soundManifest.sounds.find((sound) => sound.id === soundId);
     if (entry === undefined || entry.kind !== "music") return false;
-    if (!this.loaded.has(entry.id)) await this.loadOne(context, entry);
-    const buffer = this.buffers.get(entry.id);
-    if (buffer === undefined || !this.loaded.has(entry.id)) return false;
     this.stopMusic();
+    this.musicId = soundId;
+    if (!this.loaded.has(entry.id)) await this.loadOne(context, entry);
+    // A stopMusic() during the fetch wins: whatever wanted silence still wants it.
+    if (this.musicId !== soundId) return false;
+    const buffer = this.buffers.get(entry.id);
+    if (buffer === undefined || !this.loaded.has(entry.id)) {
+      this.musicId = null;
+      return false;
+    }
     const source = context.createBufferSource();
     source.buffer = buffer;
     source.loop = true;
@@ -292,5 +306,6 @@ export class RoomAudio {
   stopMusic(): void {
     this.musicSource?.stop();
     this.musicSource = null;
+    this.musicId = null;
   }
 }

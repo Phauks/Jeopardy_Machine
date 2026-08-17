@@ -57,6 +57,21 @@
     audioReady = roomAudio.primed;
   }
 
+  // The lobby track (M5 sound pack): one signature track, playing while the room fills up and
+  // stopping the moment the game starts - Kahoot's pattern, and the owner's directive
+  // (docs/content/media-and-sounds.md section 7). The DISPLAY owns it because the display is
+  // the room's audio device; phones never play it. Which track this is comes from the
+  // manifest's `lobbyTrack` slot, and today's occupant is a CC0 placeholder pending the
+  // owner's round-4 pick.
+  $effect(() => {
+    if (!audioReady) return;
+    if (store.view.phase === "lobby") void roomAudio.playLobbyMusic();
+    else roomAudio.stopMusic();
+  });
+  onDestroy(() => {
+    roomAudio.stopMusic();
+  });
+
   const theme = $derived(
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,

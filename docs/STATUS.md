@@ -56,15 +56,15 @@ The surfaces build on what the DO already speaks (all shapes in `packages/protoc
 
 ## M4 play surfaces (appended 2026-08-14)
 
-| Claim                                                                                                    | Reproduce                                                                                                          |
-| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| The three play surfaces are real routes over the room-store seam (mock rooms until the M3 reconcile)     | `pnpm dev`, open /room/DUMYX (phone), /room/DUMYX/display, /room/DUMYX/host (`?mirror`, `?theme=<preset>` toggles) |
-| Store contract: a full fixture game (teams, wagers, final, undo, manual mode) through the action surface | `pnpm -F @jeopardy/web test` (`src/lib/room/room-store.contract.test.ts`)                                          |
-| Every A4 buzzer state, every C4 console state, and the C1b mirror invariant render-tested                | `pnpm -F @jeopardy/web test` (`buzzer-screen.states`, `host-console.states`, `pre-game.states`)                    |
-| All four theme presets x all three surfaces smoke-render; QR + room code on the display title screen     | `pnpm -F @jeopardy/web test` (`surfaces-presets.smoke.test.ts`)                                                    |
-| Room audio: only-winner-heard exclusive slot (drop, never queue) + serialized sound check                | `pnpm -F @jeopardy/web test` (`room-audio.test.ts`; sounds are placeholder tones until the M5 bundling pass)       |
+| Claim                                                                                                    | Reproduce                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The three play surfaces are real routes over the room-store seam (mock rooms until the M3 reconcile)     | `pnpm dev`, open /room/DUMYX (phone), /room/DUMYX/display, /room/DUMYX/host (`?mirror`, `?theme=<preset>` toggles)                                           |
+| Store contract: a full fixture game (teams, wagers, final, undo, manual mode) through the action surface | `pnpm -F @jeopardy/web test` (`src/lib/room/room-store.contract.test.ts`)                                                                                    |
+| Every A4 buzzer state, every C4 console state, and the C1b mirror invariant render-tested                | `pnpm -F @jeopardy/web test` (`buzzer-screen.states`, `host-console.states`, `pre-game.states`)                                                              |
+| All four theme presets x all three surfaces smoke-render; QR + room code on the display title screen     | `pnpm -F @jeopardy/web test` (`surfaces-presets.smoke.test.ts`)                                                                                              |
+| Room audio: only-winner-heard exclusive slot (drop, never queue) + serialized sound check                | `pnpm -F @jeopardy/web test` (`room-audio.test.ts`) + the bundled pack gate (`sound-manifest.gate.test.ts`: onset window, duration windows, per-file sha256) |
 
-Not yet true for M4: the ws room store is a documented stub (each mock room is one isolated tab); clue text has no wire channel; sound files are not bundled; the FLIP clue zoom and the host companion view are deferred (docs/design/surfaces.md "Known gaps").
+Not yet true for M4: the ws room store is a documented stub (each mock room is one isolated tab); clue text has no wire channel; the FLIP clue zoom and the host companion view are deferred (docs/design/surfaces.md "Known gaps").
 
 ## Avatars in motion (appended 2026-08-14)
 

@@ -115,14 +115,15 @@ One breakpoint, `(max-width: 48rem), (max-height: 26rem)`, catches a phone in bo
 
 ## Audio (`room-audio.ts`)
 
-Web Audio, pre-decoded buffers, three channels honoring the owner directives: `playBuzz` = the room's **exclusive slot** (would-overlap sounds are DROPPED, never queued; keyed off buzz-won alone), `playSoundCheck` = the one sanctioned queue (C3 serializes every team's sound), `playLocalPreview` = device-local feedback outside the slot (join preview, losing-buzz personal feedback). Routing is per-device: displays default on, everything else off. **Sound files are not bundled yet** - every catalog id (the approved 14 in `buzz-sound-catalog.ts`, slugs matching the roster fixture and docs/content/media-and-sounds.md section 9) synthesizes a placeholder tone with the uniform ~10 ms onset; the M5 bundling pass swaps `primeBuffers()` to `decodeAudioData` over real files and changes nothing else.
+Web Audio, pre-decoded buffers, three channels honoring the owner directives: `playBuzz` = the room's **exclusive slot** (would-overlap sounds are DROPPED, never queued; keyed off buzz-won alone), `playSoundCheck` = the one sanctioned queue (C3 serializes every team's sound), `playLocalPreview` = device-local feedback outside the slot (join preview, losing-buzz personal feedback). Routing is per-device: displays default on, everything else off. The M5 bundling pass landed the FILES (docs/content/media-and-sounds.md section 10): `prime()` still returns synchronously - it seeds a placeholder tone per id, so nothing is ever silent inside a user gesture - and then decodes the real pack over the top. Music is a fourth channel that never rides the room slot and is never fetched at prime: the lobby track is one manifest slot (`lobbyTrack`), started by the display while the room phase is lobby, and its current occupant is a placeholder pending the owner pick.
 
 ## Testing
 
 - `room-store.contract.test.ts`: a full game (teams, wagers, final, undo, overrides, manual mode, late join) through the store's action surface, plus every `buzzerStageFor` mapping. The ws store must pass the same assertions behind a real DO at reconcile.
 - `buzzer-screen.states.test.ts` / `host-console.states.test.ts` / `pre-game.states.test.ts`: SSR renders (repo pattern) of every A4 state, every console state, the C1b mirror invariant (answers + wager dots NEVER in mirrored markup), the three pre-game screens, and the overflow-menu rule (kick, hand-off, AND team lock all behind "..."). `pre-game.states.test.ts` also drives `playerRouteStageFor` through the unclicked transitions - kick, game start, mid-game arrival.
 - `surfaces-presets.smoke.test.ts`: all four theme presets x all three surfaces render; QR + room code on the title screen.
-- `room-audio.test.ts`: the exclusive-slot drop rule and the sound-check queue against a fake AudioContext.
+- `room-audio.test.ts`: the exclusive-slot drop rule, cues sharing that one slot, the sound-check queue, the synthesized time-up beep, and the music channel staying off the slot and idempotent per track - all against a fake AudioContext.
+- `sound-manifest.gate.test.ts`: the bundled pack against the files on disk - every onset inside the 8-15 ms fairness window, buzz-ins inside 0.5-1.5 s, cues under 3 s, a per-file sha256 re-hash, no orphans, a CC0 credits row per file, and the eager (precached) half under 512 KB.
 - `diorama/wander.test.ts`: the movement rules where they are pure - avatars never leave the pen (including under an absurd frame delta), reduced motion stops them dead, a beat expires, arrivals never stack, and a seed reproduces a layout exactly.
 - `staging/staging-layout.test.ts`: the staged lobby where it is pure - station packing without overlap on either theme, waiting occupants never inside a station, a station keeping its spot when a team is created, a waiting player keeping theirs when somebody boards, the walk to a seat taking real time and never overshooting, the reduced-motion snap, and the theme interface's own shape.
 - `staging/staged-lobby.states.test.ts`: the roster-to-stations mapping, and the 2D degradation carrying the same answer (nameplates, hull colours, crews aboard, the holding area) under both themes.
@@ -132,8 +133,7 @@ Web Audio, pre-decoded buffers, three channels honoring the owner directives: `p
 
 ## Known gaps (tracked, deliberate)
 
-- Buzzer sound FILES (placeholder tones until the M5 audio bundling pass).
 - Mock rooms are per-tab (no cross-tab sync; by design until reconcile).
 - The FLIP zoom-from-cell clue reveal: the display uses the baseline scale/fade (reduced-motion-aware); the FLIP measurement pass is display polish scheduled with M5's projector work.
 - Host companion view (C1b option a - the phone-sized private layer for mirrored setups) is not built; mirror mode ships with the print-pack fallback story.
-- `viewport-fit=cover` metas and wake lock ship on the player route; PWA precache of fonts/sounds grows in M5.
+- `viewport-fit=cover` metas and wake lock ship on the player route. The precache now covers the bundled buzz/cue one-shots (under 320 KB) and deliberately EXCLUDES the music beds - install downloads its whole list before activating, and the lobby track alone is 3.8 MB.
