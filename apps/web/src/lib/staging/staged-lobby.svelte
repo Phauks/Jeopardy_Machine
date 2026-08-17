@@ -58,6 +58,9 @@
       entityId: occupant.entityId,
       avatarId: occupant.avatarId,
       accentId: occupant.accentId,
+      // The name travels into the scene for the crew plates under the stations - the 3D half
+      // of "names beneath the boats" (owner, 2026-08-16). The free-roaming diorama ignores it.
+      label: occupant.label,
     })),
   );
   const staging = $derived({ theme, stations, waitingEntityIds });

@@ -26,8 +26,13 @@ import {
   startBeat,
   stepAgent,
 } from "#lib/diorama/wander.ts";
-import { placeStaging, stationAnchors } from "#lib/staging/staging-layout.ts";
-import { holdingBobOffset, stepStagedAgent } from "#lib/staging/staging-motion.ts";
+import { crewPlate, holdingAreaCopy } from "#lib/staging/staging-copy.ts";
+import { placeStaging, stagingBands, stationAnchors } from "#lib/staging/staging-layout.ts";
+import {
+  easeStationPosition,
+  holdingBobOffset,
+  stepStagedAgent,
+} from "#lib/staging/staging-motion.ts";
 import type { RandomSource, WanderAgent, WanderMode } from "#lib/diorama/wander.ts";
 import type { StagedTarget, StagingStation } from "#lib/staging/staging-layout.ts";
 import type { StagingColorRole, StagingPart, StagingTheme } from "#lib/staging/staging-theme.ts";
@@ -40,6 +45,12 @@ export type DioramaOccupant = {
   avatarId: string | null;
   /** Accent palette id; drives the runtime recolor. */
   accentId: string | null;
+  /**
+   * The person's name. Only the STAGED lobby uses it, for the crew plate under each station
+   * (owner, 2026-08-16: "names beneath the boats"); the free-roaming diorama draws no names,
+   * which is why it is optional rather than a second occupant type.
+   */
+  label?: string | null;
 };
 
 export type DioramaOptions = {
@@ -92,8 +103,14 @@ type StationVisual = {
   /** Meshes whose colour comes from the room theme instead. */
   themeMeshes: { mesh: THREE.Mesh; role: StagingColorRole }[];
   nameplate: THREE.Sprite | null;
+  /** The crew list under the station - who is aboard, readable from the back of a hall. */
+  crewPlate: THREE.Sprite | null;
   colorHex: string;
   label: string;
+  /** The crew the plate currently shows, so it is redrawn on a change and not every frame. */
+  crewSignature: string;
+  /** Where the layout wants this station; the group eases toward it (staging-motion.ts). */
+  target: { x: number; z: number };
 };
 
 /** A loaded model, kept once per avatar id and cloned per instance. */
@@ -136,6 +153,71 @@ function cloneWithColormap(
     object.material = material;
   });
   return root;
+}
+
+/** One line of a text sprite: what it says, how big, and in which of the palette's colours. */
+type SpriteLine = { text: string; sizePx: number; color: string };
+
+/** Canvas width every text sprite is drawn at. Height follows the lines, so nothing stretches. */
+const spriteCanvasWidth = 512;
+
+/**
+ * Draw centred lines of text onto a canvas, ready to become a sprite texture.
+ *
+ * One function for the team nameplate, the crew plate under each station, and the holding
+ * area's label - because they are the same object (words floating in a 3D scene that must stay
+ * readable over a light hull and a dark sky alike), and three copies of the halo-then-fill
+ * recipe would drift. Redrawn only when the TEXT changes; never per frame.
+ */
+function drawTextCanvas(
+  lines: readonly SpriteLine[],
+  fontFamily: string,
+): HTMLCanvasElement | null {
+  const canvas = document.createElement("canvas");
+  const lineHeights = lines.map((line) => Math.round(line.sizePx * 1.34));
+  canvas.width = spriteCanvasWidth;
+  canvas.height = Math.max(
+    1,
+    lineHeights.reduce((total, height) => total + height, 0),
+  );
+  const context = canvas.getContext("2d");
+  if (context === null) return null;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  let cursor = 0;
+  lines.forEach((line, index) => {
+    const height = lineHeights[index] ?? 0;
+    context.font = `600 ${String(line.sizePx)}px ${fontFamily}`;
+    // A dark halo under the text so it stays readable over a light hull as well as a dark sky -
+    // the same job --effect-category-text-shadow does in the 2D chrome.
+    context.lineWidth = Math.max(4, line.sizePx * 0.14);
+    context.strokeStyle = "rgba(0,0,0,0.62)";
+    const baseline = cursor + height / 2;
+    context.strokeText(line.text, canvas.width / 2, baseline, canvas.width - 24);
+    context.fillStyle = line.color;
+    context.fillText(line.text, canvas.width / 2, baseline, canvas.width - 24);
+    cursor += height;
+  });
+  return canvas;
+}
+
+/**
+ * Put a freshly drawn canvas on a sprite, sized so the text never stretches: the sprite's
+ * height follows the canvas aspect rather than being guessed. Disposes the texture it replaces,
+ * which matters because a lobby renames teams and fills boats all evening.
+ */
+function applyCanvasToSprite(
+  sprite: THREE.Sprite,
+  canvas: HTMLCanvasElement,
+  widthUnits: number,
+): void {
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = sprite.material;
+  material.map?.dispose();
+  material.map = texture;
+  material.needsUpdate = true;
+  sprite.scale.set(widthUnits, (widthUnits * canvas.height) / canvas.width, 1);
 }
 
 /** The staging vocabulary's three primitives, made real. The ONLY place they become three. */
@@ -210,9 +292,16 @@ export class DioramaScene {
   /** Null = free wandering (the old behaviour); set = the staged lobby. */
   #staging: StagingConfig | null = null;
   #stationVisuals = new Map<string, StationVisual>();
+  /** The water and its kerb, plus the sign that says what the place is. Rebuilt on resize. */
+  #holdingGroup: THREE.Group | null = null;
   #holdingMesh: THREE.Mesh | null = null;
+  #holdingLabel: THREE.Sprite | null = null;
+  /** What the holding sign currently says, so it is redrawn on a change and not every frame. */
+  #holdingLabelText = "";
   /** entityId -> where they belong right now. Recomputed on staging changes and resizes. */
   #targets = new Map<string, StagedTarget>();
+  /** entityId -> display name, for the crew plates. Empty in the free-roaming diorama. */
+  #names = new Map<string, string>();
   /** Kept so a station built after the last setPalette still gets the theme's colours. */
   #palette: DioramaPalette;
 
@@ -288,11 +377,24 @@ export class DioramaScene {
     (this.#holdingMesh?.material as THREE.MeshLambertMaterial | undefined)?.color.set(
       palette.holding,
     );
+    for (const rail of this.#holdingGroup?.children ?? []) {
+      if (!rail.name.startsWith("holding-edge-") || !(rail instanceof THREE.Mesh)) continue;
+      (rail.material as THREE.MeshLambertMaterial).color.set(palette.structure);
+    }
     // Stations restyle in place: the theme-role meshes take the new tokens, the team-role ones
     // keep their team's colour, and no geometry is rebuilt.
     for (const visual of this.#stationVisuals.values()) {
       this.#paintStation(visual, visual.colorHex);
     }
+    // Every word on the stage is drawn IN the palette's colours, so a theme swap has to redraw
+    // them. Clearing the three "what does it currently say" signatures is what makes the
+    // re-apply below repaint instead of skipping - the same reconcile, told the text is stale.
+    this.#holdingLabelText = "";
+    for (const visual of this.#stationVisuals.values()) {
+      visual.crewSignature = "";
+      visual.label = "";
+    }
+    if (this.#staging !== null) this.#applyStaging(this.#staging);
   }
 
   /** Match the drawing buffer to the element's box. Called from a ResizeObserver. */
@@ -340,7 +442,7 @@ export class DioramaScene {
   }
 
   #applyStaging(config: StagingConfig): void {
-    this.#ensureHoldingSurface(config.theme);
+    this.#ensureHoldingArea(config);
     const anchors = stationAnchors(config.stations, config.theme, this.#bounds);
     const wanted = new Set(config.stations.map((station) => station.stationId));
     for (const [stationId, visual] of this.#stationVisuals) {
@@ -353,15 +455,22 @@ export class DioramaScene {
       const anchor = anchors[index];
       if (anchor === undefined) continue;
       let visual = this.#stationVisuals.get(station.stationId);
+      const isNew = visual === undefined;
       if (visual === undefined) {
         visual = this.#buildStation(config.theme, station);
         this.#stationVisuals.set(station.stationId, visual);
         this.#scene.add(visual.group);
       }
-      visual.group.position.set(anchor.x, 0, anchor.z);
+      // A NEW station appears where it belongs; an existing one eases there over the next few
+      // frames (#tick), because the grid that guarantees clearance changes shape when a team is
+      // created and every other boat has to make room (staging-layout.ts's reversal note).
+      visual.target = { x: anchor.x, z: anchor.z };
+      if (isNew) visual.group.position.set(anchor.x, 0, anchor.z);
       visual.group.rotation.y = anchor.heading;
+      visual.group.scale.setScalar(anchor.scale);
       if (visual.colorHex !== station.colorHex) this.#paintStation(visual, station.colorHex);
       if (visual.label !== station.label) this.#writeNameplate(config.theme, visual, station.label);
+      this.#writeCrewPlate(config.theme, visual, station);
     }
 
     this.#targets = new Map(
@@ -375,30 +484,150 @@ export class DioramaScene {
     );
   }
 
-  #ensureHoldingSurface(theme: StagingTheme): void {
-    const surface = theme.holdingSurface;
+  /**
+   * The holding area as a PLACE: a bounded surface, a kerb around it, and a sign saying what it
+   * is and what to do about being in it.
+   *
+   * All three are the answer to the owner's "I don't understand still in the water" (2026-08-16).
+   * The water used to be a 60x40 plane under the entire stage - which is to say, no boundary at
+   * all - and carried no words anywhere. Being unassigned was drawn as a POSITION, and a
+   * position is not a state anybody can read from the back of a hall.
+   *
+   * Rebuilt rather than reconciled: it is three meshes and a sprite, it changes only when the
+   * pen resizes or the theme swaps, and sizing a shared unit plane by scale keeps that cheap.
+   */
+  #ensureHoldingArea(config: StagingConfig): void {
+    const surface = config.theme.holdingSurface;
     if (surface === null) {
-      if (this.#holdingMesh !== null) {
-        this.#scene.remove(this.#holdingMesh);
-        disposeSubtree(this.#holdingMesh);
-        this.#holdingMesh = null;
-      }
+      this.#teardownHoldingArea();
+      // A theme with no drawn surface (the campfires clearing) still gets the SIGN: the words
+      // are what make waiting legible, and they do not depend on there being water.
+      this.#writeHoldingLabel(config);
       return;
     }
-    if (this.#holdingMesh !== null) return;
-    const mesh = new THREE.Mesh(
-      geometryFor(surface.shape),
-      new THREE.MeshLambertMaterial({
-        color: this.#palette.holding,
-        transparent: surface.opacity < 1,
-        opacity: surface.opacity,
-      }),
+    if (this.#holdingGroup === null) {
+      const group = new THREE.Group();
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshLambertMaterial({
+          color: this.#palette.holding,
+          transparent: surface.opacity < 1,
+          opacity: surface.opacity,
+        }),
+      );
+      // A unit plane in XY, turned onto the stage floor and then SCALED to the band, so a
+      // resize is two numbers rather than a new geometry.
+      mesh.rotation.x = -Math.PI / 2;
+      group.add(mesh);
+      this.#holdingMesh = mesh;
+      if (surface.edge !== null) {
+        for (let side = 0; side < 4; side += 1) {
+          const rail = new THREE.Mesh(
+            new THREE.BoxGeometry(1, 1, 1),
+            new THREE.MeshLambertMaterial({ color: this.#palette.structure }),
+          );
+          rail.name = `holding-edge-${String(side)}`;
+          group.add(rail);
+        }
+      }
+      this.#holdingGroup = group;
+      this.#scene.add(group);
+    }
+    this.#layOutHoldingArea(surface);
+    this.#writeHoldingLabel(config);
+  }
+
+  /** Size the water and its kerb to the holding band. Called on build and on every resize. */
+  #layOutHoldingArea(surface: NonNullable<StagingTheme["holdingSurface"]>): void {
+    const group = this.#holdingGroup;
+    if (group === null) return;
+    const band = stagingBands(this.#bounds).holding;
+    const width = this.#bounds.halfWidth * 2 + surface.margin * 2;
+    const depth = band.nearZ - band.farZ + surface.margin * 2;
+    const centerZ = (band.nearZ + band.farZ) / 2;
+    group.position.set(0, 0, 0);
+    this.#holdingMesh?.scale.set(width, depth, 1);
+    this.#holdingMesh?.position.set(0, surface.y, centerZ);
+    const edge = surface.edge;
+    if (edge === null) return;
+    // Four rails: two running the width, two the depth, each sitting ON the surface so the
+    // water looks contained rather than painted.
+    const rails = group.children.filter((child) => child.name.startsWith("holding-edge-"));
+    const halfWidth = width / 2;
+    const halfDepth = depth / 2;
+    const placements: { scale: [number, number, number]; position: [number, number, number] }[] = [
+      {
+        scale: [width + edge.thickness, edge.height, edge.thickness],
+        position: [0, edge.height / 2 + surface.y, centerZ + halfDepth],
+      },
+      {
+        scale: [width + edge.thickness, edge.height, edge.thickness],
+        position: [0, edge.height / 2 + surface.y, centerZ - halfDepth],
+      },
+      {
+        scale: [edge.thickness, edge.height, depth],
+        position: [-halfWidth, edge.height / 2 + surface.y, centerZ],
+      },
+      {
+        scale: [edge.thickness, edge.height, depth],
+        position: [halfWidth, edge.height / 2 + surface.y, centerZ],
+      },
+    ];
+    rails.forEach((rail, index) => {
+      const placement = placements[index];
+      if (placement === undefined) return;
+      rail.scale.set(...placement.scale);
+      rail.position.set(...placement.position);
+    });
+  }
+
+  /**
+   * The sign over the holding area - the words the owner asked for, in the theme's own
+   * vocabulary (staging-copy.ts). Floats above head height in the middle of the band, where it
+   * covers nobody and reads from the back of a hall.
+   */
+  #writeHoldingLabel(config: StagingConfig): void {
+    const copy = holdingAreaCopy(
+      config.theme,
+      config.waitingEntityIds.length,
+      config.stations.length,
     );
-    // Themes author their surface as a plane in XY; the stage floor is XZ.
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.y = surface.y;
-    this.#holdingMesh = mesh;
-    this.#scene.add(mesh);
+    const lines: SpriteLine[] = [
+      { text: copy.title, sizePx: 62, color: this.#palette.nameplateColor },
+      { text: copy.hint, sizePx: 38, color: this.#palette.accent },
+    ];
+    if (copy.count.length > 0) {
+      lines.push({ text: copy.count, sizePx: 32, color: this.#palette.nameplateColor });
+    }
+    const signature = lines.map((line) => line.text).join("|");
+    if (signature === this.#holdingLabelText && this.#holdingLabel !== null) {
+      this.#positionHoldingLabel();
+      return;
+    }
+    this.#holdingLabelText = signature;
+    const canvas = drawTextCanvas(lines, this.#palette.nameplateFont);
+    if (canvas === null) return;
+    if (this.#holdingLabel === null) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+      this.#holdingLabel = sprite;
+      this.#scene.add(sprite);
+    }
+    applyCanvasToSprite(this.#holdingLabel, canvas, 3.1);
+    this.#positionHoldingLabel();
+  }
+
+  #positionHoldingLabel(): void {
+    const band = stagingBands(this.#bounds).holding;
+    this.#holdingLabel?.position.set(0, 1.45, (band.nearZ + band.farZ) / 2);
+  }
+
+  #teardownHoldingArea(): void {
+    if (this.#holdingGroup !== null) {
+      this.#scene.remove(this.#holdingGroup);
+      disposeSubtree(this.#holdingGroup);
+      this.#holdingGroup = null;
+      this.#holdingMesh = null;
+    }
   }
 
   #buildStation(theme: StagingTheme, station: StagingStation): StationVisual {
@@ -408,8 +637,11 @@ export class DioramaScene {
       teamMeshes: [],
       themeMeshes: [],
       nameplate: null,
+      crewPlate: null,
       colorHex: "",
       label: "",
+      crewSignature: "",
+      target: { x: 0, z: 0 },
     };
     for (const part of theme.stationParts) {
       const mesh = new THREE.Mesh(geometryFor(part.shape), new THREE.MeshLambertMaterial());
@@ -455,36 +687,56 @@ export class DioramaScene {
    */
   #writeNameplate(theme: StagingTheme, visual: StationVisual, label: string): void {
     visual.label = label;
-    const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 128;
-    const context = canvas.getContext("2d");
-    if (context === null) return;
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.font = `600 76px ${this.#palette.nameplateFont}`;
-    context.textAlign = "center";
-    context.textBaseline = "middle";
-    // A dark halo under the text so a nameplate stays readable over a light hull as well as a
-    // dark sky - the same job --effect-category-text-shadow does in the 2D chrome.
-    context.lineWidth = 10;
-    context.strokeStyle = "rgba(0,0,0,0.55)";
-    context.strokeText(label, canvas.width / 2, canvas.height / 2, canvas.width - 24);
-    context.fillStyle = this.#palette.nameplateColor;
-    context.fillText(label, canvas.width / 2, canvas.height / 2, canvas.width - 24);
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
+    const canvas = drawTextCanvas(
+      [{ text: label, sizePx: 76, color: this.#palette.nameplateColor }],
+      this.#palette.nameplateFont,
+    );
+    if (canvas === null) return;
     if (visual.nameplate === null) {
       const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
       sprite.position.set(...theme.nameplateOffset);
-      sprite.scale.set(1.6, 0.4, 1);
       visual.nameplate = sprite;
       visual.group.add(sprite);
     }
-    const material = visual.nameplate.material;
-    material.map?.dispose();
-    material.map = texture;
-    material.needsUpdate = true;
+    applyCanvasToSprite(visual.nameplate, canvas, 1.6);
+  }
+
+  /**
+   * WHO IS ABOARD - the crew's names on a plate beneath the station (owner, 2026-08-16). The
+   * nameplate over the mast answers "whose boat is that"; this answers "am I on it", which is
+   * the question a room full of people looking for their friends is actually asking.
+   *
+   * Overflow is a count, not a scroll: past `crewPlateNameLimit` names the plate says "+4"
+   * rather than shrinking into illegibility (staging-copy.ts owns that rule, and the 2D
+   * degradation applies the same one to the same names).
+   */
+  #writeCrewPlate(theme: StagingTheme, visual: StationVisual, station: StagingStation): void {
+    const names = station.memberIds.map((id) => this.#names.get(id) ?? "");
+    const plate = crewPlate(names.filter((name) => name.length > 0));
+    if (plate.text === visual.crewSignature) return;
+    visual.crewSignature = plate.text;
+    if (plate.text.length === 0) {
+      // An empty station keeps no plate at all - a boat nobody has boarded should look empty,
+      // and an empty rectangle of halo is worse than nothing.
+      if (visual.crewPlate !== null) {
+        visual.group.remove(visual.crewPlate);
+        disposeSubtree(visual.crewPlate);
+        visual.crewPlate = null;
+      }
+      return;
+    }
+    const canvas = drawTextCanvas(
+      [{ text: plate.text, sizePx: 40, color: this.#palette.nameplateColor }],
+      this.#palette.nameplateFont,
+    );
+    if (canvas === null) return;
+    if (visual.crewPlate === null) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+      sprite.position.set(...theme.crewPlateOffset);
+      visual.crewPlate = sprite;
+      visual.group.add(sprite);
+    }
+    applyCanvasToSprite(visual.crewPlate, canvas, 2.1);
   }
 
   #teardownStaging(): void {
@@ -493,11 +745,16 @@ export class DioramaScene {
       disposeSubtree(visual.group);
     }
     this.#stationVisuals.clear();
-    if (this.#holdingMesh !== null) {
-      this.#scene.remove(this.#holdingMesh);
-      disposeSubtree(this.#holdingMesh);
-      this.#holdingMesh = null;
+    this.#teardownHoldingArea();
+    if (this.#holdingLabel !== null) {
+      this.#scene.remove(this.#holdingLabel);
+      disposeSubtree(this.#holdingLabel);
+      this.#holdingLabel = null;
+      this.#holdingLabelText = "";
     }
+    // Everyone goes back to full size - the staged stage may have had them at 60% aboard a
+    // packed grid, and the free-roaming diorama has no scale of its own.
+    for (const instance of this.#instances.values()) instance.root.scale.setScalar(1);
     this.#targets.clear();
   }
 
@@ -527,6 +784,14 @@ export class DioramaScene {
    */
   setOccupants(occupants: readonly DioramaOccupant[]): void {
     if (this.#disposed) return;
+    // Names for EVERY occupant, not only the ones the diorama draws: a boat with thirty crew
+    // shows "+24" on its plate, and that count has to include the people past the avatar cap.
+    this.#names = new Map(
+      occupants
+        .filter((occupant) => (occupant.label ?? "").length > 0)
+        .map((occupant) => [occupant.entityId, occupant.label ?? ""]),
+    );
+    if (this.#staging !== null) this.#applyStaging(this.#staging);
     const shown = occupants.slice(0, maxDioramaAvatars);
     const wanted = new Set(shown.map((occupant) => occupant.entityId));
     for (const [entityId, instance] of this.#instances) {
@@ -710,6 +975,20 @@ export class DioramaScene {
     const now = this.#clock.getElapsedTime();
     const options = { frozen: this.#reducedMotion, celebratingEntityIds: this.#celebrating };
     const staged = this.#staging;
+    // Stations slide to the spot the current grid gives them. Creating a team re-packs the
+    // stage (staging-layout.ts), and the difference between that reading as "the harbour makes
+    // room" and as a glitch is entirely that this is a move rather than an assignment.
+    if (staged !== null) {
+      for (const visual of this.#stationVisuals.values()) {
+        const eased = easeStationPosition(
+          { x: visual.group.position.x, z: visual.group.position.z },
+          visual.target,
+          delta,
+          this.#reducedMotion,
+        );
+        visual.group.position.set(eased.x, 0, eased.z);
+      }
+    }
     for (const [entityId, instance] of this.#instances) {
       // Two movement brains, one body. In staged mode an occupant walks to the spot the layout
       // gave them; otherwise they wander. Both produce the same agent shape, so everything
@@ -724,6 +1003,9 @@ export class DioramaScene {
         if (target.stationId === null && staged?.theme.holdingMotion === "bob") {
           bob = holdingBobOffset(entityId, now, this.#reducedMotion);
         }
+        // Aboard a station packed down to fit the grid, a person is packed down with it -
+        // otherwise a crew of six stands shoulder-through-shoulder on a 60% boat.
+        instance.root.scale.setScalar(target.scale);
       }
       instance.root.position.set(instance.agent.x, bob, instance.agent.z);
       instance.root.rotation.y = instance.agent.heading;
@@ -747,7 +1029,10 @@ export class DioramaScene {
     this.#colormapCanvasCache.clear();
     this.#stationVisuals.clear();
     this.#targets.clear();
+    this.#names.clear();
+    this.#holdingGroup = null;
     this.#holdingMesh = null;
+    this.#holdingLabel = null;
     // One walk over the whole scene covers the crowd, the stage, and every station and
     // nameplate the staged lobby built (they are all children of it).
     disposeSubtree(this.#scene);

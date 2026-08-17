@@ -142,6 +142,40 @@ describe("the staged lobby degrades differently from the diorama, on purpose", (
     expect(motion).toMatch(/frozen[\s\S]{0,400}mode: "idle"/);
     expect(source("staging/staging-motion.ts")).toMatch(/if \(frozen\) return 0;/);
   });
+
+  // Owner report, 2026-08-16: "I don't understand still in the water", and "names beneath the
+  // boats". Both fixes have to exist on BOTH paths or the answer depends on whether the
+  // projector laptop happened to have WebGL - which is the one thing the staged lobby's whole
+  // two-path design exists to prevent. The 3D half cannot be rendered in a headless test, so
+  // it is gated at the source, next to the 2D half that IS rendered (staged-lobby.states.test).
+  it("says the holding-area words on the 3D stage as well as in the CSS one", () => {
+    const scene = source("diorama/diorama-scene.ts");
+    const fallback = source("staging/staged-lobby-2d.svelte");
+    for (const surface of [scene, fallback]) {
+      expect(surface).toContain("staging/staging-copy.ts");
+      expect(surface).toContain("holdingAreaCopy");
+    }
+    // The words are DRAWN, not merely computed: a sprite the scene positions over the water.
+    expect(scene).toContain("#writeHoldingLabel");
+    expect(scene).toContain("#positionHoldingLabel");
+  });
+
+  it("draws the crew's names beneath each station on both paths", () => {
+    expect(source("diorama/diorama-scene.ts")).toContain("#writeCrewPlate");
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("crew-plate");
+    // ...and the overflow rule is shared, so the two views list the same people.
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("crewPlateNameLimit");
+    expect(source("diorama/diorama-scene.ts")).toContain("crewPlate(");
+  });
+
+  it("gives the water a boundary rather than running it under the whole stage", () => {
+    // The 60x40 plane is what made "in the water" indistinguishable from "on the floor".
+    const boats = source("staging/staging-themes/boats.ts");
+    expect(boats).not.toContain("width: 60");
+    expect(boats).toContain("edge:");
+    expect(source("diorama/diorama-scene.ts")).toContain("holding-edge-");
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("holding-noun");
+  });
 });
 
 describe("guardrail 3+4: the diorama is decoration, and never behind a live clue", () => {
