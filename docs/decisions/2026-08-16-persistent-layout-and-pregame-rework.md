@@ -69,3 +69,29 @@ The first item of the batch, implemented. What it is now, and the reasoning that
 **Copy.** The password field is labelled `Password` and says nothing else. The create form's name field carries the live counter the batch asks for.
 
 **The way back is a component.** `src/lib/chrome/home-button.svelte` - an anchor (never `history.back()`: a QR arrival has nothing behind it), `inline` or `floating`, tokenized, with an optional confirm for a surface that is mid-game. The `/dev` layout adopted it; the play surfaces adopt it in their own passes.
+
+## The console review (owner, 2026-08-17) - what it changed and the rules it produced
+
+The cog above shipped, the owner used it, and the report was short and pointed. Three of the six items turned into rules rather than fixes, which is why they are recorded here rather than only in a changelog.
+
+**"Display text size and other settings show the theme assets, which makes them difficult to read."**
+
+> **A control panel is never painted by the thing it controls.**
+
+The cog steers the type scale a theme renders at, and it was itself rendered in that theme: labels in the board's condensed poster face, values in the theme's accent, the whole rail on a ground the theme chose for a projector. It looked fine under retro-tv, which is what it was built against - and the theme gallery had already been through this exact failure on 2026-08-13, when the preset picker washed out on the light paper theme. Twice is a rule.
+
+The palette lives in `tokens.css` as `--control-*`, deliberately OUTSIDE the theme contract and deliberately fixed (hexes and a system face - a control token derived from a theme color is a themed token with extra steps, and fails in the same place). Both host panels wear it. The one exception is a PREVIEW: the display type-scale sample uses the board's own tokens, because it is a picture of the projector and is supposed to look like one. `console-chrome.gate.test.ts` holds the line at source level, since custom properties do not resolve in an SSR render and no markup test could have caught either bug.
+
+**"I don't understand SAVE CAPS."**
+
+The button was named after itself. The rule that replaced it: **a control that waits says what it is holding.** Switches (streamer mode, listing, spectators allowed) apply on change - a toggle that needs a second button is a toggle nobody trusts. Typed values must not travel letter by letter, so the two typed groups hold a draft and state the edit they would send (`player cap 30 -> 24`), offer Discard beside Apply, and disable the Apply when there is nothing pending. The room half now says the difference in words at the top, because it is a difference a host meets mid-game.
+
+**"Mirror mode needs to be easier to enter."** It is a labelled toggle in the console header carrying its own state. `?mirror` remains, as a SEED for the device preference rather than an override - it used to be OR-ed with it, which meant a console opened through the query could never leave, and the dock's "Exit mirror" was a button that could not work.
+
+**"You should show all player data... Also show spectators."** The roster panel (`host-roster-panel.svelte`), a second rail under the same in-place law: every player, every team, the audience, and the host powers the protocol already granted but nothing had ever called - rename, kick, lock, hand off leadership, take somebody off a team. One power was genuinely missing: the host could eject a player from a team but not SEAT them on one, so `team-join` gained an optional host-only `playerId` (the one protocol change this review needed, and the "team-move" message the sequencing note above anticipated). A team's lock stops joiners, never the host.
+
+**Spectators are a count, and that is permanent.** They join anonymously and hold no seat, so there is no list to show and no wiring that would produce one; `rosterPayload.spectatorCount` is filled from live connections by the DO. The field is optional because ABSENT means "this producer cannot count an audience" - the local sim, where a mock room is a single tab - and a surface must render that as unknown, not as zero.
+
+**"I don't think the room I created shows the correct settings" / a capacity of "26/30" on an empty room.** Both were the same thing: mock material presented as a room. Every play route seeded the 30-player fixture roster into whatever code the URL carried, and the ws store's settings shell is the protocol's defaults. So the dummy roster is now bounded to the fixture code and an explicit `?demo` (`seedRosterFor`), a local simulation is FLAGGED as one on the console, and `RoomView.settingsKnown` lets a surface say "not loaded yet" instead of drawing defaults that are not this room's.
+
+> **A surface with no data says so. It never shows a plausible number.**
