@@ -69,6 +69,11 @@
     return winner === null ? null : entityDisplayName(view, winner.entityId);
   });
   const connectedCount = $derived(view.roster.players.filter((entry) => entry.connected).length);
+  // Who is out of THIS clue after a wrong answer (#16). The rebound is the moment the host most
+  // needs it and the console never showed it before the 2026-08-16 walk.
+  const lockedOutNames = $derived(
+    (clue?.lockedOutEntities ?? []).map((entityId) => entityDisplayName(view, entityId)),
+  );
   const phase = $derived(game?.phase ?? "lobby");
   const canArm = $derived(phase === "reading" || phase === "tiebreaker-reading");
   const canJudge = $derived(
@@ -285,7 +290,18 @@
               <li>{view.roster.teams.length} teams</li>
               <li>Display: open <code>/room/{view.roomCode}/display</code> on the projector</li>
             </ul>
-            <button type="button" class="primary" onclick={() => store.startGame()}>Start game</button>
+            <!-- An empty room cannot start: the engine has nobody to seat, so `start-game` is
+                 refused and the room stays in its lobby. It used to be a button that did
+                 nothing (2026-08-16 host-loop walk); now it says why. -->
+            <button
+              type="button"
+              class="primary"
+              disabled={view.roster.players.length === 0}
+              onclick={() => store.startGame()}>Start game</button
+            >
+            {#if view.roster.players.length === 0}
+              <p class="wizard-line">Nobody has joined yet - the game needs at least one player.</p>
+            {/if}
           </section>
         {:else}
           <div class="console-grid">
@@ -315,13 +331,20 @@
                         board?.wagerCells.includes(cellKey(categoryIndex, rowIndex)) ?? false}
                       {@const value =
                         view.content.cellValues[game.roundIndex]?.[categoryIndex]?.[rowIndex] ?? 0}
+                      <!-- A played cell is a REOPEN button while the board is open (C4's
+                           always-available list, and section 8 step 8). The store has always
+                           had reopenCell; until the 2026-08-16 host-loop walk nothing on any
+                           surface called it, so a mis-scored clue could be undone only by
+                           unwinding every action after it. -->
                       <button
                         type="button"
                         class="minimap-cell"
                         class:used
-                        disabled={used || phase !== "awaiting-selection"}
+                        disabled={phase !== "awaiting-selection"}
+                        title={used ? "Reopen this clue" : undefined}
                         onclick={() => {
-                          store.selectCell(categoryIndex, rowIndex);
+                          if (used) store.reopenCell(categoryIndex, rowIndex);
+                          else store.selectCell(categoryIndex, rowIndex);
                         }}
                       >
                         {used ? "" : value}
@@ -435,6 +458,58 @@
                     Correct <span class="key-hint">&rarr;</span>
                   </button>
                 </div>
+                {#if lockedOutNames.length > 0}
+                  <!-- Found missing by the 2026-08-16 host-loop walk: a wrong answer locks that
+                       entity out and re-arms for the rest (game-anatomy section 8 step 5), and
+                       the console said nothing - so a host judging a rebound could not tell who
+                       was still in it, which is the one fact the rebound is about. -->
+                  <p class="lockout-line">
+                    Locked out of this clue: <strong>{lockedOutNames.join(", ")}</strong>
+                  </p>
+                {/if}
+                {#if phase === "all-answering" || phase === "all-judging"}
+                  <!-- EVERYONE-ANSWERS (matrix #22). The store has had closeAnswers() and
+                       judgeEntity() since the seam was written and the console had no way to
+                       call either, so a room in this mode reached all-judging and stopped
+                       dead. It is off by default, which is why nothing had noticed. -->
+                  <div class="everyone-answers">
+                    <p class="wizard-line">
+                      Answers in: {Object.keys(clue.submissions).length} / {standings.length}
+                    </p>
+                    {#if phase === "all-answering"}
+                      <button type="button" class="chip" onclick={() => store.closeAnswers()}>
+                        Close answers now
+                      </button>
+                    {:else}
+                      <ul class="reveal-list">
+                        {#each standings as row (row.entityId)}
+                          {@const submission = clue.submissions[row.entityId]}
+                          {@const verdict = clue.entityVerdicts[row.entityId]}
+                          <li class="reveal-row" class:judgeable={verdict === undefined}>
+                            <span class="award-name">{row.name}</span>
+                            <span class="reveal-answer">{submission?.text ?? "(no answer)"}</span>
+                            {#if verdict !== undefined}
+                              <span class="verdict">{verdict}</span>
+                            {:else}
+                              <button
+                                type="button"
+                                class="chip"
+                                onclick={() => store.judgeEntity(row.entityId, "correct")}
+                                >Correct</button
+                              >
+                              <button
+                                type="button"
+                                class="chip"
+                                onclick={() => store.judgeEntity(row.entityId, "wrong")}
+                                >Wrong</button
+                              >
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {/if}
                 <div class="escape-row">
                   <button type="button" class="chip" onclick={() => store.closeBuzzWindow()}>
                     No takers <span class="key-hint">T</span>
@@ -502,6 +577,73 @@
                     {/each}
                   </ul>
                 {/if}
+              {:else if game?.tiebreaker != null}
+                <!-- SUDDEN DEATH (matrix #37). Found unrunnable by the 2026-08-16 host-loop
+                     walk: a tiebreaker carries no CLUE, and every control on this panel - the
+                     ARM button included - lived inside the clue branch, so the console showed
+                     "Board up, pick any cell" while the engine sat in tiebreaker-reading.
+                     The keyboard still worked, which is the only reason it was survivable. -->
+                <h2>Sudden death</h2>
+                <p class="wizard-line">
+                  Tied for first:
+                  <strong>
+                    {game.tiebreaker.participants
+                      .map((entityId) => entityDisplayName(view, entityId))
+                      .join(" · ")}
+                  </strong>
+                </p>
+                <p class="wizard-line">Read the tiebreaker clue aloud, then arm. No score moves.</p>
+                {#if game.tiebreaker.eliminated.length > 0}
+                  <p class="lockout-line">
+                    Out of this clue:
+                    <strong>
+                      {game.tiebreaker.eliminated
+                        .map((entityId) => entityDisplayName(view, entityId))
+                        .join(", ")}
+                    </strong>
+                  </p>
+                {/if}
+                <div class="action-row">
+                  <button
+                    type="button"
+                    class="arm-button"
+                    disabled={!canArm}
+                    onclick={() => store.armBuzzers()}
+                  >
+                    ARM <span class="key-hint">space</span>
+                  </button>
+                  {#if answeringName !== null}
+                    <p class="answering-line" role="status">
+                      <strong>{answeringName}</strong> answers
+                    </p>
+                  {/if}
+                </div>
+                <div class="judge-row">
+                  <button
+                    type="button"
+                    class="judge wrong"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("wrong")}
+                  >
+                    Wrong <span class="key-hint">&larr;</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="judge correct"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("correct")}
+                  >
+                    Correct <span class="key-hint">&rarr;</span>
+                  </button>
+                </div>
+                <div class="escape-row">
+                  <button type="button" class="chip" onclick={() => store.tiebreakerNextClue()}>
+                    Next tiebreaker clue
+                  </button>
+                  <button type="button" class="chip" onclick={() => store.closeBuzzWindow()}>
+                    No takers <span class="key-hint">T</span>
+                  </button>
+                </div>
               {:else if phase === "game-over"}
                 <h2>Game over</h2>
                 <ScoresStrip rows={standings} />
@@ -1010,6 +1152,23 @@
 
   .verdict.pending {
     color: var(--surface-text-muted);
+  }
+
+  .lockout-line {
+    margin: 0;
+    font-size: 0.85em;
+    color: var(--score-negative);
+  }
+
+  .everyone-answers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .primary:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   /* --- Mirror mode: display-first, slim dock. --- */
