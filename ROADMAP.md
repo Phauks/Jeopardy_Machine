@@ -143,11 +143,14 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 - [x] **The room's settings reach the join path**: `RoomView` carries the protocol's `RoomSettings` and the room's last refusal, and `room-refusal.ts` turns every wire reason into human copy in one exhaustive switch - a full room or a spectators-off room says so, in words, before anyone picks a character
 - [ ] Next: the host console's room-settings panel, including revealing a hidden code on the host's own device (both room-layer doors exist; `/dev/rooms` drives them today)
 - [ ] Reconcile with M3: flip `createRoomStore` to the ws store and wire the gap list in docs/design/surfaces.md (content channel, timers, pause, room-closed screens) - exit criteria (real phones in one room) blocks on this
-- [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups, bundled sound files, PWA precache growth (tracked in docs/design/surfaces.md "Known gaps")
+- [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups (tracked in docs/design/surfaces.md "Known gaps"). Bundled sound files and the PWA precache growth landed in the M5 asset pass below
 
 ### M5 - Event readiness (the club night)
 
 Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal - whose checklist includes the PWA drills: airplane-mode editor test and a service-worker-update-during-game drill (docs/decisions/2026-08-13-pwa.md). **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
+
+- [x] Sound pack bundled: `tools/audio-bake` (fetch + per-page license re-verification + trim/normalize/uniform-onset/encode, deterministic), 21 CC0 files under `apps/web/static/sounds/` with a manifest and credits table, `RoomAudio.prime()` decoding the real pack, the time-up double-beep synthesized in-app. Record of what shipped: docs/content/media-and-sounds.md section 10
+- [ ] **Owner still owes the lobby track pick** - the slot is built and a CC0 placeholder ships in it (media-and-sounds.md section 10, "Lobby track: PLACEHOLDER")
 
 ### M6 - Fairness + resilience polish
 

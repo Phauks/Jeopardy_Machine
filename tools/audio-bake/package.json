@@ -1,0 +1,14 @@
+{
+  "name": "@jeopardy/audio-bake",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline sound pipeline: fetches the approved CC0 sources from Freesound, re-verifies each license line on its own page, trims/normalizes/onset-standardizes them, and writes the pack committed under apps/web/static/sounds/. Never bundled into shipped Workers.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "fetch": "node src/fetch.mjs",
+    "bake": "node src/bake.mjs",
+    "analyze": "node src/analyze.mjs",
+    "verify": "node src/verify.mjs"
+  }
+}

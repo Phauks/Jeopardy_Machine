@@ -13,13 +13,29 @@
 import { version } from "$app/env";
 import { assets, immutable } from "$app/manifest";
 import { self as serviceWorker } from "$app/service-worker";
+import { soundManifest } from "#lib/room/sound-manifest.ts";
 
 // One cache per deployed version; activation deletes every older one.
 const cacheName = `app-shell-${version}`;
+
+// The music beds are the one part of static/ that must NOT be precached (M5 sound pack). The
+// lobby track alone is ~3.8 MB, and `install` downloads its whole list before the SW can
+// activate - precaching it would turn an install into a multi-megabyte stall on venue Wi-Fi
+// for a track most surfaces never play. RoomAudio fetches music on demand instead
+// (apps/web/src/lib/room/room-audio.ts); the 17 buzz/cue one-shots, which ARE latency-
+// critical, total under 320 KB and stay precached with everything else.
+const onDemandPaths = new Set(
+  soundManifest.sounds
+    .filter((sound) => sound.kind === "music")
+    .map((sound) => soundManifest.basePath + sound.file),
+);
+
 // `immutable` = hashed JS/CSS emitted by Vite (empty during `vite dev` - the SW is a no-op
-// shell there); `assets` = everything in static/ (icons, manifest). Both are safe to
+// shell there); `assets` = everything in static/ (icons, manifest, sounds). Both are safe to
 // cache-first: a new deploy changes the URL (immutable) or the cache name (assets).
-const precachedPaths = [...immutable, ...assets].map((entry) => entry.path);
+const precachedPaths = [...immutable, ...assets]
+  .map((entry) => entry.path)
+  .filter((path) => !onDemandPaths.has(path));
 
 serviceWorker.addEventListener("install", (event) => {
   event.waitUntil(caches.open(cacheName).then((cache) => cache.addAll(precachedPaths)));
