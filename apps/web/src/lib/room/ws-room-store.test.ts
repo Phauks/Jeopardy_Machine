@@ -49,6 +49,9 @@ function snapshotFrame(overrides: Record<string, unknown> = {}) {
     board: emptyBoard,
     paused: false,
     clueContent: null,
+    // The room's running countdowns as REMAINING ms (M6). Mandatory on the wire, because a
+    // console reopening mid-clue had no other way to know how long the window had left.
+    timers: [],
     ...overrides,
   };
 }

@@ -242,6 +242,7 @@ describe("room server messages", () => {
         board: { rounds: [{ categoryTitles: ["Firsts"], cellValues: [[100, 200]] }] },
         paused: false,
         clueContent: null,
+        timers: [{ kind: "answer-window", remainingMs: 3200 }],
       },
       {
         version: v,
@@ -377,10 +378,11 @@ describe("room server messages", () => {
     ).toBe(false);
   });
 
-  it("makes a stateful client's three needs mandatory, not optional", () => {
-    // The M4 reconcile's findings, held as schema: a snapshot without the board or the seating
-    // rule leaves a display with nothing to paint and a teams room with no teams, and an event
-    // batch without its state leaves every client guessing (see the notes on those fields).
+  it("makes a stateful client's needs mandatory, not optional", () => {
+    // The M4 reconcile's findings plus M6's, held as schema: a snapshot without the board or
+    // the seating rule leaves a display with nothing to paint and a teams room with no teams, a
+    // snapshot without `timers` leaves a console reopening mid-clue with a frozen countdown,
+    // and an event batch without its state leaves every client guessing (see those fields).
     const snapshot = {
       version: v,
       type: "snapshot",
@@ -392,9 +394,10 @@ describe("room server messages", () => {
       board: { rounds: [] },
       paused: false,
       clueContent: null,
+      timers: [],
     };
     expect(roomServerMessageSchema.safeParse(snapshot).success).toBe(true);
-    for (const missing of ["teamsMode", "board"]) {
+    for (const missing of ["teamsMode", "board", "timers"]) {
       const { [missing]: _dropped, ...rest } = snapshot as Record<string, unknown>;
       expect(roomServerMessageSchema.safeParse(rest).success, missing).toBe(false);
     }

@@ -8,8 +8,13 @@
 //   no-such-room. An idle-expiry alarm wipes the room and frees its code.
 // - The engine feed: relayed actions are stamped with server arrival time + session
 //   identity (room/engine-glue.ts), run through @jeopardy/engine's transition, persisted,
-//   and narrated to every client as redacted event batches. Arrival order IS buzz order
-//   (fairness compensation is M6, upstream of the engine).
+//   and narrated to every client as redacted event batches.
+// - Buzz latency compensation (M6, docs/decisions/2026-08-17-buzz-latency-compensation.md):
+//   while an arming is open, buzzes are HELD for a few milliseconds in room/arm-window.ts,
+//   ranked by credited reaction time, and only then fed to the engine as an ordered list.
+//   The engine never learns any of this happened - reordering is upstream of it, which is
+//   what boundary 2.1 requires. With the setting off, arrival order is the order, exactly
+//   as it was in M3.
 // - Timer hints -> alarms: the engine's timer-set events become scheduled expiry actions in
 //   a multiplexed alarm book (room/storage.ts) alongside leadership-succession checks and
 //   the expiry deadline; the ONE runtime alarm always sits at the earliest entry.
@@ -34,13 +39,24 @@ import { updateRoomSettingsRequestSchema } from "@jeopardy/protocol/room/room-se
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
 import {
+  adjudicateArmWindow,
+  openArmWindow,
+  queueBuzz,
+  recordRoundTrip,
+} from "./room/arm-window.ts";
+import {
   boardMaterial,
   clueContentFor,
   resolveCellContent,
   resolveFinalContent,
 } from "./room/content.ts";
 import { buildRoomDiagnostics } from "./room/diagnostics.ts";
-import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
+import {
+  identityEditsLocked,
+  stampRelayedAction,
+  timerExpiryAction,
+  timerLiveInPhase,
+} from "./room/engine-glue.ts";
 import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
 import {
@@ -53,6 +69,7 @@ import {
   emptySchedule,
   nextWakeAt,
   roomSettingsPayload,
+  runningTimers,
   toWireRosterEntry,
 } from "./room/storage.ts";
 import type { GameAction } from "@jeopardy/engine/actions";
@@ -61,11 +78,12 @@ import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
 import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
-import type { RoomClientMessage } from "@jeopardy/protocol/room/client-messages";
+import type { ActionTiming, RoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
 import type { RoomRole } from "@jeopardy/protocol/room/identity";
 import type { RosterPayload, TeamDoc } from "@jeopardy/protocol/room/roster";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
+import type { ArmWindow } from "./room/arm-window.ts";
 import type { RegistryListing, RegistrySnapshot } from "./room/registry-writer.ts";
 import type {
   AlarmSchedule,
@@ -95,7 +113,20 @@ type LoadedRoom = {
   teams: StoredTeams;
   renames: RenameLog;
   schedule: AlarmSchedule;
+  // The open arming's held buzzes and round-trip samples; null between armings (M6).
+  armWindow: ArmWindow | null;
 };
+
+type RoomStorageKey =
+  | "meta"
+  | "setup"
+  | "state"
+  | "spec"
+  | "roster"
+  | "teams"
+  | "renames"
+  | "schedule"
+  | "armWindow";
 
 function setupFromSpec(spec: RoomGameSpec, seed: string): GameSetup {
   if (spec.kind === "definition") return setupFromGameDefinition(spec.body, seed);
@@ -138,7 +169,17 @@ export class GameRoomDO extends Server {
 
   private async load(): Promise<LoadedRoom | null> {
     if (this.room !== undefined) return this.room;
-    const keys = ["meta", "setup", "state", "spec", "roster", "teams", "renames", "schedule"];
+    const keys: RoomStorageKey[] = [
+      "meta",
+      "setup",
+      "state",
+      "spec",
+      "roster",
+      "teams",
+      "renames",
+      "schedule",
+      "armWindow",
+    ];
     const values = await this.ctx.storage.get<unknown>(keys);
     const meta = values.get("meta") as RoomMeta | undefined;
     if (meta === undefined) {
@@ -153,16 +194,20 @@ export class GameRoomDO extends Server {
       roster: (values.get("roster") as StoredRoster | undefined) ?? {},
       teams: (values.get("teams") as StoredTeams | undefined) ?? {},
       renames: (values.get("renames") as RenameLog | undefined) ?? {},
-      schedule:
-        (values.get("schedule") as AlarmSchedule | undefined) ?? structuredClone(emptySchedule),
+      // Spread over the empty book rather than replacing it: a room stored before a new
+      // schedule field existed (the M6 buzz deadline) must come back with that field defined
+      // rather than undefined, or the first comparison against it is a silent no-op.
+      schedule: {
+        ...structuredClone(emptySchedule),
+        ...(values.get("schedule") as Partial<AlarmSchedule> | undefined),
+      },
+      armWindow: (values.get("armWindow") as ArmWindow | undefined) ?? null,
     };
     this.lastPersistedActivity = meta.lastActivityAt;
     return this.room;
   }
 
-  private async persist(
-    ...keys: ("meta" | "setup" | "state" | "spec" | "roster" | "teams" | "renames" | "schedule")[]
-  ): Promise<void> {
+  private async persist(...keys: RoomStorageKey[]): Promise<void> {
     const room = this.room;
     if (room === null || room === undefined) return;
     const entries: Record<string, unknown> = {};
@@ -271,7 +316,17 @@ export class GameRoomDO extends Server {
       // A phone that reconnects mid-clue must land on the screen it left, so an open clue
       // ships its (redacted) content with the snapshot rather than waiting for the next one.
       clueContent: this.clueContentForRole(attachment.role),
+      // ...and the countdown it left, or a console that reopens on a different laptop
+      // mid-answer paints a clue with no clock on it (user-flows C6, hardened in M6).
+      timers: runningTimers(room.schedule, room.meta, room.state.phase, Date.now()),
     });
+    // Reconnecting INTO an open arming: the returning client gets the arm id at once, so it
+    // can ack (which measures the new socket's round trip) and stamp a buzz. Its own elapsed
+    // claim will be nonsense - it never saw the original arm - but the claim can only ever
+    // make a press look slower, so the server estimate governs and the seat still races.
+    if (room.armWindow !== null && this.buzzHoldingOpen(room)) {
+      this.send(connection, this.armWindowPayload(room.armWindow));
+    }
   }
 
   // ---- clue content ----------------------------------------------------------------------
@@ -312,32 +367,41 @@ export class GameRoomDO extends Server {
 
   // ---- engine pipeline ------------------------------------------------------------------
 
-  // Apply engine actions in arrival order, persist once, narrate once. Returns accepted
+  // Apply engine actions in the order given, persist once, narrate once. Returns accepted
   // events (callers special-case buzz feedback). Rejections: reported to `reporter` unless
   // silent (alarm-fired stale timers are EXPECTED to reject harmlessly).
+  //
+  // `reporters` is the per-action override the adjudicated buzz batch needs: one arming's
+  // presses arrive on many sockets, and every loser must hear "too late" on ITS OWN socket
+  // rather than on whichever connection happened to trigger the flush.
   private async applyEngineActions(
     actions: GameAction[],
-    options: { reporter?: Connection; silentRejections?: boolean } = {},
+    options: {
+      reporter?: Connection;
+      reporters?: (Connection | undefined)[];
+      silentRejections?: boolean;
+    } = {},
   ): Promise<GameEvent[]> {
     const room = await this.load();
     if (room === null) return [];
     const accepted: GameEvent[] = [];
-    for (const action of actions) {
+    for (const [index, action] of actions.entries()) {
+      const reporter = options.reporters?.[index] ?? options.reporter;
       const result = transition(room.state, action, room.setup);
       const rejection = result.events.find((event) => event.type === "action-rejected");
       if (rejection !== undefined && rejection.type === "action-rejected") {
-        if (options.silentRejections !== true && options.reporter !== undefined) {
+        if (options.silentRejections !== true && reporter !== undefined) {
           if (action.type === "buzz") {
             // The engine narrates buzz rejections precisely (too-late, locked-out...);
             // relay that as silent per-phone feedback, never room audio.
             const buzzEvent = result.events.find((event) => event.type === "buzz-rejected");
-            this.send(options.reporter, {
+            this.send(reporter, {
               type: "buzz-rejected",
               reason: buzzEvent?.type === "buzz-rejected" ? buzzEvent.reason : "not-armed",
               lockedUntil: null,
             });
           } else {
-            this.sendError(options.reporter, "action-rejected", rejection.reason);
+            this.sendError(reporter, "action-rejected", rejection.reason);
           }
         }
         continue;
@@ -358,13 +422,22 @@ export class GameRoomDO extends Server {
       }
     }
     if (accepted.length === 0) return [];
+    // Drop book entries the new phase can no longer be waiting on. They used to linger and
+    // fire as harmless rejections, which was fine until snapshots started reporting the room's
+    // live timers (M6): a phantom countdown on a reconnecting host's console is worse than a
+    // wasted alarm, and this removes both.
+    for (const kind of Object.keys(room.schedule.engineTimers)) {
+      if (!timerLiveInPhase(room.state.phase, kind)) delete room.schedule.engineTimers[kind];
+    }
+    const armed = accepted.find((event) => event.type === "buzzers-armed");
+    if (armed !== undefined && armed.type === "buzzers-armed") this.openArmingWindow(room, armed);
     const lifecycleChanged = accepted.some(
       (event) => event.type === "game-started" || event.type === "game-over",
     );
     room.meta.stateVersion += 1;
     room.meta.lastActivityAt = Date.now();
     this.lastPersistedActivity = room.meta.lastActivityAt;
-    await this.persist("state", "meta", "schedule");
+    await this.persist("state", "meta", "schedule", "armWindow");
     await this.rescheduleAlarm();
     this.broadcastEngineEvents(accepted);
     // A phase change is exactly what a lobby browser reads ("in lobby" vs "playing"), so it
@@ -399,6 +472,16 @@ export class GameRoomDO extends Server {
       }
     }
 
+    // The arming's id and its holding window, to everyone joined: a phone needs it to stamp
+    // its buzz and to ack (which is what measures its round trip), a display needs the window
+    // length to size the beat before the winner appears.
+    if (room.armWindow !== null && events.some((event) => event.type === "buzzers-armed")) {
+      const payload = this.armWindowPayload(room.armWindow);
+      for (const connection of this.getConnections<Attachment>()) {
+        if (connection.state !== null) this.send(connection, payload);
+      }
+    }
+
     // Authored text rides its own channel (the engine never sees content), pushed at the two
     // moments a screen needs words: a clue opening and the final round starting.
     if (
@@ -416,8 +499,33 @@ export class GameRoomDO extends Server {
     // the state it produced (server-messages.ts explains why the events alone are not enough
     // for a client to hold state). The state redaction is memoized per ROLE: it is identical
     // for every phone in the room, and a 100-player buzz would otherwise redact it 100 times.
-    const stream = events.filter((event) => event.type !== "buzz-won");
+    //
+    // buzz-rejected is filtered OUT of that stream and delivered privately instead: the wire
+    // contract calls it "per-phone silent feedback, never room audio" (protocol room/server-
+    // messages.ts), and it was leaking to the whole room for the one case that reaches here -
+    // a locked-out player mashing after the arm, which the engine ACCEPTS (it re-triggers the
+    // penalty) rather than rejecting. M6 finding: the room heard about every mash and the
+    // masher heard nothing.
+    const stream = events.filter(
+      (event) => event.type !== "buzz-won" && event.type !== "buzz-rejected",
+    );
     const stateByRole = new Map<RoomRole, unknown>();
+    //
+    // One private message per press, whichever way the engine narrated it: an early-buzz
+    // carries the lockout deadline the phone draws its penalty ring from, and a bare
+    // buzz-rejected (locked out, not the captain) carries the reason alone. A press that
+    // produced BOTH - the mash that re-triggers a running penalty - is one press and gets one
+    // message, the one with the deadline on it.
+    const feedback = new Map<string, { reason: string; lockedUntil: number | null }>();
+    for (const event of events) {
+      if (event.type === "early-buzz") {
+        feedback.set(event.playerId, { reason: "early-lockout", lockedUntil: event.lockedUntil });
+      }
+    }
+    for (const event of events) {
+      if (event.type !== "buzz-rejected" || feedback.has(event.playerId)) continue;
+      feedback.set(event.playerId, { reason: event.reason, lockedUntil: null });
+    }
     for (const connection of this.getConnections<Attachment>()) {
       const attachment = connection.state;
       if (attachment === null) continue;
@@ -433,16 +541,128 @@ export class GameRoomDO extends Server {
           game: stateByRole.get(attachment.role) ?? null,
         });
       }
-      for (const event of stream) {
-        if (event.type === "early-buzz" && event.playerId === attachment.playerId) {
-          this.send(connection, {
-            type: "buzz-rejected",
-            reason: "early-lockout",
-            lockedUntil: event.lockedUntil,
-          });
-        }
-      }
+      const mine = attachment.playerId === null ? undefined : feedback.get(attachment.playerId);
+      if (mine !== undefined) this.send(connection, { type: "buzz-rejected", ...mine });
     }
+  }
+
+  // ---- buzz latency compensation ---------------------------------------------------------
+  //
+  // The M6 headline (docs/decisions/2026-08-17-buzz-latency-compensation.md). Three moves:
+  // arming opens a window and tells every client its id; each client acks immediately, which
+  // measures its round trip over exactly the path its buzz will take; buzzes are held for a
+  // few milliseconds and fed to the engine ranked by credited reaction time. The arithmetic
+  // and its threat model live in @jeopardy/protocol's room/buzz-fairness.ts; this class owns
+  // only the clock, the sockets and the storage.
+
+  /** 0 = compensation is off for this room, and buzzes go to the engine as they arrive. */
+  private compensationWindowMs(room: LoadedRoom): number {
+    const buzzing = room.setup.settings.buzzing;
+    return buzzing.latencyCompensation ? buzzing.compensationWindowMs : 0;
+  }
+
+  // Open the window for an arming. Called from applyEngineActions the moment the engine says
+  // buzzers-armed, so armedAt is within a millisecond of the broadcast that follows it - which
+  // is what every client's t0 and every round-trip sample is measured against.
+  private openArmingWindow(
+    room: LoadedRoom,
+    armed: Extract<GameEvent, { type: "buzzers-armed" }>,
+  ): void {
+    room.meta.armCounter = (room.meta.armCounter ?? 0) + 1;
+    room.schedule.buzzAdjudicateAt = null;
+    room.armWindow = openArmWindow({
+      armId: room.meta.armCounter,
+      armedAt: Date.now(),
+      rebound: armed.rebound,
+      windowMs: this.compensationWindowMs(room),
+    });
+  }
+
+  private armWindowPayload(window: ArmWindow): Record<string, unknown> {
+    return {
+      type: "arm-window",
+      arm: {
+        armId: window.armId,
+        at: window.armedAt,
+        compensationMs: window.windowMs,
+        rebound: window.rebound,
+      },
+    };
+  }
+
+  /** True while this arming's buzzes are being HELD rather than fed straight to the engine. */
+  private buzzHoldingOpen(room: LoadedRoom): boolean {
+    if (room.armWindow === null || room.armWindow.windowMs <= 0) return false;
+    return room.state.phase === "armed" || room.state.phase === "tiebreaker-armed";
+  }
+
+  // A client answering the arm broadcast: arrival minus broadcast IS this connection's round
+  // trip, measured end to end with the server's own clock. Deliberately NOT persisted on its
+  // own - the sample rides the next buzz write (a 100-phone room would otherwise pay 100
+  // storage writes for a number that is worthless the moment the arming ends). If eviction
+  // beats the first buzz, the sample is lost and the room simply compensates nobody, which is
+  // the conservative direction.
+  private async handleArmAck(
+    connection: Connection<Attachment>,
+    armId: number,
+    receivedAt: number,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null || room.armWindow === null) return;
+    if (room.armWindow.armId !== armId) return; // an ack for a previous arming proves nothing
+    recordRoundTrip(room.armWindow, connection.id, receivedAt);
+  }
+
+  // Hold this buzz instead of adjudicating it now. The phone already gave its own player
+  // optimistic feedback (user-flows A4), so the only thing waiting buys is the chance to put
+  // the presses in the right order - and the deadline shrinks as soon as somebody is credibly
+  // fast (room/arm-window.ts).
+  private async holdBuzz(
+    connection: Connection<Attachment>,
+    room: LoadedRoom,
+    playerId: string,
+    receivedAt: number,
+    timing: ActionTiming | undefined,
+  ): Promise<void> {
+    const window = room.armWindow;
+    if (window === null) return;
+    queueBuzz(window, {
+      playerId,
+      connectionId: connection.id,
+      arrivalAt: receivedAt,
+      // A claim stamped with a DIFFERENT arming is not a claim about this race (the room
+      // re-armed while the press was in flight); it is dropped, not trusted and not punished.
+      claimedElapsedMs:
+        timing !== undefined && timing.armId === window.armId ? timing.elapsedMs : null,
+      sequence: window.pending.length,
+    });
+    room.schedule.buzzAdjudicateAt = window.adjudicateAt;
+    await this.persist("armWindow", "schedule");
+    await this.rescheduleAlarm();
+  }
+
+  // Close the window and hand the engine the ordered list. Called when the deadline fires,
+  // and BEFORE any other action reaches the engine - a host's "no takers" or an expiring
+  // buzz-window timer must never resolve a clue whose presses are still in the holding pen.
+  private async flushArmWindow(): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    const window = room.armWindow;
+    if (window === null || window.pending.length === 0) return;
+    const ordered = adjudicateArmWindow(window);
+    window.pending = [];
+    window.adjudicateAt = null;
+    room.schedule.buzzAdjudicateAt = null;
+    await this.persist("armWindow", "schedule");
+
+    const byConnectionId = new Map<string, Connection<Attachment>>();
+    for (const connection of this.getConnections<Attachment>()) {
+      byConnectionId.set(connection.id, connection);
+    }
+    await this.applyEngineActions(
+      ordered.map((buzz) => ({ type: "buzz" as const, at: buzz.at, playerId: buzz.playerId })),
+      { reporters: ordered.map((buzz) => byConnectionId.get(buzz.connectionId)) },
+    );
   }
 
   // ---- initialize RPC -------------------------------------------------------------------
@@ -487,6 +707,7 @@ export class GameRoomDO extends Server {
         pausedAt: null,
         playerCounter: 0,
         teamCounter: 0,
+        armCounter: 0,
       };
       this.room = {
         meta,
@@ -497,6 +718,7 @@ export class GameRoomDO extends Server {
         teams: {},
         renames: {},
         schedule: structuredClone(emptySchedule),
+        armWindow: null,
       };
       this.lastPersistedActivity = now;
       await this.persist(
@@ -508,6 +730,7 @@ export class GameRoomDO extends Server {
         "teams",
         "renames",
         "schedule",
+        "armWindow",
       );
       await this.rescheduleAlarm();
       return Response.json(
@@ -547,6 +770,7 @@ export class GameRoomDO extends Server {
             teams: room.teams,
             renames: room.renames,
             schedule: room.schedule,
+            armWindow: room.armWindow,
           },
         }),
       );
@@ -649,6 +873,11 @@ export class GameRoomDO extends Server {
   }
 
   override async onMessage(connection: Connection<Attachment>, message: WSMessage): Promise<void> {
+    // Stamped FIRST, before parsing, rate limiting, or any await: this is the arrival time a
+    // buzz is adjudicated on and the arm-ack that measures a round trip, and a few
+    // milliseconds of our own bookkeeping would be indistinguishable from a few milliseconds
+    // of somebody's Wi-Fi.
+    const receivedAt = Date.now();
     if (typeof message !== "string") {
       this.sendError(connection, "malformed", "binary frames are not supported");
       return;
@@ -694,7 +923,12 @@ export class GameRoomDO extends Server {
         this.sendError(connection, "rejected", "already joined");
         return;
       case "action":
-        return this.handleAction(connection, attachment, incoming.action);
+        return this.handleAction(connection, attachment, incoming.action, {
+          receivedAt,
+          timing: incoming.timing,
+        });
+      case "arm-ack":
+        return this.handleArmAck(connection, incoming.armId, receivedAt);
       case "sync":
         this.sendSnapshot(connection, attachment);
         return;
@@ -1143,6 +1377,7 @@ export class GameRoomDO extends Server {
     connection: Connection<Attachment>,
     attachment: Attachment,
     raw: Record<string, unknown>,
+    context: { receivedAt: number; timing: ActionTiming | undefined },
   ): Promise<void> {
     const room = await this.load();
     if (room === null) return;
@@ -1156,7 +1391,7 @@ export class GameRoomDO extends Server {
       role: attachment.role,
       playerId,
       entityId,
-      at: Date.now(),
+      at: context.receivedAt,
       state: room.state,
     });
     if (!stamped.ok) {
@@ -1177,6 +1412,17 @@ export class GameRoomDO extends Server {
     // the wrong instinct: it hands the host a blocking error at the worst possible moment -
     // the room is full, the night has started, and one person did not tap a card. A solo team
     // is a correct, undoable outcome, and the host can still merge or rename afterwards.
+    // A buzz during an open arming is HELD, not adjudicated (see the compensation section):
+    // the engine still gets one ordered list, it just gets it a few milliseconds later and in
+    // the order the thumbs moved rather than the order the packets landed.
+    if (stamped.action.type === "buzz" && playerId !== null && this.buzzHoldingOpen(room)) {
+      await this.holdBuzz(connection, room, playerId, context.receivedAt, context.timing);
+      return;
+    }
+    // Anything else resolves the held presses first. A host's "no takers", a judge verdict, an
+    // undo - none of them may reach the engine ahead of a buzz that was pressed before them.
+    await this.flushArmWindow();
+
     if (stamped.action.type === "start-game") {
       const teamsMode = room.setup.settings.teams.playerMode === "teams";
       if (teamsMode && (await this.seatStragglersAsSoloTeams())) this.broadcastRoster();
@@ -1624,6 +1870,10 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "unauthorized", "forcing a timer is host-only");
       return;
     }
+    // Same rule as a relayed action: held presses resolve first. A host reaching for "skip
+    // the wait" during an armed window would otherwise fire the buzz-window timeout and kill
+    // a clue that somebody had already rung in on (M6).
+    await this.flushArmWindow();
     // The alarm book keeps STALE entries on purpose (a phase moved on, an undo rewound time)
     // - they fire as harmless engine rejections. So "the timer the room is on" is the first
     // entry the engine still accepts, not simply the earliest deadline: walk them in due
@@ -1846,6 +2096,11 @@ export class GameRoomDO extends Server {
         return;
       }
     }
+
+    // Held buzzes first, ALWAYS - not only when their own deadline is what woke us. The
+    // buzz-window timeout is the dangerous neighbour: firing it while presses sit in the
+    // holding pen would kill a clue somebody legitimately rang in on.
+    await this.flushArmWindow();
 
     // Engine timers: dispatch every due expiry action. Stale ones (the phase moved on, an
     // undo rewound time) reject inside the engine and are dropped silently - by design.

@@ -15,11 +15,19 @@
 // - "teams":    Record<teamId, TeamDoc> - the team customization tier
 // - "renames":  Record<participantId, number[]> - rename timestamps for rate limiting
 // - "schedule": AlarmSchedule - the multiplexed alarm book (engine timers, leadership
-//               succession, room expiry); the ONE runtime alarm is always min() of these
+//               succession, room expiry, the buzz-adjudication deadline); the ONE runtime
+//               alarm is always min() of these
+// - "armWindow": ArmWindow | null - the open arming's held buzzes and round-trip samples
+//               (room/arm-window.ts). Persisted rather than cached because eviction between
+//               the arm and the adjudication would otherwise lose presses nobody could recover
+import { timerLiveInPhase } from "./engine-glue.ts";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { RosterEntry, TeamDoc } from "@jeopardy/protocol/room/roster";
+import type { RunningTimer } from "@jeopardy/protocol/room/server-messages";
 import type { GameActionType } from "@jeopardy/engine/actions";
+import type { GamePhase } from "@jeopardy/engine/state";
+import type { ArmWindow } from "./arm-window.ts";
 import type { StoredRoomPassword } from "./password.ts";
 
 export type RoomLifecycle = "lobby" | "active" | "ended";
@@ -62,6 +70,10 @@ export type RoomMeta = {
   // TOKENS are crypto-random; ids are deliberately small and readable in logs.
   playerCounter: number;
   teamCounter: number;
+  // Monotonic id of the current arming (M6). Clients echo it in arm-ack and stamp it on a
+  // buzz's timing, so a press from the arming BEFORE a rebound is recognizable as stale
+  // rather than silently credited against the wrong t0.
+  armCounter: number;
 };
 
 export type StoredRosterEntry = RosterEntry & {
@@ -99,12 +111,19 @@ export type AlarmSchedule = {
   // a whole room losing its Wi-Fi survivable (docs/decisions/2026-08-14-room-controls-and-
   // staging.md).
   emptyRoomAt: number | null;
+  // When the room must stop holding this arming's buzzes and adjudicate them (M6 latency
+  // compensation, room/arm-window.ts); null whenever nothing is queued. Sub-second and the
+  // shortest deadline the book ever carries, which is exactly why it rides the SAME alarm as
+  // everything else: a second timer source would be a second thing to get wrong across
+  // hibernation.
+  buzzAdjudicateAt: number | null;
 };
 
 export const emptySchedule: AlarmSchedule = {
   engineTimers: {},
   successions: {},
   emptyRoomAt: null,
+  buzzAdjudicateAt: null,
 };
 
 /**
@@ -125,7 +144,36 @@ export function nextWakeAt(schedule: AlarmSchedule, meta: RoomMeta, idleExpiryMs
     earliest = Math.min(earliest, entry.dueAt);
   }
   if (schedule.emptyRoomAt !== null) earliest = Math.min(earliest, schedule.emptyRoomAt);
+  // Buzz adjudication ignores the pause, unlike the engine timers above: it resolves presses
+  // that already happened rather than counting down toward something, and leaving a room's
+  // buzzers held because the host paused a half-second later would lose the race outright.
+  if (schedule.buzzAdjudicateAt !== null) {
+    earliest = Math.min(earliest, schedule.buzzAdjudicateAt);
+  }
   return earliest;
+}
+
+/**
+ * The timers the room is still running, as remaining milliseconds - what a snapshot carries so
+ * a console or display reconnecting mid-clue can paint the countdown it missed (user-flows C6).
+ * Stale book entries are filtered by phase (engine-glue.ts timerLiveInPhase), because the book
+ * deliberately keeps entries the engine has moved past and a phantom countdown on a host's
+ * screen is worse than none. A paused room reports the time each timer HAS LEFT, frozen.
+ */
+export function runningTimers(
+  schedule: AlarmSchedule,
+  meta: RoomMeta,
+  phase: string,
+  now: number,
+): RunningTimer[] {
+  const timers: RunningTimer[] = [];
+  for (const [kind, entry] of Object.entries(schedule.engineTimers)) {
+    if (!timerLiveInPhase(phase as GamePhase, kind)) continue;
+    const remainingMs =
+      meta.pausedAt === null ? Math.max(entry.dueAt - now, 0) : (entry.remainingMs ?? 0);
+    timers.push({ kind, remainingMs });
+  }
+  return timers.toSorted((left, right) => left.remainingMs - right.remainingMs);
 }
 
 /**
@@ -161,4 +209,5 @@ export type RoomDurableState = {
   teams: StoredTeams;
   renames: RenameLog;
   schedule: AlarmSchedule;
+  armWindow: ArmWindow | null;
 };
