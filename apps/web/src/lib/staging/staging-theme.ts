@@ -81,14 +81,34 @@ export type StagingSeat = {
   heading: number;
 };
 
-/** The holding area's own surface, when the theme draws one (water does, a clearing may not). */
+/** A rim around the holding surface: the thing that makes it a PLACE rather than a colour. */
+export type HoldingEdge = {
+  /** How far the rim stands above the surface. */
+  height: number;
+  /** How thick the rim is, looking down. */
+  thickness: number;
+  color: StagingColorRole;
+};
+
+/**
+ * The holding area's own surface, when the theme draws one (water does, a clearing may not).
+ *
+ * The surface is sized to the HOLDING BAND (staging-layout.ts) plus `margin`, not to the whole
+ * stage. That is a 2026-08-16 reversal of the boats theme's original 60x40 plane: a surface
+ * that ran past every edge of the frame made the water indistinguishable from the floor, which
+ * is the mechanical half of the owner's "I don't understand still in the water" - there was no
+ * boundary, so there was no place to be in. The words are the other half (staging-copy.ts).
+ */
 export type HoldingSurface = {
-  shape: StagingShape;
+  /** How far past the holding band the surface runs, in world units. */
+  margin: number;
   /** Height above the floor - water sits a hair above it so it z-fights nothing. */
   y: number;
   color: StagingColorRole;
   /** Slight transparency reads as water without needing a shader. 1 = opaque. */
   opacity: number;
+  /** Null draws an unbounded surface; every theme that draws one should bound it. */
+  edge: HoldingEdge | null;
 };
 
 export type StagingTheme = {
@@ -109,6 +129,12 @@ export type StagingTheme = {
   seatOffsets: readonly StagingSeat[];
   /** Local point the team's nameplate floats at. */
   nameplateOffset: Vector3Tuple;
+  /**
+   * Local point the CREW PLATE sits at - the list of who is aboard (owner, 2026-08-16: "names
+   * beneath the boats on the display"). In front of and below the station, so it never covers
+   * the people it names and the room reads it as belonging to that station.
+   */
+  crewPlateOffset: Vector3Tuple;
   holdingSurface: HoldingSurface | null;
   /**
    * What waiting looks like. "bob" rides an unassigned occupant gently up and down (treading
@@ -129,5 +155,28 @@ export function seatForMember(theme: StagingTheme, memberIndex: number): Staging
   const wrap = Math.floor(memberIndex / seats.length);
   if (wrap === 0) return seat;
   const side = wrap % 2 === 1 ? 1 : -1;
-  return { ...seat, x: seat.x + side * 0.12 * Math.ceil(wrap / 2), z: seat.z - 0.08 * wrap };
+  // ...but the nudge is CLAMPED to the station's own footprint, because the layout guarantees
+  // clearance between FOOTPRINTS (staging-layout.ts) and an unbounded nudge would walk the
+  // twentieth member of a team off their boat and onto the neighbouring one. A seat the theme
+  // itself authored further out than the footprint (a stool at the very edge of a campfire
+  // ring) is never pulled in - it is the theme's own geometry, and only the drift is bounded.
+  return {
+    ...seat,
+    x: clampToFootprint(
+      seat.x + side * 0.12 * Math.ceil(wrap / 2),
+      seat.x,
+      footprintLimit(theme.stationFootprint.width),
+    ),
+    z: clampToFootprint(seat.z - 0.08 * wrap, seat.z, footprintLimit(theme.stationFootprint.depth)),
+  };
+}
+
+/** Half a footprint, less the width of a shoulder, so a seated avatar is inside its station. */
+function footprintLimit(extent: number): number {
+  return Math.max(0, extent / 2 - 0.1);
+}
+
+function clampToFootprint(value: number, authored: number, limit: number): number {
+  const bound = Math.max(limit, Math.abs(authored));
+  return Math.min(bound, Math.max(-bound, value));
 }

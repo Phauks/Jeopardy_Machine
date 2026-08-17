@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "spriteSize": 192,
   "basePath": "/avatars/",
   "sheet": {
@@ -40,6 +40,42 @@
       "hex": "#d9679f"
     }
   ],
+  "skinTones": [
+    {
+      "id": "tone-1",
+      "label": "Tone 1",
+      "hex": "#f8ddc4"
+    },
+    {
+      "id": "tone-2",
+      "label": "Tone 2",
+      "hex": "#eec8a2"
+    },
+    {
+      "id": "tone-3",
+      "label": "Tone 3",
+      "hex": "#dda878"
+    },
+    {
+      "id": "tone-4",
+      "label": "Tone 4",
+      "hex": "#bc8055"
+    },
+    {
+      "id": "tone-5",
+      "label": "Tone 5",
+      "hex": "#8d5836"
+    },
+    {
+      "id": "tone-6",
+      "label": "Tone 6",
+      "hex": "#5c3722"
+    }
+  ],
+  "skinRecolor": {
+    "targets": ["#fde4c7", "#f2bf99", "#f1976c", "#b06041"],
+    "tolerance": 24
+  },
   "avatars": [
     {
       "id": "bunny",
@@ -58,7 +94,9 @@
       "sheet": {
         "file": "bunny--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
     },
     {
       "id": "cat",
@@ -77,7 +115,9 @@
       "sheet": {
         "file": "cat--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#717388", "#76798e"],
+      "tolerance": null
     },
     {
       "id": "caterpillar",
@@ -96,7 +136,9 @@
       "sheet": {
         "file": "caterpillar--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#38a177", "#42ab7c"],
+      "tolerance": null
     },
     {
       "id": "chick",
@@ -115,7 +157,9 @@
       "sheet": {
         "file": "chick--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffc255", "#ffc659"],
+      "tolerance": null
     },
     {
       "id": "cow",
@@ -134,7 +178,9 @@
       "sheet": {
         "file": "cow--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#d8d8e6", "#e1e1ec"],
+      "tolerance": null
     },
     {
       "id": "dog",
@@ -153,7 +199,9 @@
       "sheet": {
         "file": "dog--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
     },
     {
       "id": "elephant",
@@ -172,7 +220,9 @@
       "sheet": {
         "file": "elephant--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#989fbe", "#a2aacc"],
+      "tolerance": null
     },
     {
       "id": "fish",
@@ -191,7 +241,9 @@
       "sheet": {
         "file": "fish--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#e48846", "#e78f48"],
+      "tolerance": null
     },
     {
       "id": "giraffe",
@@ -210,7 +262,9 @@
       "sheet": {
         "file": "giraffe--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffaf45", "#ffb84d"],
+      "tolerance": null
     },
     {
       "id": "hog",
@@ -229,7 +283,9 @@
       "sheet": {
         "file": "hog--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
     },
     {
       "id": "lion",
@@ -248,7 +304,9 @@
       "sheet": {
         "file": "lion--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffaf45", "#ffb84d"],
+      "tolerance": null
     },
     {
       "id": "monkey",
@@ -267,7 +325,9 @@
       "sheet": {
         "file": "monkey--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#cc7854", "#d47f59"],
+      "tolerance": null
     },
     {
       "id": "parrot",
@@ -286,7 +346,9 @@
       "sheet": {
         "file": "parrot--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#e45e48", "#ea6246"],
+      "tolerance": null
     },
     {
       "id": "pig",
@@ -305,7 +367,9 @@
       "sheet": {
         "file": "pig--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#e28aae", "#e58fb7"],
+      "tolerance": null
     },
     {
       "id": "tiger",
@@ -324,7 +388,9 @@
       "sheet": {
         "file": "tiger--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#e48846", "#e78f48"],
+      "tolerance": null
     },
     {
       "id": "female-a",
@@ -343,7 +409,9 @@
       "sheet": {
         "file": "female-a--walk.webp",
         "clip": "wheelchair-move-forward"
-      }
+      },
+      "recolorTargets": ["#8a5fd5"],
+      "tolerance": null
     },
     {
       "id": "female-b",
@@ -362,7 +430,9 @@
       "sheet": {
         "file": "female-b--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffd061"],
+      "tolerance": null
     },
     {
       "id": "female-c",
@@ -381,7 +451,9 @@
       "sheet": {
         "file": "female-c--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
     },
     {
       "id": "female-d",
@@ -400,7 +472,9 @@
       "sheet": {
         "file": "female-d--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#71778e"],
+      "tolerance": null
     },
     {
       "id": "female-e",
@@ -419,7 +493,9 @@
       "sheet": {
         "file": "female-e--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffffff", "#d0e8ff"],
+      "tolerance": null
     },
     {
       "id": "female-f",
@@ -438,7 +514,9 @@
       "sheet": {
         "file": "female-f--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#5b66c4", "#ffab42"],
+      "tolerance": null
     },
     {
       "id": "male-a",
@@ -457,7 +535,9 @@
       "sheet": {
         "file": "male-a--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#319a74", "#5ac487"],
+      "tolerance": null
     },
     {
       "id": "male-b",
@@ -476,7 +556,9 @@
       "sheet": {
         "file": "male-b--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
     },
     {
       "id": "male-c",
@@ -495,7 +577,9 @@
       "sheet": {
         "file": "male-c--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#6794d9"],
+      "tolerance": null
     },
     {
       "id": "male-d",
@@ -514,7 +598,9 @@
       "sheet": {
         "file": "male-d--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#cf534f"],
+      "tolerance": 28
     },
     {
       "id": "male-e",
@@ -533,7 +619,9 @@
       "sheet": {
         "file": "male-e--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#ffab42", "#ffc053"],
+      "tolerance": null
     },
     {
       "id": "male-f",
@@ -552,7 +640,9 @@
       "sheet": {
         "file": "male-f--walk.webp",
         "clip": "walk"
-      }
+      },
+      "recolorTargets": ["#319a74", "#61cb8b"],
+      "tolerance": null
     }
   ]
 }

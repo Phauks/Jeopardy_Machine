@@ -50,6 +50,12 @@
     themeKey?: string;
     /** Fixed layout seed - a reopened display arranges the same room the same way. */
     seed?: number;
+    /**
+     * Hold everyone still, on top of prefers-reduced-motion rather than instead of it: the
+     * host's per-device "stage motion: still" preference (src/lib/host-settings/). The OS
+     * setting is a floor nothing may override (guardrail 2), so the two are OR-ed.
+     */
+    holdStill?: boolean;
   };
   let {
     occupants,
@@ -60,6 +66,7 @@
     beat = null,
     themeKey = "default",
     seed = 1,
+    holdStill = false,
   }: Props = $props();
 
   let host = $state<HTMLDivElement | null>(null);
@@ -90,7 +97,7 @@
       created = new SceneClass({
         canvas: canvasElement,
         palette,
-        reducedMotion: prefersReducedMotion.current,
+        reducedMotion: prefersReducedMotion.current || holdStill,
         seed,
       });
       created.resize(hostElement.clientWidth, hostElement.clientHeight);
@@ -134,7 +141,7 @@
     scene?.setCelebrating(celebratingEntityIds);
   });
   $effect(() => {
-    scene?.setReducedMotion(prefersReducedMotion.current);
+    scene?.setReducedMotion(prefersReducedMotion.current || holdStill);
   });
   $effect(() => {
     // themeKey is read for its dependency, not its value: the colors themselves come from the

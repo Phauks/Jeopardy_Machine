@@ -10,8 +10,11 @@
   // keep working; the dock is for visibility, not the only input.
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
+  import SettingsPanel from "#lib/host-settings/settings-panel.svelte";
   import SimPanel from "#lib/room/sim-panel.svelte";
   import { cellKey } from "@jeopardy/engine/state";
+  import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
+  import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
   import { entityDisplayName, standingsFor } from "#lib/room/room-view.ts";
   import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -22,20 +25,35 @@
     showSimPanel?: boolean;
     /** Initial mirror state (a per-device toggle, never a room setting). */
     mirror?: boolean;
+    /** Start with the settings panel open - the route's ?settings, and what tests render. */
+    settingsOpen?: boolean;
   };
-  let { store, showSimPanel = false, mirror = false }: Props = $props();
+  let { store, showSimPanel = false, mirror = false, settingsOpen = false }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
   const clue = $derived(game?.clue ?? null);
   const standings = $derived(standingsFor(view));
 
-  // svelte-ignore state_referenced_locally - deliberately the INITIAL value: mirror is a
-  // per-device toggle owned by this component after mount; the route only seeds it.
-  let mirrorMode = $state(mirror);
+  // THE COG'S STATE. Mirror, manual mode, the two type scales and the rest are DEVICE
+  // preferences now (src/lib/host-settings/) rather than component state: they belong to this
+  // laptop, they survive a reload mid-game, and the display window of the same browser reads
+  // the same document. Whether the panel is open is the only thing that is genuinely
+  // component state, because it is not a preference - it is where you are looking.
+  // svelte-ignore state_referenced_locally - deliberately the INITIAL value only.
+  let panelOpen = $state(settingsOpen);
+  const device = $derived(devicePreferences.current);
+  const mirrorMode = $derived(device.mirror || mirror);
+  const manualMode = $derived(device.manualMode);
   let scoreDrawerOpen = $state(false);
-  let manualMode = $state(false);
   let hostWagerEntry = $state<number | null>(null);
+
+  // The per-surface type scale, and the whole reason it is per-surface: in mirror mode this
+  // laptop IS the projector, so it wears the DISPLAY scale; otherwise it is the host's own
+  // screen at arm's length and wears the console's (owner, 2026-08-16).
+  const surfaceScale = $derived(
+    typeScaleStyle(mirrorMode ? device.displayTypeScale : device.consoleTypeScale),
+  );
 
   const clueContent = $derived(
     clue === null || view.content === null
@@ -51,6 +69,11 @@
     return winner === null ? null : entityDisplayName(view, winner.entityId);
   });
   const connectedCount = $derived(view.roster.players.filter((entry) => entry.connected).length);
+  // Who is out of THIS clue after a wrong answer (#16). The rebound is the moment the host most
+  // needs it and the console never showed it before the 2026-08-16 walk.
+  const lockedOutNames = $derived(
+    (clue?.lockedOutEntities ?? []).map((entityId) => entityDisplayName(view, entityId)),
+  );
   const phase = $derived(game?.phase ?? "lobby");
   const canArm = $derived(phase === "reading" || phase === "tiebreaker-reading");
   const canJudge = $derived(
@@ -63,9 +86,20 @@
 
   // Keyboard-first (C4): spacebar arms, arrows judge, U undoes - active in BOTH layouts.
   function onKeydown(event: KeyboardEvent): void {
-    if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
+    // Never while the host is typing or picking. A SELECT was the gap: the settings panel put
+    // dropdowns on this screen for the first time, and space on a focused select opens it in
+    // every browser - which would have armed the buzzers instead. Same for a contenteditable
+    // and for any modifier chord, which belongs to the browser, not to us.
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    ) {
       return;
     }
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
     switch (event.key) {
       case " ":
         event.preventDefault();
@@ -91,6 +125,50 @@
         break;
     }
   }
+
+  // THE COUNTDOWN. Game-anatomy section 8 step 4: the answer window starts automatically the
+  // moment a buzz is won, and until now the console said nothing about it - the host was
+  // judging against a clock only the engine could see. The kinds are named in the host's own
+  // words rather than the engine's, and the whole readout is behind a device preference,
+  // because some hosts want the pressure visible and some find it the opposite of helpful.
+  let nowMs = $state(Date.now());
+  $effect(() => {
+    if (view.pendingTimers.length === 0) return;
+    const handle = setInterval(() => {
+      nowMs = Date.now();
+    }, 200);
+    return () => {
+      clearInterval(handle);
+    };
+  });
+  const activeTimer = $derived(view.pendingTimers.at(-1) ?? null);
+  const timerSecondsLeft = $derived(
+    activeTimer === null ? null : Math.max(0, (activeTimer.firesAt - nowMs) / 1000),
+  );
+  const timerLabel = $derived.by(() => {
+    switch (activeTimer?.kind) {
+      case "auto-arm":
+        return "Auto-arm in";
+      case "selection-shot-clock":
+        return "Pick within";
+      case "buzz-window":
+        return "Buzz window";
+      case "answer-window":
+        return "Answering";
+      case "everyone-answers-window":
+        return "Everyone answering";
+      case "wager-entry":
+        return "Wager due in";
+      case "final-wager":
+        return "Final wagers close in";
+      case "final-writing":
+        return "Final answers close in";
+      case "round-time-limit":
+        return "Round ends in";
+      default:
+        return null;
+    }
+  });
 
   function commitHostWager(): void {
     if (hostWagerEntry === null || Number.isNaN(hostWagerEntry)) return;
@@ -126,7 +204,7 @@
   <!-- C1b: display-first layout. The room sees this - the private layer is GONE (answers
        live in the host companion view or the print pack), and the slim dock is acceptable
        on a projector. -->
-  <div class="mirror-layout">
+  <div class="mirror-layout" style={surfaceScale}>
     <!-- environment="none": mirror mode is a HOST device driving the projector's layout, and
          a second WebGL context on the machine running the console buys nothing. The real
          display route at /room/CODE/display is where the diorama lives. -->
@@ -149,7 +227,7 @@
         type="button"
         class="dock-button subtle"
         onclick={() => {
-          mirrorMode = false;
+          devicePreferences.update({ mirror: false });
         }}
       >
         Exit mirror
@@ -157,26 +235,18 @@
     </div>
   </div>
 {:else}
-  <div class="console-layout">
+  <div class="console-layout" style={surfaceScale} class:compact={device.rosterDensity === "compact"}>
     <header class="console-header">
       <h1>Host console <span class="room-code">{view.roomCode}</span></h1>
       <div class="header-controls">
         <span class="roster-health" title="connected / total players">
           {connectedCount}/{view.roster.players.length} connected
         </span>
-        <label class="toggle">
-          <input type="checkbox" bind:checked={manualMode} />
-          Manual mode
-        </label>
-        <button
-          type="button"
-          class="chip"
-          onclick={() => {
-            mirrorMode = true;
-          }}
-        >
-          Mirror mode
-        </button>
+        {#if manualMode}
+          <!-- Modes the host has switched on stay VISIBLE on the console even though they are
+               set in the cog: a host must never wonder why the buzzers are dead. -->
+          <span class="mode-flag">Manual mode</span>
+        {/if}
         <button
           type="button"
           class="chip"
@@ -192,302 +262,528 @@
         <button type="button" class="chip" onclick={() => store.undo()}>
           Undo <span class="key-hint">U</span>
         </button>
+        <!-- THE COG. Opens a rail beside the console, never a screen: the board, the clue and
+             the judge row stay live while it is open (the persistent-layout law). -->
+        <button
+          type="button"
+          class="chip cog"
+          aria-expanded={panelOpen}
+          aria-label="Settings"
+          onclick={() => {
+            panelOpen = !panelOpen;
+          }}
+        >
+          Settings
+        </button>
       </div>
     </header>
 
-    {#if view.phase === "lobby"}
-      <section class="panel preflight">
-        <h2>Pre-flight</h2>
-        <ul class="checklist">
-          <li>{view.roster.players.length} players in ({connectedCount} connected)</li>
-          <li>{view.roster.teams.length} teams</li>
-          <li>Display: open <code>/room/{view.roomCode}/display</code> on the projector</li>
-        </ul>
-        <button type="button" class="primary" onclick={() => store.startGame()}>Start game</button>
-      </section>
-    {:else}
-      <div class="console-grid">
-        <section class="panel minimap-panel">
-          <h2>
-            Board
-            {#if controlName !== null}
-              <span class="control-line"><strong>{controlName}</strong> picks</span>
-            {/if}
-          </h2>
-          {#if game !== null && view.content !== null}
-            {@const board = game.boards[game.roundIndex]}
-            {@const titles = view.content.categoryTitles[game.roundIndex] ?? []}
-            <div
-              class="minimap"
-              style="--minimap-columns: {titles.length}"
-              role="grid"
-              aria-label="Board minimap"
+    <!-- The console proper and the settings rail, side by side. The rail SHRINKS the console
+         rather than covering it, so nothing the host was reading disappears when they open it. -->
+    <div class="console-body">
+      <div class="console-main">
+        {#if view.phase === "lobby"}
+          <section class="panel preflight">
+            <h2>Pre-flight</h2>
+            <ul class="checklist">
+              <li>{view.roster.players.length} players in ({connectedCount} connected)</li>
+              <li>{view.roster.teams.length} teams</li>
+              <li>Display: open <code>/room/{view.roomCode}/display</code> on the projector</li>
+            </ul>
+            <!-- An empty room cannot start: the engine has nobody to seat, so `start-game` is
+                 refused and the room stays in its lobby. It used to be a button that did
+                 nothing (2026-08-16 host-loop walk); now it says why. -->
+            <button
+              type="button"
+              class="primary"
+              disabled={view.roster.players.length === 0}
+              onclick={() => store.startGame()}>Start game</button
             >
-              {#each titles as title, categoryIndex (categoryIndex)}
-                <div class="minimap-category" title={title}>{title}</div>
-              {/each}
-              {#each { length: board?.status[0]?.length ?? 0 } as _, rowIndex (rowIndex)}
-                {#each titles as _title, categoryIndex (categoryIndex)}
-                  {@const used = board?.status[categoryIndex]?.[rowIndex] === "played"}
-                  {@const isWager =
-                    board?.wagerCells.includes(cellKey(categoryIndex, rowIndex)) ?? false}
-                  {@const value =
-                    view.content.cellValues[game.roundIndex]?.[categoryIndex]?.[rowIndex] ?? 0}
+            {#if view.roster.players.length === 0}
+              <p class="wizard-line">Nobody has joined yet - the game needs at least one player.</p>
+            {/if}
+          </section>
+        {:else}
+          <div class="console-grid">
+            <section class="panel minimap-panel">
+              <h2>
+                Board
+                {#if controlName !== null}
+                  <span class="control-line"><strong>{controlName}</strong> picks</span>
+                {/if}
+              </h2>
+              {#if game !== null && view.content !== null}
+                {@const board = game.boards[game.roundIndex]}
+                {@const titles = view.content.categoryTitles[game.roundIndex] ?? []}
+                <div
+                  class="minimap"
+                  style="--minimap-columns: {titles.length}"
+                  role="grid"
+                  aria-label="Board minimap"
+                >
+                  {#each titles as title, categoryIndex (categoryIndex)}
+                    <div class="minimap-category" title={title}>{title}</div>
+                  {/each}
+                  {#each { length: board?.status[0]?.length ?? 0 } as _, rowIndex (rowIndex)}
+                    {#each titles as _title, categoryIndex (categoryIndex)}
+                      {@const used = board?.status[categoryIndex]?.[rowIndex] === "played"}
+                      {@const isWager =
+                        board?.wagerCells.includes(cellKey(categoryIndex, rowIndex)) ?? false}
+                      {@const value =
+                        view.content.cellValues[game.roundIndex]?.[categoryIndex]?.[rowIndex] ?? 0}
+                      <!-- A played cell is a REOPEN button while the board is open (C4's
+                           always-available list, and section 8 step 8). The store has always
+                           had reopenCell; until the 2026-08-16 host-loop walk nothing on any
+                           surface called it, so a mis-scored clue could be undone only by
+                           unwinding every action after it. -->
+                      <button
+                        type="button"
+                        class="minimap-cell"
+                        class:used
+                        disabled={phase !== "awaiting-selection"}
+                        title={used ? "Reopen this clue" : undefined}
+                        onclick={() => {
+                          if (used) store.reopenCell(categoryIndex, rowIndex);
+                          else store.selectCell(categoryIndex, rowIndex);
+                        }}
+                      >
+                        {used ? "" : value}
+                        {#if isWager && !used}
+                          <!-- Wager positions are host-only (the store redacts them for other
+                               roles); the dot is why the console never renders in mirror mode. -->
+                          <span class="wager-dot" title="hidden wager cell"></span>
+                        {/if}
+                      </button>
+                    {/each}
+                  {/each}
+                </div>
+                {#if phase === "awaiting-selection"}
+                  <button type="button" class="chip" onclick={() => store.endRound()}>End round</button>
+                {/if}
+              {/if}
+            </section>
+
+            <section class="panel clue-panel">
+              {#if clue !== null && clueContent !== null}
+                <h2>
+                  {clueContent.categoryTitle} ·
+                  {clue.isWagerClue ? (clue.wager === null ? "wagering..." : `$${clue.wager}`) : `$${clue.value}`}
+                </h2>
+                <p class="clue-prompt">{clueContent.prompt}</p>
+                <p class="host-answer">
+                  Answer: <strong>{clueContent.response ?? "(hidden for this role)"}</strong>
+                </p>
+
+                {#if phase === "wagering"}
+                  <div class="wizard">
+                    <p class="wizard-line">
+                      <strong>{entityDisplayName(view, clue.selectedBy ?? "")}</strong> wagers
+                      {#if view.wagerRange !== null}
+                        ({view.wagerRange.minimum} - {view.wagerRange.maximum})
+                      {/if}
+                      - waiting on their phone, or type it here:
+                    </p>
+                    <form
+                      class="host-wager-row"
+                      onsubmit={(event) => {
+                        event.preventDefault();
+                        commitHostWager();
+                      }}
+                    >
+                      <input
+                        type="number"
+                        aria-label="Wager on the player's behalf"
+                        bind:value={hostWagerEntry}
+                      />
+                      <button type="submit" class="chip">Commit wager</button>
+                    </form>
+                  </div>
+                {/if}
+
+                {#if manualMode && (phase === "reading" || phase === "armed")}
+                  <div class="manual-award">
+                    <p class="wizard-line">Award to...</p>
+                    <div class="award-grid">
+                      {#each standings as row (row.entityId)}
+                        <div class="award-row">
+                          <span class="award-name">{row.name}</span>
+                          <button
+                            type="button"
+                            class="chip"
+                            onclick={() => store.hostAward(row.entityId, "correct")}>Correct</button
+                          >
+                          <button
+                            type="button"
+                            class="chip"
+                            onclick={() => store.hostAward(row.entityId, "wrong")}>Wrong</button
+                          >
+                        </div>
+                      {/each}
+                    </div>
+                  </div>
+                {/if}
+
+                <div class="action-row">
+                  <button type="button" class="arm-button" disabled={!canArm} onclick={() => store.armBuzzers()}>
+                    ARM <span class="key-hint">space</span>
+                  </button>
+                  {#if answeringName !== null}
+                    <p class="answering-line" role="status"><strong>{answeringName}</strong> answers</p>
+                  {/if}
+                  {#if device.showTimers && timerSecondsLeft !== null && timerLabel !== null}
+                    <p class="timer-line" class:urgent={timerSecondsLeft <= 2}>
+                      {timerLabel}
+                      <strong>{timerSecondsLeft.toFixed(1)}s</strong>
+                    </p>
+                  {/if}
+                </div>
+                <div class="judge-row">
+                  <button type="button" class="judge wrong" disabled={!canJudge} onclick={() => store.judge("wrong")}>
+                    Wrong <span class="key-hint">&larr;</span>
+                  </button>
                   <button
                     type="button"
-                    class="minimap-cell"
-                    class:used
-                    disabled={used || phase !== "awaiting-selection"}
-                    onclick={() => {
-                      store.selectCell(categoryIndex, rowIndex);
-                    }}
+                    class="judge no-penalty"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("no-penalty")}
                   >
-                    {used ? "" : value}
-                    {#if isWager && !used}
-                      <!-- Wager positions are host-only (the store redacts them for other
-                           roles); the dot is why the console never renders in mirror mode. -->
-                      <span class="wager-dot" title="hidden wager cell"></span>
-                    {/if}
+                    No penalty <span class="key-hint">N</span>
                   </button>
-                {/each}
-              {/each}
-            </div>
-            {#if phase === "awaiting-selection"}
-              <button type="button" class="chip" onclick={() => store.endRound()}>End round</button>
-            {/if}
-          {/if}
-        </section>
-
-        <section class="panel clue-panel">
-          {#if clue !== null && clueContent !== null}
-            <h2>
-              {clueContent.categoryTitle} ·
-              {clue.isWagerClue ? (clue.wager === null ? "wagering..." : `$${clue.wager}`) : `$${clue.value}`}
-            </h2>
-            <p class="clue-prompt">{clueContent.prompt}</p>
-            <p class="host-answer">
-              Answer: <strong>{clueContent.response ?? "(hidden for this role)"}</strong>
-            </p>
-
-            {#if phase === "wagering"}
-              <div class="wizard">
+                  <button
+                    type="button"
+                    class="judge correct"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("correct")}
+                  >
+                    Correct <span class="key-hint">&rarr;</span>
+                  </button>
+                </div>
+                {#if lockedOutNames.length > 0}
+                  <!-- Found missing by the 2026-08-16 host-loop walk: a wrong answer locks that
+                       entity out and re-arms for the rest (game-anatomy section 8 step 5), and
+                       the console said nothing - so a host judging a rebound could not tell who
+                       was still in it, which is the one fact the rebound is about. -->
+                  <p class="lockout-line">
+                    Locked out of this clue: <strong>{lockedOutNames.join(", ")}</strong>
+                  </p>
+                {/if}
+                {#if phase === "all-answering" || phase === "all-judging"}
+                  <!-- EVERYONE-ANSWERS (matrix #22). The store has had closeAnswers() and
+                       judgeEntity() since the seam was written and the console had no way to
+                       call either, so a room in this mode reached all-judging and stopped
+                       dead. It is off by default, which is why nothing had noticed. -->
+                  <div class="everyone-answers">
+                    <p class="wizard-line">
+                      Answers in: {Object.keys(clue.submissions).length} / {standings.length}
+                    </p>
+                    {#if phase === "all-answering"}
+                      <button type="button" class="chip" onclick={() => store.closeAnswers()}>
+                        Close answers now
+                      </button>
+                    {:else}
+                      <ul class="reveal-list">
+                        {#each standings as row (row.entityId)}
+                          {@const submission = clue.submissions[row.entityId]}
+                          {@const verdict = clue.entityVerdicts[row.entityId]}
+                          <li class="reveal-row" class:judgeable={verdict === undefined}>
+                            <span class="award-name">{row.name}</span>
+                            <span class="reveal-answer">{submission?.text ?? "(no answer)"}</span>
+                            {#if verdict !== undefined}
+                              <span class="verdict">{verdict}</span>
+                            {:else}
+                              <button
+                                type="button"
+                                class="chip"
+                                onclick={() => store.judgeEntity(row.entityId, "correct")}
+                                >Correct</button
+                              >
+                              <button
+                                type="button"
+                                class="chip"
+                                onclick={() => store.judgeEntity(row.entityId, "wrong")}
+                                >Wrong</button
+                              >
+                            {/if}
+                          </li>
+                        {/each}
+                      </ul>
+                    {/if}
+                  </div>
+                {/if}
+                <div class="escape-row">
+                  <button type="button" class="chip" onclick={() => store.closeBuzzWindow()}>
+                    No takers <span class="key-hint">T</span>
+                  </button>
+                  <button type="button" class="chip" onclick={() => store.cancelClue()}>Skip clue</button>
+                  <button type="button" class="chip" onclick={() => store.undo()}>
+                    Undo <span class="key-hint">U</span>
+                  </button>
+                </div>
+              {:else if phase === "round-break"}
+                <h2>Round break</h2>
                 <p class="wizard-line">
-                  <strong>{entityDisplayName(view, clue.selectedBy ?? "")}</strong> wagers
-                  {#if view.wagerRange !== null}
-                    ({view.wagerRange.minimum} - {view.wagerRange.maximum})
-                  {/if}
-                  - waiting on their phone, or type it here:
+                  Next: <strong>{game?.breakNextStage ?? "?"}</strong>
                 </p>
-                <form
-                  class="host-wager-row"
-                  onsubmit={(event) => {
-                    event.preventDefault();
-                    commitHostWager();
+                <button type="button" class="primary" onclick={() => store.proceed()}>Proceed</button>
+              {:else if phase === "final-wagers" || phase === "final-writing" || phase === "final-reveal"}
+                <!-- The C5 Final wizard: linear, cannot be done wrong. -->
+                <h2>Final: {view.content?.final?.categoryTitle ?? ""}</h2>
+                {#if view.content?.final}
+                  <p class="clue-prompt">{view.content.final.prompt}</p>
+                  <p class="host-answer">
+                    Answer: <strong>{view.content.final.response ?? "(hidden for this role)"}</strong>
+                  </p>
+                {/if}
+                {#if phase === "final-wagers"}
+                  <p class="wizard-line">
+                    Wagers in: {Object.keys(game?.final?.wagers ?? {}).length} /
+                    {game?.final?.eligible.length ?? 0} - missing wagers become 0 at the deadline.
+                  </p>
+                  <button type="button" class="chip" onclick={() => store.expireTimer("final-wager")}>
+                    Close wagers now
+                  </button>
+                {:else if phase === "final-writing"}
+                  <p class="wizard-line">
+                    Answers in: {Object.keys(game?.final?.answers ?? {}).length} /
+                    {game?.final?.eligible.length ?? 0}
+                  </p>
+                  <button type="button" class="chip" onclick={() => store.expireTimer("final-writing")}>
+                    Close answers now
+                  </button>
+                {:else}
+                  <ul class="reveal-list">
+                    {#each finalJudgeQueue as entry (entry.entityId)}
+                      <li class="reveal-row" class:judgeable={entry.judgeable}>
+                        <span class="award-name">{entry.name}</span>
+                        <span class="reveal-answer">{entry.answer ?? "(no answer)"}</span>
+                        <span class="reveal-wager">${entry.wager}</span>
+                        {#if entry.judged !== null}
+                          <span class="verdict">{entry.judged}</span>
+                        {:else if entry.judgeable}
+                          <button
+                            type="button"
+                            class="chip"
+                            onclick={() => store.judgeEntity(entry.entityId, "correct")}>Correct</button
+                          >
+                          <button
+                            type="button"
+                            class="chip"
+                            onclick={() => store.judgeEntity(entry.entityId, "wrong")}>Wrong</button
+                          >
+                        {:else}
+                          <span class="verdict pending">waiting</span>
+                        {/if}
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              {:else if game?.tiebreaker != null}
+                <!-- SUDDEN DEATH (matrix #37). Found unrunnable by the 2026-08-16 host-loop
+                     walk: a tiebreaker carries no CLUE, and every control on this panel - the
+                     ARM button included - lived inside the clue branch, so the console showed
+                     "Board up, pick any cell" while the engine sat in tiebreaker-reading.
+                     The keyboard still worked, which is the only reason it was survivable. -->
+                <h2>Sudden death</h2>
+                <p class="wizard-line">
+                  Tied for first:
+                  <strong>
+                    {game.tiebreaker.participants
+                      .map((entityId) => entityDisplayName(view, entityId))
+                      .join(" · ")}
+                  </strong>
+                </p>
+                <p class="wizard-line">Read the tiebreaker clue aloud, then arm. No score moves.</p>
+                {#if game.tiebreaker.eliminated.length > 0}
+                  <p class="lockout-line">
+                    Out of this clue:
+                    <strong>
+                      {game.tiebreaker.eliminated
+                        .map((entityId) => entityDisplayName(view, entityId))
+                        .join(", ")}
+                    </strong>
+                  </p>
+                {/if}
+                <div class="action-row">
+                  <button
+                    type="button"
+                    class="arm-button"
+                    disabled={!canArm}
+                    onclick={() => store.armBuzzers()}
+                  >
+                    ARM <span class="key-hint">space</span>
+                  </button>
+                  {#if answeringName !== null}
+                    <p class="answering-line" role="status">
+                      <strong>{answeringName}</strong> answers
+                    </p>
+                  {/if}
+                </div>
+                <div class="judge-row">
+                  <button
+                    type="button"
+                    class="judge wrong"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("wrong")}
+                  >
+                    Wrong <span class="key-hint">&larr;</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="judge correct"
+                    disabled={!canJudge}
+                    onclick={() => store.judge("correct")}
+                  >
+                    Correct <span class="key-hint">&rarr;</span>
+                  </button>
+                </div>
+                <div class="escape-row">
+                  <button type="button" class="chip" onclick={() => store.tiebreakerNextClue()}>
+                    Next tiebreaker clue
+                  </button>
+                  <button type="button" class="chip" onclick={() => store.closeBuzzWindow()}>
+                    No takers <span class="key-hint">T</span>
+                  </button>
+                </div>
+              {:else if phase === "game-over"}
+                <h2>Game over</h2>
+                <ScoresStrip rows={standings} />
+              {:else}
+                <h2>Board up</h2>
+                <p class="wizard-line">
+                  {controlName === null
+                    ? "Pick any cell on the minimap."
+                    : `${controlName} calls the next cell - tap it on the minimap.`}
+                </p>
+              {/if}
+            </section>
+
+            <section class="panel side-panel">
+              <h2>
+                Scores
+                <button
+                  type="button"
+                  class="chip"
+                  aria-expanded={scoreDrawerOpen}
+                  onclick={() => {
+                    scoreDrawerOpen = !scoreDrawerOpen;
                   }}
                 >
-                  <input
-                    type="number"
-                    aria-label="Wager on the player's behalf"
-                    bind:value={hostWagerEntry}
-                  />
-                  <button type="submit" class="chip">Commit wager</button>
-                </form>
-              </div>
-            {/if}
-
-            {#if manualMode && (phase === "reading" || phase === "armed")}
-              <div class="manual-award">
-                <p class="wizard-line">Award to...</p>
-                <div class="award-grid">
+                  Override
+                </button>
+              </h2>
+              <ScoresStrip rows={standings} highlightEntityId={clue?.buzzWinner?.entityId ?? null} />
+              {#if scoreDrawerOpen}
+                <div class="score-drawer">
                   {#each standings as row (row.entityId)}
-                    <div class="award-row">
+                    <div class="drawer-row">
                       <span class="award-name">{row.name}</span>
-                      <button
-                        type="button"
-                        class="chip"
-                        onclick={() => store.hostAward(row.entityId, "correct")}>Correct</button
-                      >
-                      <button
-                        type="button"
-                        class="chip"
-                        onclick={() => store.hostAward(row.entityId, "wrong")}>Wrong</button
-                      >
+                      <button type="button" class="chip" onclick={() => store.scoreAdjust(row.entityId, -100)}>
+                        -100
+                      </button>
+                      <button type="button" class="chip" onclick={() => store.scoreAdjust(row.entityId, 100)}>
+                        +100
+                      </button>
+                      <input
+                        type="number"
+                        aria-label="Set score for {row.name}"
+                        value={row.score}
+                        onchange={(event) => {
+                          const next = Number.parseInt(event.currentTarget.value, 10);
+                          if (!Number.isNaN(next)) store.scoreSet(row.entityId, next);
+                        }}
+                      />
                     </div>
                   {/each}
                 </div>
-              </div>
-            {/if}
-
-            <div class="action-row">
-              <button type="button" class="arm-button" disabled={!canArm} onclick={() => store.armBuzzers()}>
-                ARM <span class="key-hint">space</span>
-              </button>
-              {#if answeringName !== null}
-                <p class="answering-line" role="status"><strong>{answeringName}</strong> answers</p>
               {/if}
-            </div>
-            <div class="judge-row">
-              <button type="button" class="judge wrong" disabled={!canJudge} onclick={() => store.judge("wrong")}>
-                Wrong <span class="key-hint">&larr;</span>
-              </button>
-              <button
-                type="button"
-                class="judge no-penalty"
-                disabled={!canJudge}
-                onclick={() => store.judge("no-penalty")}
-              >
-                No penalty <span class="key-hint">N</span>
-              </button>
-              <button
-                type="button"
-                class="judge correct"
-                disabled={!canJudge}
-                onclick={() => store.judge("correct")}
-              >
-                Correct <span class="key-hint">&rarr;</span>
-              </button>
-            </div>
-            <div class="escape-row">
-              <button type="button" class="chip" onclick={() => store.closeBuzzWindow()}>
-                No takers <span class="key-hint">T</span>
-              </button>
-              <button type="button" class="chip" onclick={() => store.cancelClue()}>Skip clue</button>
-              <button type="button" class="chip" onclick={() => store.undo()}>
-                Undo <span class="key-hint">U</span>
-              </button>
-            </div>
-          {:else if phase === "round-break"}
-            <h2>Round break</h2>
-            <p class="wizard-line">
-              Next: <strong>{game?.breakNextStage ?? "?"}</strong>
-            </p>
-            <button type="button" class="primary" onclick={() => store.proceed()}>Proceed</button>
-          {:else if phase === "final-wagers" || phase === "final-writing" || phase === "final-reveal"}
-            <!-- The C5 Final wizard: linear, cannot be done wrong. -->
-            <h2>Final: {view.content?.final?.categoryTitle ?? ""}</h2>
-            {#if view.content?.final}
-              <p class="clue-prompt">{view.content.final.prompt}</p>
-              <p class="host-answer">
-                Answer: <strong>{view.content.final.response ?? "(hidden for this role)"}</strong>
-              </p>
-            {/if}
-            {#if phase === "final-wagers"}
-              <p class="wizard-line">
-                Wagers in: {Object.keys(game?.final?.wagers ?? {}).length} /
-                {game?.final?.eligible.length ?? 0} - missing wagers become 0 at the deadline.
-              </p>
-              <button type="button" class="chip" onclick={() => store.expireTimer("final-wager")}>
-                Close wagers now
-              </button>
-            {:else if phase === "final-writing"}
-              <p class="wizard-line">
-                Answers in: {Object.keys(game?.final?.answers ?? {}).length} /
-                {game?.final?.eligible.length ?? 0}
-              </p>
-              <button type="button" class="chip" onclick={() => store.expireTimer("final-writing")}>
-                Close answers now
-              </button>
-            {:else}
-              <ul class="reveal-list">
-                {#each finalJudgeQueue as entry (entry.entityId)}
-                  <li class="reveal-row" class:judgeable={entry.judgeable}>
-                    <span class="award-name">{entry.name}</span>
-                    <span class="reveal-answer">{entry.answer ?? "(no answer)"}</span>
-                    <span class="reveal-wager">${entry.wager}</span>
-                    {#if entry.judged !== null}
-                      <span class="verdict">{entry.judged}</span>
-                    {:else if entry.judgeable}
-                      <button
-                        type="button"
-                        class="chip"
-                        onclick={() => store.judgeEntity(entry.entityId, "correct")}>Correct</button
-                      >
-                      <button
-                        type="button"
-                        class="chip"
-                        onclick={() => store.judgeEntity(entry.entityId, "wrong")}>Wrong</button
-                      >
-                    {:else}
-                      <span class="verdict pending">waiting</span>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            {/if}
-          {:else if phase === "game-over"}
-            <h2>Game over</h2>
-            <ScoresStrip rows={standings} />
-          {:else}
-            <h2>Board up</h2>
-            <p class="wizard-line">
-              {controlName === null
-                ? "Pick any cell on the minimap."
-                : `${controlName} calls the next cell - tap it on the minimap.`}
-            </p>
-          {/if}
-        </section>
 
-        <section class="panel side-panel">
-          <h2>
-            Scores
-            <button
-              type="button"
-              class="chip"
-              aria-expanded={scoreDrawerOpen}
-              onclick={() => {
-                scoreDrawerOpen = !scoreDrawerOpen;
-              }}
-            >
-              Override
-            </button>
-          </h2>
-          <ScoresStrip rows={standings} highlightEntityId={clue?.buzzWinner?.entityId ?? null} />
-          {#if scoreDrawerOpen}
-            <div class="score-drawer">
-              {#each standings as row (row.entityId)}
-                <div class="drawer-row">
-                  <span class="award-name">{row.name}</span>
-                  <button type="button" class="chip" onclick={() => store.scoreAdjust(row.entityId, -100)}>
-                    -100
-                  </button>
-                  <button type="button" class="chip" onclick={() => store.scoreAdjust(row.entityId, 100)}>
-                    +100
-                  </button>
-                  <input
-                    type="number"
-                    aria-label="Set score for {row.name}"
-                    value={row.score}
-                    onchange={(event) => {
-                      const next = Number.parseInt(event.currentTarget.value, 10);
-                      if (!Number.isNaN(next)) store.scoreSet(row.entityId, next);
-                    }}
-                  />
-                </div>
-              {/each}
-            </div>
-          {/if}
+            </section>
+          </div>
+        {/if}
 
-        </section>
+        {#if simStore !== null}
+          <!-- Rendered in every phase (spawning and disconnect drills matter in the lobby too);
+               dev-flag-gated by the route, never reachable by players. -->
+          <SimPanel {simStore} />
+        {/if}
       </div>
-    {/if}
 
-    {#if simStore !== null}
-      <!-- Rendered in every phase (spawning and disconnect drills matter in the lobby too);
-           dev-flag-gated by the route, never reachable by players. -->
-      <SimPanel {simStore} />
-    {/if}
+      {#if panelOpen}
+        <SettingsPanel
+          {store}
+          preferences={devicePreferences}
+          onClose={() => {
+            panelOpen = false;
+          }}
+        />
+      {/if}
+    </div>
   </div>
 {/if}
 
 <style>
+  /* THE CONSOLE'S OWN TYPE SCALE. Every font-size below this line is in em, so the host's
+     "console text size" preference is one multiplier here and the whole surface follows -
+     without touching the display's scale, which is a different number for a different
+     distance (src/lib/host-settings/device-preferences.ts). */
   .console-layout {
     display: flex;
     flex-direction: column;
     gap: 0.8rem;
     min-height: 100dvh;
     padding: 0.8rem 1rem 2rem;
+    font-size: calc(1rem * var(--type-scale, 1));
     background: var(--surface-page);
     color: var(--surface-text);
+  }
+
+  /* The console and the settings rail side by side: opening the cog narrows the console
+     rather than covering it, so a clue being judged stays readable throughout. */
+  .console-body {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.8rem;
+  }
+
+  .console-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    flex: 1;
+    min-width: 0;
+  }
+
+  @media (max-width: 64rem) {
+    .console-body {
+      flex-direction: column;
+      align-items: stretch;
+    }
+  }
+
+  /* Roster density: the same rows, packed for a room with twenty teams instead of four. */
+  .console-layout.compact .drawer-row,
+  .console-layout.compact .award-row,
+  .console-layout.compact .reveal-row {
+    gap: 0.25rem;
+    padding-block: 0.1rem;
+    font-size: 0.88em;
+  }
+
+  .console-layout.compact .award-grid {
+    gap: 0.1rem;
+  }
+
+  /* A mode the host switched on in the cog, stated on the console itself - the buzzers being
+     deliberately dead must never look like the buzzers being broken. */
+  .mode-flag {
+    font-family: var(--font-chrome);
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    border: 1px solid currentColor;
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
   }
 
   .console-header {
@@ -502,7 +798,7 @@
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-size: 1.2rem;
+    font-size: 1.2em;
     margin: 0;
   }
 
@@ -521,15 +817,8 @@
   }
 
   .roster-health {
-    font-size: 0.8rem;
+    font-size: 0.8em;
     color: var(--surface-text-muted);
-  }
-
-  .toggle {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    font-size: 0.85rem;
   }
 
   .panel {
@@ -546,7 +835,7 @@
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     margin: 0;
     display: flex;
     align-items: center;
@@ -569,7 +858,7 @@
   }
 
   .control-line {
-    font-size: 0.75rem;
+    font-size: 0.75em;
     text-transform: none;
     letter-spacing: 0;
     color: var(--accent);
@@ -582,7 +871,7 @@
   }
 
   .minimap-category {
-    font-size: 0.6rem;
+    font-size: 0.6em;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     color: var(--surface-text-muted);
@@ -600,7 +889,7 @@
     background: var(--board-cell-bg);
     color: var(--board-value-color);
     font-family: var(--font-values);
-    font-size: 0.8rem;
+    font-size: 0.8em;
     cursor: pointer;
     min-width: 0;
   }
@@ -628,19 +917,19 @@
 
   .clue-prompt {
     font-family: var(--font-clue);
-    font-size: 1.05rem;
+    font-size: 1.05em;
     margin: 0;
   }
 
   .host-answer {
     margin: 0;
-    font-size: 0.95rem;
+    font-size: 0.95em;
     color: var(--board-value-color);
   }
 
   .wizard-line {
     margin: 0;
-    font-size: 0.9rem;
+    font-size: 0.9em;
   }
 
   .host-wager-row {
@@ -667,7 +956,7 @@
 
   .arm-button {
     font-family: var(--font-display);
-    font-size: 1.5rem;
+    font-size: 1.5em;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     padding: 0.7rem 2.2rem;
@@ -685,8 +974,28 @@
 
   .answering-line {
     margin: 0;
-    font-size: 1rem;
+    font-size: 1em;
     color: var(--accent);
+  }
+
+  .timer-line {
+    margin: 0;
+    margin-left: auto;
+    font-family: var(--font-chrome);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--surface-text-muted);
+  }
+
+  .timer-line strong {
+    font-family: var(--font-values);
+    color: var(--surface-text);
+  }
+
+  /* The last two seconds are the ones a host actually reacts to. */
+  .timer-line.urgent strong {
+    color: var(--score-negative);
   }
 
   .judge-row {
@@ -745,12 +1054,12 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 0.9rem;
+    font-size: 0.9em;
   }
 
   .chip {
     font-family: var(--font-chrome);
-    font-size: 0.78rem;
+    font-size: 0.78em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.3rem 0.65rem;
@@ -770,7 +1079,7 @@
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    font-size: 1.05rem;
+    font-size: 1.05em;
     padding: 0.7rem 1.2rem;
     border: none;
     border-radius: var(--board-radius);
@@ -789,7 +1098,7 @@
   .checklist {
     margin: 0;
     padding-left: 1.1rem;
-    font-size: 0.92rem;
+    font-size: 0.92em;
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
@@ -836,13 +1145,30 @@
   }
 
   .verdict {
-    font-size: 0.8rem;
+    font-size: 0.8em;
     text-transform: uppercase;
     letter-spacing: 0.06em;
   }
 
   .verdict.pending {
     color: var(--surface-text-muted);
+  }
+
+  .lockout-line {
+    margin: 0;
+    font-size: 0.85em;
+    color: var(--score-negative);
+  }
+
+  .everyone-answers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .primary:disabled {
+    opacity: 0.4;
+    cursor: default;
   }
 
   /* --- Mirror mode: display-first, slim dock. --- */
@@ -869,7 +1195,7 @@
 
   .dock-button {
     font-family: var(--font-chrome);
-    font-size: 0.78rem;
+    font-size: 0.78em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.4rem 0.8rem;

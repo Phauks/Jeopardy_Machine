@@ -1,251 +1,309 @@
-// The pre-game journey - character, team, lobby - server-rendered, plus the pure stage
-// derivation that decides which of them a phone is looking at.
+// The ONE pre-game surface: its regions, its states, and the law it exists to obey.
 //
-// The stage function gets the hardest tests here, because the transitions that matter most are
-// the ones nobody clicks: being kicked back to team selection, and the host starting the game
-// while you are still choosing.
+// The old version of this file tested a four-value stage function - character | team | lobby |
+// playing - and every assertion in it was about which screen had REPLACED the others. Those
+// tests passing is what made the wizard chain feel correct. The law adopted on 2026-08-16
+// (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md) says regions change state
+// in place and nothing already shown gets hidden, so the tests below are written to fail if a
+// region ever disappears - which is the failure mode the old shape could not express.
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
-import CharacterScreen from "#lib/room/character-screen.svelte";
-import LobbyScreen from "#lib/room/lobby-screen.svelte";
+import PreGameScreen from "#lib/room/pre-game-screen.svelte";
 import TeamCard from "#lib/room/team-card.svelte";
-import TeamScreen from "#lib/room/team-screen.svelte";
-import { buzzSoundCatalog } from "#lib/room/buzz-sound-catalog.ts";
 import { fixtureRosterView } from "#lib/room/fixture-room.ts";
+import { limits } from "@jeopardy/protocol/limits";
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
-import { playerRouteStageFor } from "#lib/room/pre-game-stage.ts";
-import type { RoomView } from "#lib/room/room-view.ts";
+import {
+  playerSurfaceFor,
+  preGameRegionsFor,
+  teamNameProblem,
+  uniqueNickname,
+} from "#lib/room/pre-game.ts";
 
 const roster = fixtureRosterView();
 const firstTeamId = roster.teams[0]?.teamId ?? "";
+const secondTeamId = roster.teams[1]?.teamId ?? "";
+
+function newStore(seed = "pre-game"): LocalSimRoomStore {
+  return new LocalSimRoomStore({ roomCode: "DUMYX", role: "player", seed });
+}
 
 function joinedStore(options: { team?: boolean } = {}): LocalSimRoomStore {
-  const store = new LocalSimRoomStore({ roomCode: "DUMYX", role: "player", seed: "lobby" });
+  const store = newStore("joined");
   store.join({
     nickname: "Lorax",
     avatarId: "fish",
     accentId: "moss",
     buzzSoundId: "loon",
+    skinToneId: null,
     ...(options.team === true ? { team: { kind: "join" as const, teamId: firstTeamId } } : {}),
   });
   return store;
 }
 
-describe("which pre-game screen a phone is on", () => {
-  const noSolo = { soloAccepted: false };
+function bodyOf(store: LocalSimRoomStore): string {
+  return render(PreGameScreen, { props: { store, roomCode: "DUMYX" } }).body;
+}
 
-  it("asks for a character until the phone has a seat", () => {
-    const store = new LocalSimRoomStore({ roomCode: "DUMYX", role: "player", seed: "stage" });
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("character");
+describe("which surface a phone is on - two answers, not four", () => {
+  it("keeps a seatless phone on the pre-game surface", () => {
+    expect(playerSurfaceFor(newStore().view)).toBe("pre-game");
   });
 
-  it("asks for a team once you are in the room but on nobody's team", () => {
-    expect(playerRouteStageFor(joinedStore().view, noSolo)).toBe("team");
+  it("keeps a seated, teamless phone on the SAME surface (no team screen to send it to)", () => {
+    expect(playerSurfaceFor(joinedStore().view)).toBe("pre-game");
   });
 
-  it("goes to the lobby once you are aboard one", () => {
-    expect(playerRouteStageFor(joinedStore({ team: true }).view, noSolo)).toBe("lobby");
+  it("keeps a seated, teamed phone on the same surface again", () => {
+    expect(playerSurfaceFor(joinedStore({ team: true }).view)).toBe("pre-game");
   });
 
-  it("stops asking about teams once you have chosen to play alone", () => {
-    expect(playerRouteStageFor(joinedStore().view, { soloAccepted: true })).toBe("lobby");
-  });
-
-  it("never asks about teams in an individuals-mode room", () => {
-    const view: RoomView = { ...joinedStore().view, teamsMode: false };
-    expect(playerRouteStageFor(view, noSolo)).toBe("lobby");
-  });
-
-  it("returns a kicked player to team selection with no code path of its own", () => {
-    const store = joinedStore({ team: true });
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("lobby");
-    store.kickFromTeam(store.view.myPlayerId ?? "");
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("team");
-  });
-
-  it("puts every phone on the buzzer when the room starts, wherever it was", () => {
+  it("moves every phone to the buzzer when the room starts, wherever it was", () => {
     const store = joinedStore();
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("team");
+    expect(playerSurfaceFor(store.view)).toBe("pre-game");
     store.startGame();
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("playing");
+    expect(playerSurfaceFor(store.view)).toBe("buzzer");
   });
 
   it("still asks a mid-game arrival for a character first", () => {
-    const store = new LocalSimRoomStore({ roomCode: "DUMYX", role: "player", seed: "late" });
+    const store = newStore("late");
     store.startGame();
-    expect(playerRouteStageFor(store.view, noSolo)).toBe("character");
+    expect(playerSurfaceFor(store.view)).toBe("pre-game");
+    expect(preGameRegionsFor(store.view).lateJoin).toBe(true);
+  });
+
+  it("returns a kicked player to the holding area without changing surface", () => {
+    const store = joinedStore({ team: true });
+    expect(preGameRegionsFor(store.view).teams.hasTeam).toBe(true);
+    store.kickFromTeam(store.view.myPlayerId ?? "");
+    expect(playerSurfaceFor(store.view)).toBe("pre-game");
+    expect(preGameRegionsFor(store.view).teams.hasTeam).toBe(false);
   });
 });
 
-describe("character screen (A2, the identity moment)", () => {
-  const { body } = render(CharacterScreen, {
-    props: { roomCode: "DUMYX", roster, teamsMode: true, onConfirm: () => undefined },
-  });
-
-  it("leads with the moving preview, then the name, look, and sound", () => {
-    expect(body).toContain("Choose your character");
-    expect(body).toContain("Your name");
-    expect(body).toContain("Look");
-    expect(body).toContain("Buzzer sound");
-    // The animated walk sheet is the preview - the whole reason this screen is its own screen.
-    expect(body).toContain("avatar-animated");
-    expect(body.indexOf("avatar-animated")).toBeLessThan(body.indexOf("Your name"));
-  });
-
-  it("lists all 14 approved buzz sounds by display name", () => {
-    expect(buzzSoundCatalog).toHaveLength(14);
-    for (const sound of buzzSoundCatalog) {
-      expect(body).toContain(sound.label);
-    }
-  });
-
-  it("does NOT ask about teams - that is the next screen's question", () => {
-    expect(body).not.toContain("Pick your team");
-    for (const team of roster.teams) {
-      expect(body).not.toContain(team.name);
-    }
-  });
-
-  it("explains team-scoped audio in teams mode (the double-confirmation rule)", () => {
-    expect(body).toContain("the room hears your team");
-  });
-
-  it("names the next step honestly in each mode", () => {
-    expect(body).toContain("Next: pick a team");
-    const solo = render(CharacterScreen, {
-      props: { roomCode: "DUMYX", roster, teamsMode: false, onConfirm: () => undefined },
-    });
-    expect(solo.body).toContain("Join the room");
-    const late = render(CharacterScreen, {
-      props: {
-        roomCode: "DUMYX",
-        roster,
-        teamsMode: true,
-        lateJoin: true,
-        onConfirm: () => undefined,
+describe("the regions are ALL present in every pre-game state", () => {
+  // The core of the law, asserted as one property across the state space rather than as prose.
+  const states: readonly (readonly [string, () => LocalSimRoomStore])[] = [
+    ["no avatar chosen yet", () => newStore()],
+    ["seated, no team", () => joinedStore()],
+    ["seated, on a team", () => joinedStore({ team: true })],
+    [
+      "leading a team you founded",
+      () => {
+        const store = joinedStore();
+        store.createTeam("Founders");
+        return store;
       },
+    ],
+  ];
+
+  for (const [label, make] of states) {
+    it(`shows character, teams and roster together: ${label}`, () => {
+      const body = bodyOf(make());
+      expect(body, "character region").toContain('aria-label="Your character"');
+      expect(body, "teams region").toContain('aria-label="Teams"');
+      expect(body, "roster region").toContain('aria-label="Who is here"');
     });
-    expect(late.body).toContain("Join the game");
+  }
+
+  it("keeps the look controls on screen after joining a team", () => {
+    // The exact regression the old chain had: joining a team unmounted the character screen.
+    const body = bodyOf(joinedStore({ team: true }));
+    expect(body).toContain("Buzzer sound");
+    expect(body).toContain('aria-label="Accent color"');
+    expect(body).toContain('aria-label="Avatar"');
   });
 
-  it("shows no validation error before anyone has tried to continue", () => {
-    expect(body).not.toContain('role="alert"');
-  });
-});
-
-describe("team screen (A2, the choice)", () => {
-  const { body } = render(TeamScreen, {
-    props: { store: joinedStore(), onPlaySolo: () => undefined },
-  });
-
-  it("shows the staged lobby with you in it, above the cards", () => {
-    expect(body).toContain("staged-lobby");
-    expect(body).toContain("the water");
-    expect(body).toContain("Lorax");
-    expect(body.indexOf("staged-lobby")).toBeLessThan(body.indexOf("Start a new team"));
-  });
-
-  it("renders every team as both a station and a card", () => {
+  it("keeps the teams on screen while you are still choosing a look", () => {
+    // And its mirror: choosing a character used to hide every team in the room.
+    const body = bodyOf(newStore());
     for (const team of roster.teams) {
-      // Once as a nameplate on its station, once as a card - hence at least twice.
-      expect((body.match(new RegExp(team.name, "g")) ?? []).length).toBeGreaterThanOrEqual(2);
+      expect(body, team.name).toContain(team.name);
     }
   });
 
-  it("tells you where you are and what the move looks like", () => {
-    expect(body).toContain("You are in the water until you choose");
-    expect(body).toContain("watches you move across");
-  });
-
-  it("offers creating a team (which makes you its leader) and playing alone", () => {
-    expect(body).toContain("Start a new team");
-    expect(body).toContain("Create and lead");
-    expect(body).toContain("Play on my own instead");
-  });
-
-  it("disables joining a locked team", () => {
-    expect(body).toContain("Locked");
+  it("offers a way home from the surface", () => {
+    expect(bodyOf(newStore())).toContain("home-button");
   });
 });
 
-describe("team card overflow rule (owner-specified)", () => {
+describe("the character region changes MODE, not markup, when you take a seat", () => {
+  it("edits a local draft before joining and the room's copy after", () => {
+    expect(preGameRegionsFor(newStore().view).identityMode).toBe("draft");
+    expect(preGameRegionsFor(joinedStore().view).identityMode).toBe("live");
+  });
+
+  it("offers the same three look controls in both modes", () => {
+    const before = bodyOf(newStore());
+    const after = bodyOf(joinedStore());
+    for (const control of ['aria-label="Accent color"', 'aria-label="Avatar"', "Buzzer sound"]) {
+      expect(before, `draft: ${control}`).toContain(control);
+      expect(after, `live: ${control}`).toContain(control);
+    }
+  });
+
+  it("replaces the join button with a confirmation line, keeping the bar itself", () => {
+    expect(bodyOf(newStore())).toContain("Join the room");
+    const seated = bodyOf(joinedStore());
+    expect(seated).toContain("You are in as");
+    expect(seated).toContain("change anything above whenever you like");
+  });
+
+  it("counts the name live instead of explaining the limit in prose", () => {
+    const body = bodyOf(newStore());
+    expect(body).toContain(`0/${String(limits.player.nicknameMaxLength)}`);
+    expect(body).not.toContain("You can change it later");
+  });
+});
+
+describe("team management, in place, on the same screen", () => {
+  it("creates a team and makes the creator its leader", () => {
+    const store = joinedStore();
+    store.createTeam("Kestrels");
+    const regions = preGameRegionsFor(store.view);
+    expect(regions.teams.hasTeam).toBe(true);
+    expect(regions.teams.leadsTeam).toBe(true);
+    expect(store.view.roster.teams.some((team) => team.name === "Kestrels")).toBe(true);
+  });
+
+  it("MOVES an already-teamed player to another team with the same call", () => {
+    const store = joinedStore({ team: true });
+    expect(preGameRegionsFor(store.view).teams.myTeamId).toBe(firstTeamId);
+    store.joinTeam(secondTeamId);
+    expect(preGameRegionsFor(store.view).teams.myTeamId).toBe(secondTeamId);
+    // And exactly one roster row holds them - a move is not an extra membership.
+    const mine = store.view.roster.players.filter(
+      (player) => player.playerId === store.view.myPlayerId,
+    );
+    expect(mine).toHaveLength(1);
+  });
+
+  it("steps back to the holding area without leaving the room", () => {
+    const store = joinedStore({ team: true });
+    store.leaveTeam();
+    expect(preGameRegionsFor(store.view).teams.myTeamId).toBeNull();
+    expect(store.view.myPlayerId).not.toBeNull();
+  });
+
+  it("renames a team the player leads, in place", () => {
+    const store = joinedStore();
+    store.createTeam("Typo Brigade");
+    const teamId = preGameRegionsFor(store.view).teams.myTeamId ?? "";
+    store.updateTeam({ name: "Kestrels" }, teamId);
+    expect(store.view.roster.teams.find((team) => team.teamId === teamId)?.name).toBe("Kestrels");
+  });
+
+  it("offers 'Move here' rather than 'Join' once you are on a team", () => {
+    const team = roster.teams[1];
+    if (team === undefined) throw new Error("fixture needs two teams");
+    const joining = render(TeamCard, {
+      props: { team, members: [], viewerHasTeam: false, onJoin: () => undefined },
+    }).body;
+    const moving = render(TeamCard, {
+      props: { team, members: [], viewerHasTeam: true, onJoin: () => undefined },
+    }).body;
+    expect(joining).toContain("Join this team");
+    expect(moving).toContain("Move here");
+  });
+
+  it("shows your own team a status line instead of a button, at the same height", () => {
+    const team = roster.teams[0];
+    if (team === undefined) throw new Error("fixture team missing");
+    const members = roster.players.filter((player) => player.teamId === team.teamId);
+    const viewer = members[0];
+    if (viewer === undefined) throw new Error("fixture team has no members");
+    const { body } = render(TeamCard, {
+      props: { team, members, viewerPlayerId: viewer.playerId, onJoin: () => undefined },
+    });
+    expect(body).toContain("You are on this team");
+    expect(body).not.toContain("Join this team");
+  });
+});
+
+describe("rename and leave obey the overflow rule", () => {
   const team = roster.teams[0];
   if (team === undefined) throw new Error("fixture team missing");
   const members = roster.players.filter((player) => player.teamId === team.teamId);
 
-  it("admin viewers get the '...' trigger; kick/hand-off stay hidden until opened", () => {
+  it("keeps rename behind the team's '...' rather than as a visible edit field", () => {
     const { body } = render(TeamCard, {
       props: {
         team,
         members,
         viewerPlayerId: team.leaderPlayerId,
         viewerIsAdmin: true,
-        onKick: () => undefined,
-        onHandOff: () => undefined,
-      },
-    });
-    expect(body).toContain("...");
-    expect(body).not.toContain("Kick from team");
-    expect(body).not.toContain("Make leader");
-    expect(body).toContain("leader"); // the crown affordance
-  });
-
-  it("puts the team lock behind the team's own '...' too, never as a visible switch", () => {
-    const { body } = render(TeamCard, {
-      props: {
-        team,
-        members,
-        viewerPlayerId: team.leaderPlayerId,
-        viewerIsAdmin: true,
-        onToggleLock: () => undefined,
+        onRename: () => undefined,
       },
     });
     expect(body).toContain(`Actions for ${team.name}`);
-    expect(body).not.toContain("Lock team");
-    expect(body).not.toContain("Unlock team");
+    expect(body).not.toContain("Rename team");
+    // The name is a heading until the menu says otherwise - no input is rendered up front.
+    expect(body).not.toContain('aria-label="Team name"');
   });
 
-  it("non-admin viewers get no overflow trigger at all", () => {
-    const { body } = render(TeamCard, {
-      props: { team, members, viewerPlayerId: members[1]?.playerId ?? null, viewerIsAdmin: false },
-    });
-    expect(body).not.toContain("aria-haspopup");
-  });
+  it("keeps leaving behind the same '...' and offers it only to members", () => {
+    const member = members[0];
+    if (member === undefined) throw new Error("fixture team has no members");
+    const asMember = render(TeamCard, {
+      props: { team, members, viewerPlayerId: member.playerId, onLeave: () => undefined },
+    }).body;
+    expect(asMember).toContain("aria-haspopup");
+    expect(asMember).not.toContain("Leave this team");
 
-  it("shows per-member personal identity inside the team display (both tiers visible)", () => {
-    const { body } = render(TeamCard, { props: { team, members } });
-    for (const member of members) {
-      expect(body).toContain(member.nickname);
-    }
-    // Personal avatar chips render with each member's own accent, not the team color.
-    expect(body).toContain("avatar-chip");
+    const asOutsider = render(TeamCard, {
+      props: { team, members, viewerPlayerId: "not-a-member", onLeave: () => undefined },
+    }).body;
+    expect(asOutsider).not.toContain("aria-haspopup");
   });
 });
 
-describe("lobby (A3)", () => {
-  it("greets you by name and team, with the explicit waiting state", () => {
-    const { body } = render(LobbyScreen, { props: { store: joinedStore({ team: true }) } });
-    expect(body).toContain("Lorax");
-    expect(body).toContain(roster.teams[0]?.name ?? "@@never@@");
-    expect(body).toContain("Waiting for the host to start");
+describe("the at-cap refusal", () => {
+  function storeAtCap(): LocalSimRoomStore {
+    const store = joinedStore();
+    while (store.view.roster.teams.length < limits.team.teamMaxCount) {
+      store.createTeam(`Team ${String(store.view.roster.teams.length + 1)}`);
+    }
+    return store;
+  }
+
+  it("stops offering creation once the room holds every team it can", () => {
+    const regions = preGameRegionsFor(storeAtCap().view);
+    expect(regions.teams.atTeamCap).toBe(true);
+    expect(regions.teams.canCreateTeam).toBe(false);
+    expect(teamNameProblem("Overflow", regions)).toBe("at-cap");
   });
 
-  it("offers buzzer practice as local-only and self-customization on your own chip", () => {
-    const { body } = render(LobbyScreen, { props: { store: joinedStore({ team: true }) } });
-    expect(body).toContain("Buzzer practice");
-    expect(body).toContain("your phone only");
-    expect(body).toContain("change look");
+  it("REFUSES in the store too, because the last slot can go between render and tap", () => {
+    const store = storeAtCap();
+    const before = store.view.roster.teams.length;
+    store.createTeam("One Too Many");
+    expect(store.view.roster.teams.length).toBe(before);
+    expect(store.view.refusal?.reason).toBe("teams-full");
   });
 
-  it("keeps the staged view live, so a team change is still a visible move here", () => {
-    const { body } = render(LobbyScreen, { props: { store: joinedStore({ team: true }) } });
-    expect(body).toContain("staged-lobby");
-    // The stations are tappable in the lobby too - changing your mind before the game is fine.
-    expect(body).toContain('aria-pressed="true"');
+  it("says so on the screen, in words, without showing a protocol code", () => {
+    const body = bodyOf(storeAtCap());
+    expect(body).toContain("maximum");
+    expect(body).not.toContain("teams-full");
   });
 
-  it("names the holding area rather than saying 'solo' for people still waiting", () => {
-    const { body } = render(LobbyScreen, { props: { store: joinedStore({ team: true }) } });
-    expect(body).toContain("Still in the water");
+  it("still lets a capped room be joined - the cap is on teams, not on seats", () => {
+    expect(preGameRegionsFor(storeAtCap().view).teams.actionable).toBe(true);
+  });
+});
+
+describe("individuals-mode rooms keep the region and say what it is", () => {
+  it("never leaves a hole where the teams would be", () => {
+    const store = joinedStore();
+    const view = { ...store.view, teamsMode: false };
+    expect(preGameRegionsFor(view).teams.shown).toBe(false);
+  });
+});
+
+describe("nickname de-duplication (A2's auto-suffix)", () => {
+  it("leaves a free name alone and suffixes a taken one", () => {
+    expect(uniqueNickname("Sam", ["Ada", "Bo"])).toBe("Sam");
+    expect(uniqueNickname("Sam", ["sam"])).toBe("Sam 2");
+    expect(uniqueNickname("Sam", ["Sam", "Sam 2"])).toBe("Sam 3");
   });
 });

@@ -38,8 +38,21 @@
      * The theme document's `staging` slot, with the route's ?staging= dev override on top.
      */
     stagingThemeId?: string | null;
+    /**
+     * Hold the stage still without touching the OS accessibility setting - the host's
+     * "stage motion: still" device preference (src/lib/host-settings/). A laptop driving a
+     * projector and a board at once is allowed to stop paying for a walking crowd mid-game.
+     * "off" is the caller's job: it passes environment="none".
+     */
+    stageStill?: boolean;
   };
-  let { store, joinOrigin = null, environment = "studio", stagingThemeId = null }: Props = $props();
+  let {
+    store,
+    joinOrigin = null,
+    environment = "studio",
+    stagingThemeId = null,
+    stageStill = false,
+  }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -230,6 +243,7 @@
           occupants={roomStaging.occupants}
           waitingEntityIds={roomStaging.waitingEntityIds}
           {environment}
+          {stageStill}
           beat={dioramaBeat}
         />
       {:else}
@@ -237,6 +251,7 @@
           occupants={dioramaOccupants}
           {environment}
           {celebratingEntityIds}
+          holdStill={stageStill}
           beat={dioramaBeat}
         />
       {/if}
@@ -442,7 +457,7 @@
     place-items: center;
     background: var(--surface-scrim);
     font-family: var(--font-display);
-    font-size: clamp(2rem, 6vh, 4rem);
+    font-size: calc(clamp(2rem, 6vh, 4rem) * var(--type-scale));
     text-transform: uppercase;
   }
 
@@ -457,7 +472,7 @@
 
   .game-title {
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 10vh, 7rem);
+    font-size: calc(clamp(2.5rem, 10vh, 7rem) * var(--type-scale));
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--board-value-color);
@@ -507,7 +522,7 @@
 
   .code-hidden-title {
     font-family: var(--font-display);
-    font-size: clamp(1.1rem, 3.4vh, 2rem);
+    font-size: calc(clamp(1.1rem, 3.4vh, 2rem) * var(--type-scale));
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--board-value-color);
@@ -516,7 +531,7 @@
 
   .code-hidden-line {
     font-family: var(--font-chrome);
-    font-size: clamp(0.8rem, 2vh, 1.1rem);
+    font-size: calc(clamp(0.8rem, 2vh, 1.1rem) * var(--type-scale));
     text-transform: uppercase;
     letter-spacing: 0.06em;
     color: var(--surface-text-muted);
@@ -532,20 +547,20 @@
   }
 
   .join-url {
-    font-size: clamp(1.1rem, 3.2vh, 2.2rem);
+    font-size: calc(clamp(1.1rem, 3.2vh, 2.2rem) * var(--type-scale));
     letter-spacing: 0.05em;
     margin: 0;
   }
 
   .room-code-line {
-    font-size: clamp(0.9rem, 2.4vh, 1.6rem);
+    font-size: calc(clamp(0.9rem, 2.4vh, 1.6rem) * var(--type-scale));
     color: var(--surface-text-muted);
     margin: 0;
   }
 
   .room-code {
     font-family: var(--font-values);
-    font-size: clamp(2rem, 8vh, 5rem);
+    font-size: calc(clamp(2rem, 8vh, 5rem) * var(--type-scale));
     letter-spacing: 0.14em;
     color: var(--board-value-color);
     text-shadow: var(--effect-value-glow);
@@ -553,7 +568,7 @@
   }
 
   .joined-count {
-    font-size: clamp(0.8rem, 2vh, 1.2rem);
+    font-size: calc(clamp(0.8rem, 2vh, 1.2rem) * var(--type-scale));
     color: var(--surface-text-muted);
     margin: 0;
   }
@@ -575,7 +590,7 @@
     box-shadow: var(--effect-cell-shadow);
     color: var(--clue-text-color);
     font-family: var(--font-chrome);
-    font-size: clamp(1.1rem, 3.4vh, 2.4rem);
+    font-size: calc(clamp(1.1rem, 3.4vh, 2.4rem) * var(--type-scale));
     font-weight: 600;
     text-transform: uppercase;
     text-align: center;
@@ -602,7 +617,7 @@
   .interstitial-title,
   .winner-names {
     font-family: var(--font-display);
-    font-size: clamp(2rem, 8vh, 5.5rem);
+    font-size: calc(clamp(2rem, 8vh, 5.5rem) * var(--type-scale));
     text-transform: uppercase;
     margin: 0;
     color: var(--clue-text-color);
@@ -612,7 +627,7 @@
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    font-size: clamp(1rem, 2.6vh, 1.6rem);
+    font-size: calc(clamp(1rem, 2.6vh, 1.6rem) * var(--type-scale));
     color: var(--board-value-color);
     margin: 0;
   }
@@ -709,7 +724,7 @@
 
   .wager-splash .wager-splash-text {
     font-family: var(--font-display);
-    font-size: clamp(2.5rem, 11vh, 7rem);
+    font-size: calc(clamp(2.5rem, 11vh, 7rem) * var(--type-scale));
     text-transform: uppercase;
     color: var(--board-value-color);
     text-shadow: var(--effect-value-glow);
@@ -748,9 +763,9 @@
       /* Layout constants from tokens.css, re-clamped for a narrow viewport. Overriding them
          on this subtree is the sanctioned move - they are app layout constants rather than
          theme document fields (docs/design/theming.md), and every consumer reads the token. */
-      --board-category-size: clamp(0.6rem, 2.6vw, 1.1rem);
-      --board-value-size: clamp(1.1rem, 6vw, 2.4rem);
-      --clue-text-size: clamp(1.05rem, 4.6vw, 2rem);
+      --board-category-size: calc(clamp(0.6rem, 2.6vw, 1.1rem) * var(--type-scale));
+      --board-value-size: calc(clamp(1.1rem, 6vw, 2.4rem) * var(--type-scale));
+      --clue-text-size: calc(clamp(1.05rem, 4.6vw, 2rem) * var(--type-scale));
     }
 
     /* The stage stops being an overlay band and becomes a block after the content, with a
@@ -797,21 +812,21 @@
     }
 
     .game-title {
-      font-size: clamp(2rem, 9vw, 3rem);
+      font-size: calc(clamp(2rem, 9vw, 3rem) * var(--type-scale));
     }
 
     .room-code {
-      font-size: clamp(2.2rem, 14vw, 4rem);
+      font-size: calc(clamp(2.2rem, 14vw, 4rem) * var(--type-scale));
     }
 
     .join-url {
-      font-size: clamp(0.9rem, 4vw, 1.3rem);
+      font-size: calc(clamp(0.9rem, 4vw, 1.3rem) * var(--type-scale));
       overflow-wrap: anywhere;
     }
 
     .interstitial-title,
     .winner-names {
-      font-size: clamp(1.6rem, 8vw, 3rem);
+      font-size: calc(clamp(1.6rem, 8vw, 3rem) * var(--type-scale));
     }
 
     /* A 6-column board does not become readable by shrinking; it becomes readable by

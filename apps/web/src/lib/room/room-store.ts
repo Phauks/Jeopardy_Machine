@@ -11,6 +11,7 @@
 // (create-room-store.ts), never a component change.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomView } from "#lib/room/room-view.ts";
 
 /** What a phone submits from the A2 join screen (mirrors the protocol join message fields). */
@@ -19,6 +20,8 @@ export type JoinRequest = {
   avatarId: string | null;
   accentId: string | null;
   buzzSoundId: string | null;
+  /** Humans only; null = the pack's own colors, never inferred (protocol room/identity.ts). */
+  skinToneId: string | null;
   /** Teams mode only: tap an existing card or found a new team (creator becomes leader). */
   team?: { kind: "join"; teamId: string } | { kind: "create"; name: string };
 };
@@ -29,6 +32,7 @@ export type IdentityPatch = {
   avatarId?: string | null;
   accentId?: string | null;
   buzzSoundId?: string | null;
+  skinToneId?: string | null;
 };
 
 /** Sparse team-tier edit; leader-only (or host override naming the team). */
@@ -59,7 +63,15 @@ export type RoomStore = {
   // Personal tier (any player, self only) + team tier (leader or host).
   updateIdentity(patch: IdentityPatch): void;
   createTeam(name: string): void;
+  /**
+   * Join a team, or MOVE to one from another - the same call either way, because the roster
+   * stores one teamId per player and replacing it is the whole operation. Changing your mind
+   * before the game starts is allowed (user-flows "Teams & leadership"), and doing it as one
+   * message rather than leave-then-join means the room never sees you briefly teamless.
+   */
   joinTeam(teamId: string): void;
+  /** Step back to the holding area without picking another team. */
+  leaveTeam(): void;
   updateTeam(patch: TeamPatch, teamId?: string): void;
   kickFromTeam(playerId: string): void;
   handOffLeadership(playerId: string): void;
@@ -97,6 +109,13 @@ export type RoomStore = {
   tiebreakerNextClue(): void;
   /** Freeze/unfreeze all pending timers; the display shows "one moment" (C4 pause). */
   setPaused(paused: boolean): void;
+  /**
+   * Change the ROOM's own settings - listing, entry/password, caps, spectators, streamer mode
+   * (packages/protocol/src/room/room-settings.ts). Host-only and sparse: send the fields you
+   * mean to change. Server state, broadcast to every connection, and therefore the opposite of
+   * a device preference in every way that matters (src/lib/host-settings/).
+   */
+  updateRoomSettings(patch: RoomSettingsPatch): void;
   /**
    * Fire a pending timer's expiry action now (host force-expire; also how tests and the sim
    * panel advance time). Omitting `kind` fires whichever timer the current phase waits on.

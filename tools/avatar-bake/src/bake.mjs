@@ -18,6 +18,7 @@ import { accentPalette } from "./accent-palette.mjs";
 import { parseGlb, repackGlb } from "./glb-repack.mjs";
 import { packs } from "./packs.mjs";
 import { avatars, clipsFor, packIdFor } from "./roster.mjs";
+import { skinTonePalette, skinToneTargets, skinToneTolerance } from "./skin-tone-palette.mjs";
 
 const analyzeMode = process.argv.includes("--analyze");
 const toolRoot = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -336,6 +337,16 @@ for (const avatar of avatars) {
     // actually got rendered, so an avatar that fell back to idle for want of a walk cycle is
     // visible in the manifest rather than a silent surprise.
     sheet: { file: sheetFileName, clip: result.sheetClips[avatar.id] },
+    // v3: the recolor inputs the PHONE needs. The stills are baked per accent, but the walk
+    // sheet is baked once in pack colors, so the only way the animated preview can wear the
+    // player's accent is to recolor it in the browser - which needs these two fields on the
+    // phone's own manifest (apps/web/src/lib/avatars/sheet-recolor.ts). They duplicate the
+    // model manifest's copy on purpose: that document is display-only and deliberately kept
+    // out of every phone's bundle (src/lib/diorama/motion-guardrails.gate.test.ts), so the
+    // phone cannot read it. Both copies come from the same roster.mjs entry and the manifest
+    // gate asserts they agree, which is what keeps the duplication honest.
+    recolorTargets: avatar.recolorTargets,
+    tolerance: avatar.tolerance ?? null,
   });
   // The live tier, into its own document (see modelsManifestPath above): the trimmed GLB plus
   // everything the diorama needs to instance and recolor it without hard-coding pack
@@ -359,12 +370,16 @@ for (const existing of readdirSync(spritesDir)) {
 
 const manifest = {
   // Bump when the manifest shape changes; the loader in apps/web asserts on it. v2 added the
-  // sprite-sheet tier (docs/decisions/2026-08-14-avatars-in-motion.md).
-  version: 2,
+  // sprite-sheet tier (docs/decisions/2026-08-14-avatars-in-motion.md); v3 added the
+  // per-avatar recolor inputs and the skin-tone palette, both for the browser-side recolor
+  // that fixes the accent bug (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md).
+  version: 3,
   spriteSize: SPRITE_SIZE,
   basePath: "/avatars/",
   sheet: { frames: SHEET_FRAMES, frameSize: SHEET_FRAME_SIZE },
   accents: accentPalette,
+  skinTones: skinTonePalette,
+  skinRecolor: { targets: skinToneTargets, tolerance: skinToneTolerance },
   avatars: manifestAvatars,
 };
 const modelsManifest = {

@@ -135,12 +135,23 @@
 </article>
 
 <style>
+  /* A listed room is drawn as a BOARD CELL - the cell fill, the clue text color, the value
+     face for the numbers - because the front door is built from the board's own materials
+     (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md, the art direction).
+     Deriving from --board-* rather than the chrome tokens also keeps it legible under the
+     light paper preset, where --surface-page and --surface-text collapse toward each other. */
   .room-card {
+    --card-ink: var(--clue-text-color);
+    --card-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
+    --card-rule: color-mix(in srgb, var(--clue-text-color) 24%, transparent);
+    --card-well: color-mix(in srgb, var(--board-cell-bg) 62%, #000000);
     display: flex;
     flex-direction: column;
-    border-radius: calc(var(--board-radius) + 4px);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-raised);
+    /* Square: cells are square, and a rounded card is the generic look this page rejects. */
+    border-radius: 0;
+    border-left: 3px solid transparent;
+    background: var(--board-cell-bg);
+    box-shadow: var(--effect-cell-shadow);
     overflow: hidden;
     transition:
       opacity 150ms ease,
@@ -148,7 +159,7 @@
   }
 
   .room-card.expanded {
-    border-color: var(--accent);
+    border-left-color: var(--accent);
   }
 
   /* "Playing" is dimmed the way a server browser dims an in-progress match - a cue, not a
@@ -170,7 +181,7 @@
     padding: 0.85rem 0.95rem;
     background: none;
     border: none;
-    color: var(--surface-text);
+    color: var(--card-ink);
     font: inherit;
     cursor: pointer;
   }
@@ -194,12 +205,16 @@
     color: var(--board-value-color);
   }
 
+  .room-card:hover {
+    border-left-color: var(--board-value-color);
+  }
+
   /* The title is the loud line: chrome face, room-name scale. */
   .title {
     font-family: var(--font-chrome);
     font-size: 1.1rem;
     letter-spacing: 0.02em;
-    color: var(--surface-text);
+    color: var(--card-ink);
     flex: 1;
     min-width: 0;
     overflow: hidden;
@@ -215,7 +230,7 @@
     padding: 0.15rem 0.45rem;
     border-radius: 999px;
     border: 1px solid currentColor;
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .phase-badge[data-phase="lobby"] {
@@ -229,17 +244,17 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     font-size: 0.82rem;
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .host-label {
-    color: var(--surface-text);
+    color: var(--card-ink);
     opacity: 0.85;
   }
 
   .host-label::before {
     content: "hosted by ";
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .host-unnamed {
@@ -257,19 +272,21 @@
     align-items: center;
     gap: 0.4rem;
     font-size: 0.82rem;
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .seat-count {
     font-family: var(--font-values);
-    font-size: 1.2rem;
+    /* Large enough that the ultra-condensed value face is still a NUMBER: below about 1.4rem
+       Six Caps (the retro preset's value face) reads as a smudge. */
+    font-size: 1.45rem;
     letter-spacing: 0.04em;
     color: var(--board-value-color);
     line-height: 1;
   }
 
   .seat-cap {
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .seat-word {
@@ -282,7 +299,7 @@
     width: 5rem;
     height: 0.35rem;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--surface-text) 16%, transparent);
+    background: color-mix(in srgb, var(--clue-text-color) 20%, transparent);
     overflow: hidden;
   }
 
@@ -311,7 +328,7 @@
     gap: 0.5rem;
     flex-wrap: wrap;
     padding: 0 0.95rem 0.85rem;
-    border-top: 1px dashed var(--surface-border);
+    border-top: 1px dashed var(--card-rule);
     padding-top: 0.7rem;
   }
 
@@ -328,17 +345,19 @@
     text-transform: uppercase;
     letter-spacing: 0.1em;
     font-size: 0.68rem;
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .password-field input {
     font: inherit;
     font-size: 0.95rem;
     padding: 0.5rem 0.6rem;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--board-radius);
-    background: var(--surface-page);
-    color: var(--surface-text);
+    border: 1px solid var(--card-rule);
+    border-radius: 2px;
+    /* A well sunk INTO the cell rather than a chrome-colored box on top of it: darkening the
+       cell's own fill keeps the pairing with --clue-text-color that the board guarantees. */
+    background: var(--card-well);
+    color: var(--card-ink);
   }
 
   .password-go,
@@ -348,20 +367,20 @@
     letter-spacing: 0.06em;
     font-size: 0.85rem;
     padding: 0.55rem 0.9rem;
-    border-radius: var(--board-radius);
+    border-radius: 2px;
     cursor: pointer;
   }
 
   .password-go {
     border: none;
-    background: var(--accent);
-    color: var(--surface-page);
+    background: var(--board-value-color);
+    color: color-mix(in srgb, var(--board-cell-bg) 30%, #000000);
   }
 
   .password-cancel {
-    border: 1px solid var(--surface-border);
+    border: 1px solid var(--card-rule);
     background: transparent;
-    color: var(--surface-text-muted);
+    color: var(--card-muted);
   }
 
   .visually-hidden {

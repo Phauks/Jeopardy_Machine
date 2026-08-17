@@ -23,6 +23,13 @@ export type RoomPlayerView = {
   avatarId: string | null;
   accentId: string | null;
   buzzSoundId: string | null;
+  /**
+   * The human models' skin tone, or null for "not chosen" - which renders in the pack's own
+   * colors and is never filled in on the player's behalf
+   * (packages/protocol/src/room/identity.ts). Pets carry null always; the control is not shown
+   * for them (avatarTakesSkinTone in #lib/avatars/avatar-manifest.ts).
+   */
+  skinToneId: string | null;
   teamId: string | null;
   connected: boolean;
   joinedAt: number;

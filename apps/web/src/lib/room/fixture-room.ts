@@ -159,6 +159,10 @@ export function fixtureRosterView(): RoomRosterView {
     avatarId: resolveAvatarId(player.avatarId),
     accentId: resolveAccentId(player.accentColor),
     buzzSoundId: player.personalBuzzSoundId,
+    // The fixture roster deliberately leaves every tone unchosen. It is dummy data and a tone
+    // is a statement about a person, so inventing a spread of them for imaginary players would
+    // be exactly the inference the feature forbids (packages/protocol/src/room/identity.ts).
+    skinToneId: null,
     teamId: player.teamId,
     connected: player.connection === "connected",
     // Fixture order is join order; late joiners land after everyone else.

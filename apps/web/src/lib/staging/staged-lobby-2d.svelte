@@ -11,6 +11,7 @@
   // lobby before any JavaScript has decided whether the device can run three.
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
   import { accentById, avatarById } from "#lib/avatars/avatar-manifest.ts";
+  import { crewPlateNameLimit, holdingAreaCopy } from "#lib/staging/staging-copy.ts";
   import type { StagingStation } from "#lib/staging/staging-layout.ts";
   import type { StagingTheme } from "#lib/staging/staging-theme.ts";
 
@@ -51,32 +52,50 @@
       .map((entityId) => byId.get(entityId))
       .filter((occupant) => occupant !== undefined),
   );
+  // The same words the 3D sign carries, from the same function - so a device without WebGL is
+  // told exactly what a projector is told (staging-copy.ts).
+  const holdingCopy = $derived(holdingAreaCopy(theme, waiting.length, stations.length));
+
+  function crewOf(station: StagingStation): StagedOccupant[] {
+    return station.memberIds
+      .map((memberId) => byId.get(memberId))
+      .filter((member) => member !== undefined);
+  }
 </script>
 
 {#snippet stationContents(station: StagingStation)}
   <!-- The nameplate: the same string the 3D station carries over its mast. -->
   <span class="nameplate">{station.label}</span>
+  {@const crew = crewOf(station)}
   <span class="hull">
-    <span class="crew">
-      {#each station.memberIds as memberId (memberId)}
-        {@const member = byId.get(memberId)}
-        {#if member !== undefined}
-          {@const avatar = avatarById(member.avatarId)}
-          <span class="crew-member" class:self={member.self === true}>
-            {#if avatar}
-              <AvatarChip {avatar} accent={accentById(member.accentId)} size="28px" />
-            {/if}
-            <span class="crew-name">{member.label}</span>
-            {#if member.leader === true}
-              <span class="crown" title="Team leader">leader</span>
-            {/if}
-          </span>
+    <span class="crew-chips">
+      {#each crew.slice(0, crewPlateNameLimit) as member (member.entityId)}
+        {@const avatar = avatarById(member.avatarId)}
+        {#if avatar}
+          <AvatarChip {avatar} accent={accentById(member.accentId)} size="26px" />
         {/if}
       {/each}
-      {#if station.memberIds.length === 0}
+      {#if crew.length === 0}
         <span class="empty-crew">Nobody aboard yet</span>
       {/if}
     </span>
+  </span>
+  <!-- NAMES BENEATH THE BOAT (owner, 2026-08-16): the room has to be able to see who is
+       aboard which. Capped by the SAME rule the 3D crew plate uses (staging-copy.ts) so the
+       two views never disagree about who is listed, with the rest counted rather than cut
+       silently - and each name ellipsised on its own, so one long nickname cannot push the
+       others off the plate. -->
+  <span class="crew-plate">
+    {#each crew.slice(0, crewPlateNameLimit) as member (member.entityId)}
+      <span class="crew-name" class:self={member.self === true}>
+        {member.label}{#if member.leader === true}<span class="crown" title="Team leader"
+            >leader</span
+          >{/if}
+      </span>
+    {/each}
+    {#if crew.length > crewPlateNameLimit}
+      <span class="crew-overflow">+{crew.length - crewPlateNameLimit} more</span>
+    {/if}
   </span>
   <span class="station-noun">{theme.stationNoun}</span>
 {/snippet}
@@ -119,8 +138,23 @@
     {/if}
   </ul>
 
-  <section class="holding" class:surfaced={theme.holdingSurface !== null}>
-    <h3 class="holding-label">{theme.holdingAreaNoun}</h3>
+  <!-- THE HOLDING AREA AS A PLACE. Owner, 2026-08-16: "I don't understand still in the water."
+       Being unassigned was drawn as a position in a band and nothing else. It now says what it
+       is, what to do about it, and how many people are in it - and it has a drawn boundary, so
+       the un-teamed read as one group standing somewhere rather than as leftovers. -->
+  <section
+    class="holding"
+    class:surfaced={theme.holdingSurface !== null}
+    aria-label={holdingCopy.title}
+  >
+    <header class="holding-header">
+      <h3 class="holding-title">{holdingCopy.title}</h3>
+      <p class="holding-hint">{holdingCopy.hint}</p>
+      {#if holdingCopy.count.length > 0}
+        <span class="holding-count">{holdingCopy.count}</span>
+      {/if}
+    </header>
+    <span class="holding-noun">{theme.holdingAreaNoun}</span>
     <ul class="waiting">
       {#each waiting as occupant (occupant.entityId)}
         {@const avatar = avatarById(occupant.avatarId)}
@@ -131,9 +165,6 @@
           <span class="waiting-name">{occupant.label}</span>
         </li>
       {/each}
-      {#if waiting.length === 0}
-        <li class="empty-waiting">Everybody has picked a team</li>
-      {/if}
     </ul>
   </section>
 </div>
@@ -204,26 +235,49 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--station-color) 60%, transparent);
   }
 
-  .crew {
+  /* Chips ride ON the hull, in a row that wraps - a crowded boat looks crowded, which is the
+     same thing the 3D seat wrapping does. */
+  .crew-chips {
     display: flex;
-    flex-direction: column;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 0.25rem;
   }
 
-  .crew-member {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    font-size: 0.82rem;
+  .crew-overflow {
+    font-family: var(--font-chrome);
+    font-size: 0.7rem;
+    color: var(--surface-text);
   }
 
-  .crew-member.self .crew-name,
+  /* ...and the NAMES sit beneath it, which is the whole point: the room reads who is aboard
+     which without having to recognise six avatars at projector distance. Long names ellipsis
+     individually rather than pushing the others off the plate. */
+  .crew-plate {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.1rem 0.5rem;
+    font-size: 0.78rem;
+    line-height: 1.25;
+    color: var(--surface-text-muted);
+  }
+
+  .crew-name {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.2rem;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .crew-name.self,
   .waiting li.self .waiting-name {
     color: var(--accent);
     font-weight: 600;
   }
 
-  .crew-name,
   .waiting-name {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -241,7 +295,6 @@
   }
 
   .empty-crew,
-  .empty-waiting,
   .no-stations {
     font-size: 0.78rem;
     color: var(--surface-text-muted);
@@ -261,14 +314,22 @@
     color: var(--surface-text-muted);
   }
 
+  /* THE BOUNDARY. A place has edges; the previous version was a band of slightly different
+     background, which is why "in the water" read as "nowhere in particular". The inset border
+     and the corner caption are what make the un-teamed look like a group standing somewhere. */
   .holding {
-    padding: 0.7rem 0.8rem 0.9rem;
+    position: relative;
+    margin: 0 0.8rem 0.8rem;
+    padding: 0.9rem 0.9rem 1rem;
+    border: 2px solid var(--surface-border);
+    border-radius: 0.9rem;
     background: var(--surface-raised);
   }
 
   /* When the theme draws a surface, so does this: the holding area gets the theme's water
      colour and a wave edge, so "in the water" survives the loss of the renderer. */
   .holding.surfaced {
+    border-color: color-mix(in srgb, var(--board-category-bg) 55%, var(--surface-text));
     background:
       radial-gradient(
           1.1rem 0.55rem at 0.9rem 0,
@@ -277,16 +338,57 @@
         )
         0 0 / 1.8rem 0.6rem repeat-x,
       linear-gradient(var(--board-category-bg), color-mix(in srgb, var(--board-category-bg) 78%, var(--surface-page)));
-    padding-top: 1.1rem;
+    padding-top: 1.2rem;
   }
 
-  .holding-label {
+  .holding-header {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .holding-title {
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.95rem;
+    color: var(--surface-text);
+    margin: 0;
+  }
+
+  .holding-hint {
+    margin: 0;
+    font-size: 0.8rem;
+    color: var(--accent);
+  }
+
+  .holding-count {
+    margin-left: auto;
+    font-family: var(--font-chrome);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--surface-text-muted);
+    border: 1px solid var(--surface-border);
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+  }
+
+  /* The theme's own noun, small, on the boundary - "the water" / "the clearing" names the
+     place without competing with the instruction. */
+  .holding-noun {
+    position: absolute;
+    top: -0.55rem;
+    left: 0.9rem;
+    padding: 0 0.35rem;
+    background: var(--surface-page);
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.14em;
-    font-size: 0.65rem;
+    font-size: 0.6rem;
     color: var(--surface-text-muted);
-    margin: 0 0 0.4rem;
   }
 
   .waiting {

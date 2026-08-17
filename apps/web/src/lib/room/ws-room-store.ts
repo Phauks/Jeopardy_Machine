@@ -40,6 +40,7 @@
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
 import type { RoomRoleView, RoomView } from "#lib/room/room-view.ts";
 
@@ -115,7 +116,13 @@ export class WsRoomStore implements RoomStore {
 
   joinTeam(teamId: string): void {
     void teamId;
+    // The same message whether this is a first join or a move between teams: the server
+    // replaces the session's teamId either way, so there is no separate "move" verb.
     notWired("joinTeam", "`team-join`");
+  }
+
+  leaveTeam(): void {
+    notWired("leaveTeam", "`team-leave`");
   }
 
   updateTeam(patch: TeamPatch, teamId?: string): void {
@@ -264,6 +271,13 @@ export class WsRoomStore implements RoomStore {
   setPaused(paused: boolean): void {
     void paused;
     notWired("setPaused", "a room-level pause message NOT yet in the M3 catalog (reconcile flag)");
+  }
+
+  updateRoomSettings(patch: RoomSettingsPatch): void {
+    void patch;
+    // Both doors already exist server-side (the host-only client message and PATCH
+    // /api/rooms/<CODE>); this store sends the message one, since the console holds the socket.
+    notWired("updateRoomSettings", "`update-room-settings` {settings} (host only)");
   }
 
   expireTimer(kind?: TimerKind): void {
