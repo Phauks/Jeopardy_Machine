@@ -1,5 +1,5 @@
 // The room DO's half of the registry (docs/decisions/2026-08-14-room-visibility-and-lobby.md,
-// addendum "How registry updates reach D1"): three statements against the SAME `rooms` table
+// addendum "How registry updates reach D1"): four statements against the SAME `rooms` table
 // the web Worker owns, through this Worker's own D1 binding.
 //
 // Why the DO writes D1 directly instead of calling the web Worker: a DO cannot import the web
@@ -25,15 +25,46 @@ export type RegistrySnapshot = {
   code: string;
   phase: "lobby" | "active" | "ended";
   playerCount: number;
+  // Spectators hold no roster seat - they are live connections and nothing else - so this DO
+  // is the ONLY thing that can count them. Reported on every touch beside the roster count,
+  // because the lobby's audience line is exactly as perishable as its player fraction.
+  spectatorCount: number;
   lastSeenAt: number;
   expiresAt: number;
 };
 
+// What a settings change makes of the room's lobby row. `playerCap` is the room's own
+// settings.maxPlayers rather than the product limit: the fraction a browser reads must be the
+// door this host actually set.
+export type RegistryListing = {
+  code: string;
+  listing: "public" | "private";
+  title: string;
+  hostLabel: string;
+  hasPassword: boolean;
+  playerCap: number;
+  // The second budget travels with the first: turning spectators off, or retuning their
+  // ceiling, changes the lobby row's audience line the same instant it changes the door.
+  spectatorCap: number;
+  spectatorsAllowed: boolean;
+  lastSeenAt: number;
+};
+
 // Only ever an UPDATE: the row is created by the web Worker's create route, and a room that
-// has no row (unapplied migration, failed insert) must not resurrect itself as an unlisted
-// ghost with a fabricated title.
+// has no row (unapplied migration, failed insert) must not resurrect itself as a ghost row
+// with a fabricated title.
 const touchSql = `UPDATE rooms
-  SET phase = ?, player_count = ?, last_seen_at = ?, expires_at = ?
+  SET phase = ?, player_count = ?, spectator_count = ?, last_seen_at = ?, expires_at = ?
+  WHERE code = ?`;
+
+// The one write that touches LISTING facts, and the only reason a live room ever may: the
+// host changed the room's settings (docs/decisions/2026-08-14-room-controls-and-staging.md).
+// A room that just went private must leave the lobby immediately - waiting for a sweep would
+// leave a browsable door onto a room its host just closed to strangers - and a retuned
+// `maxPlayers` must move the "7/24" fraction with it or the lobby lies about capacity.
+const relistSql = `UPDATE rooms
+  SET listing = ?, title = ?, host_label = ?, has_password = ?, player_cap = ?,
+    spectator_cap = ?, spectators_allowed = ?, last_seen_at = ?
   WHERE code = ?`;
 
 const endSql = `UPDATE rooms SET phase = 'ended', ended_at = ?, last_seen_at = ? WHERE code = ?`;
@@ -52,6 +83,7 @@ export async function touchRegistryRow(
       .bind(
         snapshot.phase,
         snapshot.playerCount,
+        snapshot.spectatorCount,
         snapshot.lastSeenAt,
         snapshot.expiresAt,
         snapshot.code,
@@ -59,6 +91,36 @@ export async function touchRegistryRow(
       .run();
   } catch (error) {
     console.warn("registry touch failed (the lobby row may be stale)", error);
+  }
+}
+
+/**
+ * The host retuned the room: push the listing facts the lobby renders. Best-effort like every
+ * write here - a failure costs the lobby an accurate row, never the setting itself, which the
+ * DO has already applied and broadcast.
+ */
+export async function relistRegistryRow(
+  database: D1Database | undefined,
+  listing: RegistryListing,
+): Promise<void> {
+  if (database === undefined) return;
+  try {
+    await database
+      .prepare(relistSql)
+      .bind(
+        listing.listing,
+        listing.title,
+        listing.hostLabel,
+        listing.hasPassword ? 1 : 0,
+        listing.playerCap,
+        listing.spectatorCap,
+        listing.spectatorsAllowed ? 1 : 0,
+        listing.lastSeenAt,
+        listing.code,
+      )
+      .run();
+  } catch (error) {
+    console.warn("registry relist failed (the lobby row may describe the old settings)", error);
   }
 }
 
@@ -92,6 +154,7 @@ export async function deleteRegistryRow(
 // Exported for the drift gate in apps/realtime/test/registry.test.ts.
 export const registryWriterStatements = {
   touch: touchSql,
+  relist: relistSql,
   end: endSql,
   delete: deleteSql,
 } as const;

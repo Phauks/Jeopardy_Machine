@@ -11,6 +11,7 @@
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
@@ -60,26 +61,51 @@
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
+  // The two presentation slots come from the THEME DOCUMENT (`theme.staging`,
+  // `theme.environment` - packages/protocol/src/theme/theme.ts, wired at the 2026-08-16
+  // reconcile). The query strings stay as DEV OVERRIDES and deliberately win, so a preset can
+  // be reviewed against any stage without editing a document; neither ever ships in a link we
+  // print. `environment` resolves through the display's own capability map: a theme naming
+  // scenery whose kit has not shipped still renders on the studio stage.
+  const stagingThemeId = $derived(page.url.searchParams.get("staging") ?? theme.staging ?? null);
+  const environment = $derived(
+    resolveDioramaEnvironment(page.url.searchParams.get("environment") ?? theme.environment),
+  );
 </script>
 
 <svelte:head>
   <title>Display - Room {roomCode}</title>
+  <!-- The display is not only a projector. A host checking the room from their hand must not
+       get a broken page, so this route is responsive down to a phone (display-screen.svelte's
+       compact block) and carries the same viewport meta the player route does. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 </svelte:head>
 
 <svelte:window onpointerdown={primeAudio} />
 
 <div class="display-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <DisplayScreen {store} />
+  <DisplayScreen {store} {stagingThemeId} {environment} />
   {#if !audioReady}
     <p class="audio-hint">Click anywhere to enable room audio on this device</p>
   {/if}
 </div>
 
 <style>
+  /* A projector window is a fixed pane that never scrolls. A phone is not, so the shell drops
+     out of fixed positioning at the same breakpoint the screen inside it goes compact - a
+     fixed, inset-0 shell would trap the page at exactly one viewport height and hide
+     everything below the fold. */
   .display-shell {
     position: fixed;
     inset: 0;
     background: var(--page-bg);
+  }
+
+  @media (max-width: 48rem), (max-height: 26rem) {
+    .display-shell {
+      position: static;
+      min-height: 100dvh;
+    }
   }
 
   .audio-hint {

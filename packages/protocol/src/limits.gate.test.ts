@@ -61,6 +61,27 @@ describe("limits invariants", () => {
     );
   });
 
+  it("keeps the spectator budget independent, bounded, and unable to starve the room", () => {
+    // Two budgets exist so a stream audience cannot crowd out players (docs/decisions/
+    // 2026-08-14-room-controls-and-staging.md); they must therefore be separately ordered...
+    expect(limits.room.spectatorSoftCap).toBeLessThanOrEqual(limits.room.spectatorHardCap);
+    // ...and the whole room must stay inside one Durable Object's comfortable connection
+    // count: every participant of either kind is a live WebSocket on the same instance.
+    expect(limits.room.playerHardCap + limits.room.spectatorHardCap).toBeLessThanOrEqual(512);
+  });
+
+  it("keeps empty-room expiry far shorter than idle expiry, and forgiving of a Wi-Fi blip", () => {
+    // The two alarms answer different questions: idle = "occupied but dormant", empty =
+    // "everyone left". An empty room that outlived a dormant one would make the shorter
+    // deadline meaningless.
+    expect(limits.room.emptyRoomGraceMs).toBeLessThan(limits.room.idleExpiryMs);
+    // Long enough that a whole room losing its Wi-Fi and coming back keeps its game.
+    expect(limits.room.emptyRoomGraceMs).toBeGreaterThanOrEqual(5 * 60 * 1000);
+    // ...and comfortably longer than the leader-succession grace, or a room could close
+    // itself in the middle of deciding who leads a team.
+    expect(limits.room.emptyRoomGraceMs).toBeGreaterThan(limits.team.leaderDisconnectGraceMs);
+  });
+
   it("keeps team capacity able to seat the player hard cap", () => {
     // 20 teams x 5 players is the canonical 100-player shape (user-flows); the team cap must
     // never be the thing that makes a legal player count unseatable (4 players per team floor).

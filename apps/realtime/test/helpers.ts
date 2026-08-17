@@ -10,6 +10,7 @@ import { Bot } from "@jeopardy/bots/bot";
 import type { BotOptions } from "@jeopardy/bots/bot";
 import type { BotSocket } from "@jeopardy/bots/socket";
 import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { RoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import type { GameEvent } from "@jeopardy/engine/events";
 
@@ -34,22 +35,25 @@ export function roomStub(code: string) {
   return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
 }
 
-// `listing` carries the M3.5 creation fields (visibility/title/hostLabel/password -
-// docs/decisions/2026-08-14-room-visibility-and-lobby.md); omitted = the default unlisted,
-// open room every pre-existing test in this suite assumes.
+// `options` carries the room fields beyond the game itself - listing/title/hostLabel/password
+// (docs/decisions/2026-08-14-room-visibility-and-lobby.md) and the room controls
+// (docs/decisions/2026-08-14-room-controls-and-staging.md). Omitted = the default private,
+// open, spectators-welcome room every pre-existing test in this suite assumes.
 export async function initializeRoom(
   code: string,
   game: CreateRoomRequestInput["game"] = compactGame,
   seed = "workerd-suite-seed",
-  listing: Omit<CreateRoomRequestInput, "game" | "seed"> = {},
-): Promise<{ hostToken: string; expiresAt: number }> {
+  options: Omit<CreateRoomRequestInput, "game" | "seed"> = {},
+): Promise<InitializedRoom> {
   const response = await roomStub(code).fetch("https://do/initialize", {
     method: "POST",
-    body: JSON.stringify({ game, seed, ...listing } satisfies CreateRoomRequestInput),
+    body: JSON.stringify({ game, seed, ...options } satisfies CreateRoomRequestInput),
   });
   expect(response.status).toBe(201);
-  return (await response.json()) as { hostToken: string; expiresAt: number };
+  return (await response.json()) as InitializedRoom;
 }
+
+export type InitializedRoom = { hostToken: string; expiresAt: number; settings: RoomSettings };
 
 export async function upgradeToRoom(code: string): Promise<WebSocket> {
   const response = await SELF.fetch(`https://realtime.test/room/${code}/ws`, {

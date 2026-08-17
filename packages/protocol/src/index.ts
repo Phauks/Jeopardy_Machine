@@ -84,11 +84,19 @@ export { themeBackgroundSchema } from "./theme/background.ts";
 export type { ThemeBackground } from "./theme/background.ts";
 export {
   themeBodySchema,
+  themeEnvironmentSchema,
   themePresetIdSchema,
   themeSchema,
   themeSchemaVersion,
+  themeStagingSchema,
 } from "./theme/theme.ts";
-export type { Theme, ThemeBody, ThemePresetId } from "./theme/theme.ts";
+export type {
+  Theme,
+  ThemeBody,
+  ThemeEnvironment,
+  ThemePresetId,
+  ThemeStaging,
+} from "./theme/theme.ts";
 
 // jeopardy mode layer
 export { cellSchema } from "./modes/jeopardy/cells.ts";

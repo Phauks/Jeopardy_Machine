@@ -14,14 +14,14 @@
 // most a couple of hours, so persisting either would be storing a credential for a thing that
 // will not exist by the time anyone reads it.
 import type { LobbyListing, RegistryStatus } from "@jeopardy/protocol/room/registry";
-import type { RoomVisibility } from "@jeopardy/protocol/room/visibility";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 
 export type SessionRoom = {
   code: string;
-  title: string;
-  hostLabel: string;
-  visibility: RoomVisibility;
-  hasPassword: boolean;
+  // The room's live settings as this tab last saw them: the create echo, then whatever a
+  // settings edit answered with. Title, listing and the entry axis all live here rather than
+  // as loose fields, so a row can never show a listing the server has already changed.
+  settings: RoomSettings;
   // The creation token: the harness's proof for joining as host, inspecting, and closing.
   hostToken: string;
   // What this tab set as the room password, so join is one click rather than a retype.
@@ -43,6 +43,28 @@ export function rememberSessionRoom(rooms: SessionRoom[], room: SessionRoom): Se
   return [room, ...rooms.filter((existing) => existing.code !== room.code)].slice(
     0,
     sessionRoomsMax,
+  );
+}
+
+/**
+ * A settings edit landed: the row adopts the SERVER's answer, never what was typed into the
+ * form - a cap the room refused to lower must not appear to have moved. `password` is this
+ * tab's own copy of the shared secret (empty string = the room is open now), kept only so the
+ * join field stays one click rather than a retype.
+ */
+export function updateSessionRoomSettings(
+  rooms: SessionRoom[],
+  code: string,
+  change: { settings: RoomSettings; password?: string },
+): SessionRoom[] {
+  return rooms.map((room) =>
+    room.code === code
+      ? {
+          ...room,
+          settings: change.settings,
+          password: change.password ?? room.password,
+        }
+      : room,
   );
 }
 
@@ -76,7 +98,7 @@ export function formatCountdown(msRemaining: number): string {
 // the list" has several causes and only one of them is a bug.
 export type LobbyPresence =
   | "closed" // this tab closed the room; absence is correct
-  | "unlisted-by-design" // an unlisted room has no registry row, ever
+  | "private-by-design" // a private room is never listed, however healthy the registry
   | "registry-down" // the lobby cannot answer, so absence proves nothing
   | "unknown" // no listing fetched yet
   | "listed" // found in the lobby, as it should be
@@ -84,7 +106,7 @@ export type LobbyPresence =
 
 export function lobbyPresence(room: SessionRoom, listing: LobbyListing | null): LobbyPresence {
   if (room.closedAt !== null) return "closed";
-  if (room.visibility === "unlisted") return "unlisted-by-design";
+  if (room.settings.listing === "private") return "private-by-design";
   // A create whose registry write failed is already known-missing; no listing can absolve it.
   if (room.registry.status !== "ok") return "registry-down";
   if (listing === null) return "unknown";
@@ -96,7 +118,7 @@ export function lobbyPresence(room: SessionRoom, listing: LobbyListing | null): 
 export function describeLobbyPresence(presence: LobbyPresence): string {
   if (presence === "listed") return "in lobby";
   if (presence === "missing") return "NOT in lobby";
-  if (presence === "unlisted-by-design") return "unlisted (no row by design)";
+  if (presence === "private-by-design") return "private (never listed)";
   if (presence === "registry-down") return "registry unavailable";
   if (presence === "closed") return "closed";
   return "lobby not checked";

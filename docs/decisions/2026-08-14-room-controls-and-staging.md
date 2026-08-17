@@ -1,0 +1,62 @@
+# 2026-08-14 - Room controls, streaming, and the staged lobby
+
+## Owner batch (verbatim intent)
+
+Listing values should read **public / private**. Wants: a Run-all button in the harness test area, modular panel layout, rooms that disappear when empty, streaming support (hide the join code), a maximum-participants setting that distinguishes players from spectators, a spectators-allowed toggle, the ability to change the password after creation, "special management tools once a room is created", a **staged lobby** (first theme: boats - players start in the water and board their team's boat when they pick a team, modular because it will not always be boats, and colour is the common retheme), a display screen that works on mobile, and the pre-game flow built end to end: **landing -> lobby selector -> character selector -> team joining**. No gameplay needed yet.
+
+## Answers to the two questions
+
+**"Listing is public or private."** Adopted - the axis values become `public` / `private`. `unlisted` was accurate jargon and bad vocabulary; a host choosing between "public" and "private" needs no explanation. The entry axis (`open` / `password`) is unchanged, and all four combinations still exist: a **private** room can still carry a password, and a **public** room can be open or locked.
+
+**"What is the difference between title and host label?"** Title = what the _game_ is called ("Environment vs Gaming Trivia Night"). Host label = who is running it ("Board Game Club"). In a server browser the pair reads as one line - _Environment vs Gaming Trivia Night - hosted by Board Game Club_ - and they answer different questions for someone scanning the lobby: what am I playing, and do I know these people. Both stay, with the host label optional (empty = no byline) and the UI labelling them in those words rather than as schema names.
+
+## Room settings (all live on the room, editable after creation)
+
+| Setting             | Values                       | Notes                                                                                                                                                                                                                                                                               |
+| ------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `listing`           | public / private             | renamed axis; private rooms never appear in the lobby                                                                                                                                                                                                                               |
+| `entry`             | open / password              | password changeable at any time; changing it never disconnects anyone already in                                                                                                                                                                                                    |
+| `maxPlayers`        | int, capped by `limits.room` | **counts players only**                                                                                                                                                                                                                                                             |
+| `maxSpectators`     | int, capped separately       | independent budget, so a stream audience cannot crowd out players                                                                                                                                                                                                                   |
+| `spectatorsAllowed` | on / off                     | off = spectator joins refused with a clear reason                                                                                                                                                                                                                                   |
+| `hideJoinCode`      | on / off                     | **streamer mode**: the display and any shared surface stop rendering the code and QR (with a "code hidden" affordance the host can reveal on demand). The code still exists and still works - this is about not broadcasting it to a stream where anyone can read it off the screen |
+| `emptyRoomGraceMs`  | duration                     | how long a room with **zero connected participants** survives before it closes itself                                                                                                                                                                                               |
+
+**Empty-room expiry is separate from idle expiry.** Idle expiry (2 h, existing) protects against rooms that are occupied but dormant. Empty expiry answers "everyone left" and should be much shorter (default 15 min - long enough for the whole room to lose Wi-Fi and come back, short enough that abandoned rooms stop squatting on codes and lobby slots). Both are alarms; whichever fires first closes the room and marks the registry row ended.
+
+## Management tools ("once a room is created")
+
+The host console gains a **Room settings** panel (and the harness gets the same controls, since it is the developer's console): change listing, entry/password, caps, spectators, streamer mode; view and rotate the join code; see the live participant census split players/spectators; close the room. Every change broadcasts to connected clients so displays update immediately (a code that just became hidden must vanish from the projector at once).
+
+> **Wired to the surfaces 2026-08-16 (the reconcile).** The room layer shipped these settings, their two doors and their broadcast on 2026-08-14; the reconcile made the SURFACES respect them. `RoomView` carries the room's settings verbatim and the room's last refusal, so:
+>
+> - **`hideJoinCode` reaches the display.** The title screen's code, QR and join URL (which contains the code) are a template BRANCH, not a CSS rule - in streamer mode the code is not in the markup at all, which is the only version of the promise that survives a screenshot or a paused stream. In its place is a deliberate "Join code hidden - ask the host for the code" panel occupying the QR's footprint, so a streamed room does not look like a broken display. Mirror mode inherits it, because it renders the same component. Reveal is deliberately NOT on the display (a button on the streamed screen defeats the setting): it belongs to the console's room-settings panel, which `/dev/rooms` already drives against real rooms and which is the next surface pass.
+> - **The boundary is "shared surface", stated deliberately.** The display and anything rendering it (mirror mode) hide the code; the staged lobby never showed one; the phone's own "Room BQKX7" line stays, because a personal device in one player's hand is not what streamer mode is about, and the code is in that phone's URL bar anyway. Hiding it there would cost a player the ability to tell which room they are in and protect nothing.
+> - **The caps reach the join path.** A room at `maxPlayers`, or one whose host allows no spectators, refuses in human copy before a character is chosen - `room-refusal.ts` is the one place the protocol's refusal reasons become English, exhaustively, so a new reason fails to compile rather than reaching a player as `spectators-not-allowed`. The two spectator refusals keep their separate sentences, which is why they are separate reasons.
+> - **The spectator budget reaches the lobby card**, via the registry columns the same reconcile added (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
+
+## The staged lobby - "you are somewhere, with your team"
+
+The lobby stops being a list and becomes a **place**. First theme: **boats**.
+
+- Unassigned players are **in the water** (drifting, visibly unattached).
+- Choosing a team **puts you on that team's boat** - the boat is the team, its colour is the team colour, its nameplate is the team name.
+- Team changes are visible: you swim over, you climb aboard.
+
+**Modularity is the requirement, not the boats.** The abstraction is a **staging environment** with two slot kinds - a _holding area_ (water) and _team stations_ (boats) - plus per-station colour. A staging theme supplies: the holding-area visual, the station model/visual, how a participant is placed on a station (seat offsets), and the transition. Boats is the first implementation; campfires, tables, islands, spaceships are later ones, and **recolour is the cheap variant** every theme must support. The theme document's reserved `environment` slot names the staging theme; `none` keeps the plain 2D lobby.
+
+This builds on the diorama already shipped (display-only three.js, code-split, reduced-motion aware) - staging is the diorama gaining slots and a placement rule, not a new system.
+
+## Build order (owner-directed)
+
+1. **Landing screen** - the real front door (not the dev index): what this is, join by code, browse the lobby.
+2. **Lobby selector** - the public room browser as a place worth looking at, with the private/password affordances.
+3. **Character selector** - avatar + accent + name, with the animated walk sheets doing the work.
+4. **Team joining** - team cards, leader controls, and the staged boats view reflecting membership live.
+
+Gameplay is explicitly out of scope for this pass: everything up to the first clue.
+
+## Also in scope
+
+- **Display on mobile**: the display route currently assumes a projector. It must degrade gracefully on a phone (a host checking the room from their hand, or a small-screen spectator) - fluid type scale, no fixed pixel layouts, scrollable scores.
+- **Harness**: Run-all button in the test area (sequential, with a summary line), and the panels become modular components so the layout can be rearranged without touching probe logic.

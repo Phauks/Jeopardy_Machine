@@ -108,6 +108,54 @@ export function judgeProbe(id: ProbeId, observed: ProbeObservation): ProbeVerdic
   return observed.type === "error" && observed.reason === "malformed" ? "pass" : "fail";
 }
 
+// ---- running the whole set (the Run all button) ---------------------------------------------
+//
+// "Run all" is the button the owner asked for, and it needs two pure decisions the panel can
+// be tested without a browser for: which probes CAN run right now, and what the summary line
+// says afterwards. Both live here so the panel is wiring rather than logic.
+
+/** What the harness is in the middle of when Run all is pressed. */
+export type ProbeContext = {
+  socketOpen: boolean;
+  /** The role this tab joined as, or null when the socket is open but unjoined. */
+  joinedRole: string | null;
+  /** A room THIS TAB created that carries a password (the wrong-password probe needs one). */
+  hasPasswordRoom: boolean;
+};
+
+/**
+ * Why a probe cannot run right now, or null when it can. A skip is not a failure: a suite that
+ * reported FAIL for "the socket is not open" would train its reader to ignore red.
+ */
+export function probeBlocker(id: ProbeId, context: ProbeContext): string | null {
+  const definition = refusalProbes.find((probe) => probe.id === id);
+  if (definition === undefined) return "unknown probe";
+  if (definition.needsConnection && !context.socketOpen) return "needs an open socket";
+  if (id === "wrong-password" && !context.hasPasswordRoom) {
+    return "needs a password room this tab created";
+  }
+  if (id === "rate-limit-burst") {
+    if (context.joinedRole === null) return "needs a joined connection";
+    // The host is exempt from the message-rate cap by design (it authenticated with the
+    // creation token and legitimately bursts), so running this as host would assert a
+    // guardrail that deliberately does not exist.
+    if (context.joinedRole === "host") return "the host is exempt from the rate cap by design";
+  }
+  return null;
+}
+
+export type ProbeRunOutcome = { id: ProbeId; verdict: ProbeVerdict | "skip" };
+
+/** The summary line under Run all: what passed, what failed, what never ran and why not. */
+export function summarizeProbeRun(outcomes: ProbeRunOutcome[]): string {
+  const passed = outcomes.filter((outcome) => outcome.verdict === "pass").length;
+  const failed = outcomes.filter((outcome) => outcome.verdict === "fail").length;
+  const skipped = outcomes.filter((outcome) => outcome.verdict === "skip").length;
+  const parts = [`${String(passed)} passed`, `${String(failed)} failed`];
+  if (skipped > 0) parts.push(`${String(skipped)} skipped`);
+  return `${parts.join(" / ")} of ${String(outcomes.length)} probes`;
+}
+
 /** Human summary of what came back, for the expected-vs-actual line next to the chip. */
 export function describeObservation(observed: ProbeObservation): string {
   if (observed.type !== undefined) {

@@ -19,6 +19,16 @@
   function clock(at: number): string {
     return new Date(at).toLocaleTimeString();
   }
+
+  // One string rather than interleaved markup: the two budgets read as one sentence, and a
+  // template line break can never split "spectators" from the number it belongs to.
+  function participants(census: RoomInspection["room"]["participants"]): string {
+    const players = `players ${String(census.players.connected)}/${String(census.players.max)} (${String(census.players.seated)} seated)`;
+    const spectators = census.spectators.allowed
+      ? `spectators ${String(census.spectators.connected)}/${String(census.spectators.max)}`
+      : "spectators off";
+    return `${players} · ${spectators}`;
+  }
 </script>
 
 <div class="flex flex-col gap-2 text-sm">
@@ -36,7 +46,11 @@
       <dt class="opacity-70">room</dt>
       <dd><strong>{room.code}</strong> · {room.lifecycle}{room.paused ? " · PAUSED" : ""}</dd>
       <dt class="opacity-70">listing</dt>
-      <dd>{room.visibility}{room.hasPassword ? " · password" : " · open"}</dd>
+      <dd>
+        {room.settings.listing} · {room.settings.entry}{room.settings.hideJoinCode
+          ? " · join code hidden"
+          : ""}
+      </dd>
       <dt class="opacity-70">state version</dt>
       <dd>{room.stateVersion}</dd>
       <dt class="opacity-70">created</dt>
@@ -55,6 +69,8 @@
       <dd>
         {room.roster.players} seated ({room.roster.connected} connected) · {room.roster.teams} teams
       </dd>
+      <dt class="opacity-70">participants</dt>
+      <dd>{participants(room.participants)}</dd>
       <dt class="opacity-70">next alarm</dt>
       <dd>
         {room.alarm.nextWakeAt === null

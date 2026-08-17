@@ -13,6 +13,7 @@ import {
   deleteRegistryRow,
   endRegistryRow,
   registryWriterStatements,
+  relistRegistryRow,
   touchRegistryRow,
 } from "../src/room/registry-writer.ts";
 import {
@@ -31,10 +32,15 @@ import type { GameRoomDO } from "../src/index.ts";
 type RoomRow = {
   code: string;
   title: string;
-  visibility: string;
+  host_label: string;
+  listing: string;
   has_password: number;
   phase: string;
   player_count: number;
+  player_cap: number;
+  spectator_count: number;
+  spectator_cap: number;
+  spectators_allowed: number;
   expires_at: number;
   ended_at: number | null;
 };
@@ -42,18 +48,20 @@ type RoomRow = {
 // Stands in for the web Worker's create route, which is what really inserts the row (this
 // Worker only ever updates one). Keeping the insert here in test-land is the honest shape:
 // the DO must never conjure a row for a room the registry never heard of.
-async function seedRow(code: string, options: { visibility?: string; hasPassword?: boolean } = {}) {
+async function seedRow(code: string, options: { listing?: string; hasPassword?: boolean } = {}) {
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO rooms (code, title, host_label, visibility, has_password, phase, player_count,
-       player_cap, created_at, last_seen_at, expires_at, ended_at)
-     VALUES (?, 'Registry suite', 'Suite', ?, ?, 'lobby', 0, ?, ?, ?, ?, NULL)`,
+    `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+       player_cap, spectator_count, spectator_cap, spectators_allowed,
+       created_at, last_seen_at, expires_at, ended_at)
+     VALUES (?, 'Registry suite', 'Suite', ?, ?, 'lobby', 0, ?, 0, ?, 1, ?, ?, ?, NULL)`,
   )
     .bind(
       code,
-      options.visibility ?? "public",
+      options.listing ?? "public",
       options.hasPassword === true ? 1 : 0,
       limits.room.playerSoftCap,
+      limits.room.spectatorSoftCap,
       now,
       now,
       now + limits.room.idleExpiryMs,
@@ -73,14 +81,51 @@ describe("the DO's registry statements against the real schema", () => {
       code,
       phase: "active",
       playerCount: 7,
+      spectatorCount: 2,
       lastSeenAt: 1_760_000_000_000,
       expiresAt: 1_760_007_200_000,
     });
     const row = await readRow(code);
-    expect(row).toMatchObject({ phase: "active", player_count: 7, expires_at: 1_760_007_200_000 });
-    // Listing facts belong to the create route; a live room must never rewrite them.
+    expect(row).toMatchObject({
+      phase: "active",
+      player_count: 7,
+      // The audience is as perishable as the roster: a touch carries both counts or the
+      // lobby's spectator line ages while its player fraction does not.
+      spectator_count: 2,
+      expires_at: 1_760_007_200_000,
+    });
+    // Listing facts belong to the create route and the SETTINGS write; an ordinary touch (a
+    // roster count, a phase change) must never rewrite them.
     expect(row?.title).toBe("Registry suite");
-    expect(row?.visibility).toBe("public");
+    expect(row?.listing).toBe("public");
+  });
+
+  it("relists a room whose host changed its settings - listing, text, lock and cap", async () => {
+    const code = uniqueCode();
+    await seedRow(code);
+    await relistRegistryRow(env.DB, {
+      code,
+      listing: "private",
+      title: "Renamed room",
+      hostLabel: "New byline",
+      hasPassword: true,
+      playerCap: 12,
+      spectatorCap: 30,
+      spectatorsAllowed: false,
+      lastSeenAt: 1_760_000_000_000,
+    });
+    const row = await readRow(code);
+    expect(row).toMatchObject({
+      listing: "private",
+      title: "Renamed room",
+      host_label: "New byline",
+      has_password: 1,
+      player_cap: 12,
+      spectator_cap: 30,
+      spectators_allowed: 0,
+    });
+    // A relist is not a lifecycle write: the phase and the roster count belong to `touch`.
+    expect(row?.phase).toBe("lobby");
   });
 
   it("never conjures a row for a room the registry never heard of", async () => {
@@ -89,6 +134,7 @@ describe("the DO's registry statements against the real schema", () => {
       code,
       phase: "lobby",
       playerCount: 1,
+      spectatorCount: 0,
       lastSeenAt: Date.now(),
       expiresAt: Date.now() + 1000,
     });
@@ -114,6 +160,7 @@ describe("the DO's registry statements against the real schema", () => {
         code: "XXXXX",
         phase: "lobby",
         playerCount: 0,
+        spectatorCount: 0,
         lastSeenAt: 1,
         expiresAt: 2,
       }),
@@ -146,6 +193,55 @@ describe("a live room reporting itself", () => {
     const row = await readRow(code);
     expect(row?.player_count).toBe(1);
     expect(row?.phase).toBe("lobby");
+  });
+
+  it("reports its audience separately from its roster, as spectators arrive", async () => {
+    const code = uniqueCode();
+    await seedRow(code);
+    const { hostToken } = await initializeRoom(code);
+    const host = await connectHost(code, hostToken);
+    await connectBot(code, instantBot("Onstage"));
+    await host.waitFor("roster", (message) => message.roster.players.length === 1);
+
+    const spectator = new TestClient(await upgradeToRoom(code));
+    spectator.send({ type: "join", role: "spectator" });
+    await spectator.waitFor("welcome");
+    // Force past the coalescing window: the assertion is about WHAT is reported, and the
+    // 5s floor on roster churn is tested by the write policy, not here.
+    await runInDurableObject(roomStub(code), async (instance: GameRoomDO) => {
+      await (
+        instance as unknown as { syncRegistry: (options: { force: boolean }) => Promise<void> }
+      ).syncRegistry({ force: true });
+    });
+    const row = await readRow(code);
+    // One player, one spectator, two budgets: the audience must never show up in the number
+    // the lobby renders as "7/24 players".
+    expect(row?.player_count).toBe(1);
+    expect(row?.spectator_count).toBe(1);
+  });
+
+  // Seam check (2026-08-16 reconcile): the lobby's denominator is the ROOM's own
+  // settings.maxPlayers end to end - the create route writes it, a host edit moves it, and
+  // apps/web/src/lib/lobby/room-capacity.ts renders the fraction against it.
+  it("keeps the row's caps equal to the room's own settings when the host retunes them", async () => {
+    const code = uniqueCode();
+    await seedRow(code);
+    const { hostToken, settings } = await initializeRoom(code, undefined, "cap-seam", {
+      maxPlayers: 9,
+      maxSpectators: 40,
+    });
+    expect(settings.maxPlayers).toBe(9);
+    const host = await connectHost(code, hostToken);
+
+    host.send({
+      type: "update-room-settings",
+      settings: { maxPlayers: 12, maxSpectators: 30, spectatorsAllowed: false },
+    });
+    await host.waitFor("room-settings", (message) => message.settings.maxPlayers === 12);
+    const row = await readRow(code);
+    expect(row).toMatchObject({ player_cap: 12, spectator_cap: 30, spectators_allowed: 0 });
+    // Never the product limit: "12" is the door this host set, not the ceiling it sits under.
+    expect(row?.player_cap).not.toBe(limits.room.playerSoftCap);
   });
 
   it("reports the phase change when the game starts (what the lobby badge reads)", async () => {

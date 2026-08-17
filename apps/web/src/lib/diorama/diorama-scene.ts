@@ -26,7 +26,11 @@ import {
   startBeat,
   stepAgent,
 } from "#lib/diorama/wander.ts";
+import { placeStaging, stationAnchors } from "#lib/staging/staging-layout.ts";
+import { holdingBobOffset, stepStagedAgent } from "#lib/staging/staging-motion.ts";
 import type { RandomSource, WanderAgent, WanderMode } from "#lib/diorama/wander.ts";
+import type { StagedTarget, StagingStation } from "#lib/staging/staging-layout.ts";
+import type { StagingColorRole, StagingPart, StagingTheme } from "#lib/staging/staging-theme.ts";
 
 /** One occupant of the diorama, as the display describes it. */
 export type DioramaOccupant = {
@@ -60,12 +64,36 @@ const beatSeconds = 2.2;
 /** Crossfade between clips - short enough to read as a reaction, long enough not to pop. */
 const clipFadeSeconds = 0.25;
 
+/**
+ * The staged lobby, as the display describes it: a theme, the stations that exist right now
+ * with who is aboard each, and everyone who has not chosen yet. Passing `null` to setStaging
+ * returns the scene to free wandering (the interstitial and winner screens).
+ */
+export type StagingConfig = {
+  theme: StagingTheme;
+  stations: readonly StagingStation[];
+  /** Entity ids in the holding area, in join order - the order pins them to their spots. */
+  waitingEntityIds: readonly string[];
+};
+
 type Instance = {
   agent: WanderAgent;
   root: THREE.Object3D;
   mixer: THREE.AnimationMixer;
   actions: Record<WanderMode, THREE.AnimationAction | null>;
   current: WanderMode | null;
+};
+
+/** One built station, kept so a colour change is a material write and never a rebuild. */
+type StationVisual = {
+  group: THREE.Group;
+  /** Meshes whose colour comes from the TEAM, with the role that decides the shade. */
+  teamMeshes: { mesh: THREE.Mesh; role: StagingColorRole }[];
+  /** Meshes whose colour comes from the room theme instead. */
+  themeMeshes: { mesh: THREE.Mesh; role: StagingColorRole }[];
+  nameplate: THREE.Sprite | null;
+  colorHex: string;
+  label: string;
 };
 
 /** A loaded model, kept once per avatar id and cloned per instance. */
@@ -110,6 +138,49 @@ function cloneWithColormap(
   return root;
 }
 
+/** The staging vocabulary's three primitives, made real. The ONLY place they become three. */
+function geometryFor(shape: StagingPart["shape"]): THREE.BufferGeometry {
+  switch (shape.kind) {
+    case "box":
+      return new THREE.BoxGeometry(shape.width, shape.height, shape.depth);
+    case "cylinder":
+      return new THREE.CylinderGeometry(
+        shape.radiusTop,
+        shape.radiusBottom,
+        shape.height,
+        shape.segments,
+      );
+    case "plane":
+      return new THREE.PlaneGeometry(shape.width, shape.depth);
+  }
+}
+
+function isTeamRole(role: StagingColorRole): boolean {
+  return role === "team" || role === "team-shade" || role === "team-light";
+}
+
+/**
+ * Give a subtree's GPU resources back. three frees none of this on its own, and the staged
+ * lobby rebuilds stations as teams come and go - a leak here is a projector slowing down over
+ * an evening rather than crashing, which is the worst kind to find.
+ */
+function disposeSubtree(root: THREE.Object3D): void {
+  root.traverse((object) => {
+    if (object instanceof THREE.Sprite) {
+      object.material.map?.dispose();
+      object.material.dispose();
+      return;
+    }
+    if (!(object instanceof THREE.Mesh)) return;
+    object.geometry.dispose();
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) {
+      (material as THREE.MeshStandardMaterial).map?.dispose();
+      material.dispose();
+    }
+  });
+}
+
 export class DioramaScene {
   readonly #renderer: THREE.WebGLRenderer;
   readonly #scene: THREE.Scene;
@@ -136,10 +207,19 @@ export class DioramaScene {
   #bounds = boundsForAspect(16 / 9);
   /** Occupants requested while their model was still loading - applied when it arrives. */
   #pendingOccupants: DioramaOccupant[] = [];
+  /** Null = free wandering (the old behaviour); set = the staged lobby. */
+  #staging: StagingConfig | null = null;
+  #stationVisuals = new Map<string, StationVisual>();
+  #holdingMesh: THREE.Mesh | null = null;
+  /** entityId -> where they belong right now. Recomputed on staging changes and resizes. */
+  #targets = new Map<string, StagedTarget>();
+  /** Kept so a station built after the last setPalette still gets the theme's colours. */
+  #palette: DioramaPalette;
 
   constructor(options: DioramaOptions) {
     this.#random = seededRandom(options.seed);
     this.#reducedMotion = options.reducedMotion;
+    this.#palette = options.palette;
 
     this.#renderer = new THREE.WebGLRenderer({
       canvas: options.canvas,
@@ -201,9 +281,18 @@ export class DioramaScene {
    * the whole crowd.
    */
   setPalette(palette: DioramaPalette): void {
+    this.#palette = palette;
     this.#scene.fog?.color.set(palette.backdrop);
     (this.#ground?.material as THREE.MeshLambertMaterial | undefined)?.color.set(palette.ground);
     this.#rim?.color.set(palette.accent);
+    (this.#holdingMesh?.material as THREE.MeshLambertMaterial | undefined)?.color.set(
+      palette.holding,
+    );
+    // Stations restyle in place: the theme-role meshes take the new tokens, the team-role ones
+    // keep their team's colour, and no geometry is rebuilt.
+    for (const visual of this.#stationVisuals.values()) {
+      this.#paintStation(visual, visual.colorHex);
+    }
   }
 
   /** Match the drawing buffer to the element's box. Called from a ResizeObserver. */
@@ -220,6 +309,196 @@ export class DioramaScene {
     for (const instance of this.#instances.values()) {
       instance.agent = clampToBounds(instance.agent, this.#bounds);
     }
+    // A staged stage does have to re-place: the boats move with the pen, so their crews walk
+    // to wherever the boats ended up rather than standing in open water.
+    if (this.#staging !== null) this.#applyStaging(this.#staging);
+  }
+
+  // --- the staged lobby -------------------------------------------------------------------
+
+  /**
+   * Switch the scene between free wandering and the staged lobby, or restate the staging when
+   * a team is created, renamed, recoloured, or joined.
+   *
+   * Reconciles rather than rebuilds. A station that is already on stage keeps its meshes and
+   * its spot; only its colour and nameplate are written, and only when they changed. That is
+   * what makes recolour the cheap variant in practice and not just in the type.
+   */
+  setStaging(config: StagingConfig | null): void {
+    if (this.#disposed) return;
+    if (config === null) {
+      this.#teardownStaging();
+      this.#staging = null;
+      return;
+    }
+    // A theme swap is the one case that must rebuild: the geometry description changed.
+    if (this.#staging !== null && this.#staging.theme.id !== config.theme.id) {
+      this.#teardownStaging();
+    }
+    this.#staging = config;
+    this.#applyStaging(config);
+  }
+
+  #applyStaging(config: StagingConfig): void {
+    this.#ensureHoldingSurface(config.theme);
+    const anchors = stationAnchors(config.stations, config.theme, this.#bounds);
+    const wanted = new Set(config.stations.map((station) => station.stationId));
+    for (const [stationId, visual] of this.#stationVisuals) {
+      if (wanted.has(stationId)) continue;
+      this.#scene.remove(visual.group);
+      disposeSubtree(visual.group);
+      this.#stationVisuals.delete(stationId);
+    }
+    for (const [index, station] of config.stations.entries()) {
+      const anchor = anchors[index];
+      if (anchor === undefined) continue;
+      let visual = this.#stationVisuals.get(station.stationId);
+      if (visual === undefined) {
+        visual = this.#buildStation(config.theme, station);
+        this.#stationVisuals.set(station.stationId, visual);
+        this.#scene.add(visual.group);
+      }
+      visual.group.position.set(anchor.x, 0, anchor.z);
+      visual.group.rotation.y = anchor.heading;
+      if (visual.colorHex !== station.colorHex) this.#paintStation(visual, station.colorHex);
+      if (visual.label !== station.label) this.#writeNameplate(config.theme, visual, station.label);
+    }
+
+    this.#targets = new Map(
+      placeStaging(
+        config.stations,
+        config.waitingEntityIds,
+        config.theme,
+        this.#bounds,
+        this.#random,
+      ).map((target) => [target.entityId, target]),
+    );
+  }
+
+  #ensureHoldingSurface(theme: StagingTheme): void {
+    const surface = theme.holdingSurface;
+    if (surface === null) {
+      if (this.#holdingMesh !== null) {
+        this.#scene.remove(this.#holdingMesh);
+        disposeSubtree(this.#holdingMesh);
+        this.#holdingMesh = null;
+      }
+      return;
+    }
+    if (this.#holdingMesh !== null) return;
+    const mesh = new THREE.Mesh(
+      geometryFor(surface.shape),
+      new THREE.MeshLambertMaterial({
+        color: this.#palette.holding,
+        transparent: surface.opacity < 1,
+        opacity: surface.opacity,
+      }),
+    );
+    // Themes author their surface as a plane in XY; the stage floor is XZ.
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.y = surface.y;
+    this.#holdingMesh = mesh;
+    this.#scene.add(mesh);
+  }
+
+  #buildStation(theme: StagingTheme, station: StagingStation): StationVisual {
+    const group = new THREE.Group();
+    const visual: StationVisual = {
+      group,
+      teamMeshes: [],
+      themeMeshes: [],
+      nameplate: null,
+      colorHex: "",
+      label: "",
+    };
+    for (const part of theme.stationParts) {
+      const mesh = new THREE.Mesh(geometryFor(part.shape), new THREE.MeshLambertMaterial());
+      mesh.position.set(...part.position);
+      if (part.rotation !== undefined) mesh.rotation.set(...part.rotation);
+      // A plane authored flat needs the same XY-to-XZ turn the holding surface takes, unless
+      // the theme already rotated it deliberately (a sail is a plane standing up).
+      if (part.shape.kind === "plane" && part.rotation === undefined) {
+        mesh.rotation.x = -Math.PI / 2;
+      }
+      group.add(mesh);
+      const bucket = isTeamRole(part.color) ? visual.teamMeshes : visual.themeMeshes;
+      bucket.push({ mesh, role: part.color });
+    }
+    this.#paintStation(visual, station.colorHex);
+    this.#writeNameplate(theme, visual, station.label);
+    return visual;
+  }
+
+  /** THE RECOLOUR. Two material writes per mesh, no geometry, no reload. */
+  #paintStation(visual: StationVisual, colorHex: string): void {
+    visual.colorHex = colorHex;
+    const team = new THREE.Color(colorHex);
+    for (const { mesh, role } of visual.teamMeshes) {
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      const color = team.clone();
+      // Shade and light are derived, never authored: a theme names WHICH parts step darker or
+      // lighter, and one team colour produces the whole station's palette.
+      if (role === "team-shade") color.multiplyScalar(0.62);
+      if (role === "team-light") color.lerp(new THREE.Color(0xffffff), 0.42);
+      material.color.copy(color);
+    }
+    for (const { mesh, role } of visual.themeMeshes) {
+      const material = mesh.material as THREE.MeshLambertMaterial;
+      material.color.set(role === "accent" ? this.#palette.accent : this.#palette.structure);
+    }
+  }
+
+  /**
+   * The team's name, floating over its station. A canvas texture on a sprite: it always faces
+   * the camera without a billboard shader, it costs one texture per team, and it is redrawn
+   * only when the name actually changes (a rename in the lobby, not every frame).
+   */
+  #writeNameplate(theme: StagingTheme, visual: StationVisual, label: string): void {
+    visual.label = label;
+    const canvas = document.createElement("canvas");
+    canvas.width = 512;
+    canvas.height = 128;
+    const context = canvas.getContext("2d");
+    if (context === null) return;
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    context.font = `600 76px ${this.#palette.nameplateFont}`;
+    context.textAlign = "center";
+    context.textBaseline = "middle";
+    // A dark halo under the text so a nameplate stays readable over a light hull as well as a
+    // dark sky - the same job --effect-category-text-shadow does in the 2D chrome.
+    context.lineWidth = 10;
+    context.strokeStyle = "rgba(0,0,0,0.55)";
+    context.strokeText(label, canvas.width / 2, canvas.height / 2, canvas.width - 24);
+    context.fillStyle = this.#palette.nameplateColor;
+    context.fillText(label, canvas.width / 2, canvas.height / 2, canvas.width - 24);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    if (visual.nameplate === null) {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true }));
+      sprite.position.set(...theme.nameplateOffset);
+      sprite.scale.set(1.6, 0.4, 1);
+      visual.nameplate = sprite;
+      visual.group.add(sprite);
+    }
+    const material = visual.nameplate.material;
+    material.map?.dispose();
+    material.map = texture;
+    material.needsUpdate = true;
+  }
+
+  #teardownStaging(): void {
+    for (const visual of this.#stationVisuals.values()) {
+      this.#scene.remove(visual.group);
+      disposeSubtree(visual.group);
+    }
+    this.#stationVisuals.clear();
+    if (this.#holdingMesh !== null) {
+      this.#scene.remove(this.#holdingMesh);
+      disposeSubtree(this.#holdingMesh);
+      this.#holdingMesh = null;
+    }
+    this.#targets.clear();
   }
 
   setReducedMotion(reducedMotion: boolean): void {
@@ -282,8 +561,15 @@ export class DioramaScene {
     const root = cloneWithColormap(model.scene, colormap);
     // Arrivals take the next free slot on the fixed spawn grid, so a join never disturbs
     // anyone already on stage and no two arrivals land on the same spot.
-    const placed = spawnAgent(occupant.entityId, this.#nextSlotIndex, this.#bounds, this.#random);
+    let placed = spawnAgent(occupant.entityId, this.#nextSlotIndex, this.#bounds, this.#random);
     this.#nextSlotIndex += 1;
+    // In the staged lobby an arrival appears WHERE THEY BELONG - in the water, normally - and
+    // the first move the room sees them make is the one they choose. Walking on from a wander
+    // slot would spend that moment on a journey nobody asked for.
+    const target = this.#targets.get(occupant.entityId);
+    if (target !== undefined) {
+      placed = { ...placed, x: target.x, z: target.z, heading: target.heading, mode: "idle" };
+    }
     const mixer = new THREE.AnimationMixer(root);
     const actionFor = (clipName: string): THREE.AnimationAction | null => {
       const clip = model.animations.find((candidate) => candidate.name === clipName);
@@ -423,9 +709,23 @@ export class DioramaScene {
     const delta = Math.min(0.1, this.#clock.getDelta());
     const now = this.#clock.getElapsedTime();
     const options = { frozen: this.#reducedMotion, celebratingEntityIds: this.#celebrating };
-    for (const instance of this.#instances.values()) {
-      instance.agent = stepAgent(instance.agent, delta, now, this.#bounds, this.#random, options);
-      instance.root.position.set(instance.agent.x, 0, instance.agent.z);
+    const staged = this.#staging;
+    for (const [entityId, instance] of this.#instances) {
+      // Two movement brains, one body. In staged mode an occupant walks to the spot the layout
+      // gave them; otherwise they wander. Both produce the same agent shape, so everything
+      // below this line - position, facing, clip crossfade - is written once.
+      const target = staged === null ? undefined : this.#targets.get(entityId);
+      let bob = 0;
+      if (target === undefined) {
+        instance.agent = stepAgent(instance.agent, delta, now, this.#bounds, this.#random, options);
+      } else {
+        instance.agent = stepStagedAgent(instance.agent, target, delta, { ...options, now });
+        // Only people waiting in the water tread it; anyone aboard stands on a deck.
+        if (target.stationId === null && staged?.theme.holdingMotion === "bob") {
+          bob = holdingBobOffset(entityId, now, this.#reducedMotion);
+        }
+      }
+      instance.root.position.set(instance.agent.x, bob, instance.agent.z);
       instance.root.rotation.y = instance.agent.heading;
       this.#playMode(instance, instance.agent.mode);
       instance.mixer.update(delta);
@@ -445,15 +745,12 @@ export class DioramaScene {
     this.#modelCache.clear();
     this.#colormapCache.clear();
     this.#colormapCanvasCache.clear();
-    this.#scene.traverse((object) => {
-      if (!(object instanceof THREE.Mesh)) return;
-      object.geometry.dispose();
-      const materials = Array.isArray(object.material) ? object.material : [object.material];
-      for (const material of materials) {
-        (material as THREE.MeshStandardMaterial).map?.dispose();
-        material.dispose();
-      }
-    });
+    this.#stationVisuals.clear();
+    this.#targets.clear();
+    this.#holdingMesh = null;
+    // One walk over the whole scene covers the crowd, the stage, and every station and
+    // nameplate the staged lobby built (they are all children of it).
+    disposeSubtree(this.#scene);
     this.#renderer.dispose();
   }
 }

@@ -18,20 +18,37 @@
 import { z } from "zod";
 import { limits } from "../limits.ts";
 import { roomCodeSchema, roomPhaseSchema } from "./server-messages.ts";
-import { hostLabelSchema, roomTitleSchema, roomVisibilitySchema } from "./visibility.ts";
+import { hostLabelSchema, roomListingSchema, roomTitleSchema } from "./visibility.ts";
 
 export const roomSummarySchema = z.strictObject({
   code: roomCodeSchema,
   title: roomTitleSchema,
   // Empty string = the host did not name themselves; the lobby simply omits the byline.
   hostLabel: hostLabelSchema.or(z.literal("")),
-  visibility: roomVisibilitySchema,
+  listing: roomListingSchema,
   hasPassword: z.boolean(),
   // Only lobby/active rooms are ever listed; `ended` appears in the type because the row
   // outlives the transition by one write (the sweep and the phase filter drop it).
   phase: roomPhaseSchema,
   playerCount: z.int().nonnegative(),
+  // The room's OWN `settings.maxPlayers`, not the product limit: "7/24" in the lobby has to
+  // mean the door this host actually set, or the fraction lies to everyone reading it. It
+  // moves when the host retunes the cap (room-settings.ts).
   playerCap: z.int().positive(),
+  // The SECOND budget (room-settings.ts: a stream audience must never crowd out the people who
+  // came to play), projected for the lobby row so a browser can see whether there is room to
+  // WATCH as well as room to play. `spectatorsAllowed: false` is a different fact from a full
+  // audience and reads as a different line.
+  //
+  // All three are OPTIONAL, and that is load-bearing rather than lazy: absent means "this
+  // server does not report spectators", which the lobby must render as nothing at all, while
+  // `spectatorCount: 0` means "nobody is watching" and renders as 0. A required field could
+  // not tell those apart, and a client that guessed zero would invent an empty audience for
+  // every room a pre-spectator-columns registry answers with
+  // (apps/web/src/lib/lobby/room-capacity.ts holds that distinction).
+  spectatorCount: z.int().nonnegative().optional(),
+  spectatorCap: z.int().nonnegative().optional(),
+  spectatorsAllowed: z.boolean().optional(),
   // Unix ms. `createdAt` drives newest-first ordering and the "age" column; `lastSeenAt` is
   // how fresh the projection is - a row whose DO went quiet ages visibly instead of lying.
   createdAt: z.int().positive(),

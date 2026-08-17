@@ -10,17 +10,20 @@
 // only learns seats at start-game. Roster edits in the lobby need no engine actions.
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
+import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
 import type {
   LastJudgedView,
   MyBuzzView,
   PendingTimerView,
   RoomPlayerView,
+  RoomRefusalView,
   RoomRoleView,
   RoomTeamView,
   RoomView,
@@ -41,6 +44,12 @@ export type LocalSimStoreOptions = {
   seedRoster?: "fixture" | "empty";
   /** Tap into every engine event - the display route drives room audio from this. */
   onEvent?: (event: GameEvent) => void;
+  /**
+   * The room's own settings, sparse over the protocol defaults. Mock rooms are created by
+   * opening a URL rather than by POST /api/rooms, so this is where a surface review (or a
+   * test) says "this room is in streamer mode" or "this room allows no spectators".
+   */
+  settings?: Partial<RoomSettings>;
 };
 
 /** TimerKind -> the expiry action the driver owes the engine (events.ts documents the map). */
@@ -92,6 +101,13 @@ export class LocalSimRoomStore implements RoomStore {
   private wagerRange = $state.raw<WagerRangeView | null>(null);
   private finalWagerRanges = $state.raw<WagerRangeView[]>([]);
   private pausedState = $state(false);
+  private roomSettings = $state.raw<RoomSettings>({
+    ...defaultRoomSettings,
+    entry: "open",
+    title: "",
+    hostLabel: "",
+  });
+  private refusalState = $state.raw<RoomRefusalView | null>(null);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
@@ -101,6 +117,7 @@ export class LocalSimRoomStore implements RoomStore {
     // reproduced here so mirror mode and phones are honest even in mock play.
     this.content = fixtureContentView(options.role === "host");
     this.onEvent = options.onEvent;
+    this.roomSettings = { ...this.roomSettings, ...options.settings };
     this.timerAutopilot = options.timerAutopilot ?? false;
     if ((options.seedRoster ?? "fixture") === "fixture") {
       const seeded = fixtureRosterView();
@@ -126,6 +143,8 @@ export class LocalSimRoomStore implements RoomStore {
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
       paused: this.pausedState,
+      settings: this.roomSettings,
+      refusal: this.refusalState,
     };
   }
 
@@ -304,7 +323,27 @@ export class LocalSimRoomStore implements RoomStore {
     );
   }
 
+  /**
+   * The room's door, mock-side. The refusals below are the SAME reasons and the same order the
+   * DO applies (apps/realtime/src/game-room-do.ts): the two participant budgets are
+   * independent, and a spectator is refused for its own reason so the screen can say which of
+   * "the audience is full" and "this host allows no audience" happened. A refused join changes
+   * nothing about the room - the phone keeps its connection and its choices.
+   */
+  private refuse(reason: RoomRefusalView["reason"]): void {
+    this.refusalState = { reason, at: Date.now() };
+  }
+
   join(request: JoinRequest): void {
+    const settings = this.roomSettings;
+    if (this.role === "spectator") {
+      if (!settings.spectatorsAllowed) return this.refuse("spectators-not-allowed");
+      // Spectators hold no roster seat, so the mock has nothing to count them with; the budget
+      // itself is the DO's to enforce against live connections.
+    } else if (this.rosterPlayers.length >= settings.maxPlayers) {
+      return this.refuse("room-full");
+    }
+    this.refusalState = null;
     localSeatCounter += 1;
     const playerId = `local-${String(localSeatCounter)}`;
     let teamId: string | null = null;
@@ -325,7 +364,10 @@ export class LocalSimRoomStore implements RoomStore {
       } else {
         const requestedTeamId = request.team.teamId;
         const team = this.rosterTeams.find((entry) => entry.teamId === requestedTeamId);
-        if (team === undefined || team.locked) return; // protocol: refused, keep the socket
+        // TEAM-level refusals keep the socket (server-messages.ts): the phone stays in the
+        // room and picks another card, which is why the seat is not taken above this line.
+        if (team === undefined) return this.refuse("unknown-team");
+        if (team.locked) return this.refuse("team-locked");
         teamId = team.teamId;
       }
     }
@@ -401,7 +443,9 @@ export class LocalSimRoomStore implements RoomStore {
   joinTeam(teamId: string): void {
     if (this.myPlayerId === null) return;
     const team = this.rosterTeams.find((entry) => entry.teamId === teamId);
-    if (team === undefined || team.locked) return;
+    if (team === undefined) return this.refuse("unknown-team");
+    if (team.locked) return this.refuse("team-locked");
+    this.refusalState = null;
     this.assignTeam(this.myPlayerId, teamId);
   }
 

@@ -38,16 +38,31 @@ function failingDatabase(message: string, cause?: string) {
   };
 }
 
+// The DO's initialize answer: token, deadline, and the settings it actually recorded (which
+// is what the route echoes and what the lobby row is built from).
+const initializedSettings = {
+  listing: "public",
+  entry: "open",
+  maxPlayers: 100,
+  maxSpectators: 50,
+  spectatorsAllowed: true,
+  hideJoinCode: false,
+  title: "Repro room",
+  hostLabel: "",
+};
+
 const initializingNamespace = {
   idFromName: (name: string) => name,
   get: () => ({
     fetch: () =>
       Promise.resolve(
         Response.json(
-          { hostToken: "0".repeat(32), expiresAt: Date.now() + 7_200_000 },
           {
-            status: 201,
+            hostToken: "0".repeat(32),
+            expiresAt: Date.now() + 7_200_000,
+            settings: initializedSettings,
           },
+          { status: 201 },
         ),
       ),
   }),
@@ -72,7 +87,7 @@ function createEvent(body: unknown, database?: unknown): Event {
 
 const publicRoom = {
   game: { kind: "compact", rounds: [{ columns: 3, rows: 3 }] },
-  visibility: "public",
+  listing: "public",
   title: "Repro room",
 };
 
@@ -132,9 +147,25 @@ describe("POST /api/rooms - creation reports its own listability", () => {
   it("creates the room AND reports the registry write succeeded", async () => {
     const response = await POST(createEvent(publicRoom, workingDatabase()));
     expect(response.status).toBe(201);
-    const body = (await response.json()) as { code: string; registry: unknown };
+    const body = (await response.json()) as {
+      code: string;
+      registry: unknown;
+      settings: { listing: string; entry: string };
+    };
     expect(body.code).toMatch(/^[A-Z0-9]{5}$/);
     expect(body.registry).toEqual({ status: "ok" });
+    // The echo is the DO's own reading, not the request body read back to itself.
+    expect(body.settings).toMatchObject({ listing: "public", entry: "open", maxPlayers: 100 });
+  });
+
+  it("refuses the retired `unlisted` listing value outright (no alias, no coercion)", async () => {
+    const response = await POST(
+      createEvent(
+        { game: publicRoom.game, listing: "unlisted", title: "Repro room" },
+        workingDatabase(),
+      ),
+    );
+    expect(response.status).toBe(400);
   });
 
   it("still creates the room when the registry is missing - and SAYS it is not listed", async () => {

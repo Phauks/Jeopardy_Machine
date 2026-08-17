@@ -15,12 +15,18 @@ import { settingsPresetIdSchema } from "../settings/presets.ts";
 import { gameDefinitionBodySchema } from "../modes/jeopardy/game-definition.ts";
 import { hostTokenSchema } from "./identity.ts";
 import { registryStatusSchema } from "./registry.ts";
+import {
+  defaultRoomSettings,
+  maxPlayersSchema,
+  maxSpectatorsSchema,
+  roomSettingsSchema,
+} from "./room-settings.ts";
 import { roomCodeSchema } from "./server-messages.ts";
 import {
   hostLabelSchema,
+  roomListingSchema,
   roomPasswordSchema,
   roomTitleSchema,
-  roomVisibilitySchema,
 } from "./visibility.ts";
 
 // Mirrors the board shape of @jeopardy/engine's scenario fixtures (packages/engine/src/
@@ -55,21 +61,28 @@ export const createRoomRequestSchema = z
   .strictObject({
     game: roomGameSpecSchema,
     seed: z.string().min(1).max(120).optional(),
-    visibility: roomVisibilitySchema.default("unlisted"),
-    // Listing metadata. Optional for unlisted rooms (nobody ever reads them) and REQUIRED for
+    listing: roomListingSchema.default(defaultRoomSettings.listing),
+    // Listing metadata. Optional for private rooms (nobody ever reads them) and REQUIRED for
     // public ones - an unnamed row in a server browser is noise, not an invitation.
     title: roomTitleSchema.optional(),
     hostLabel: hostLabelSchema.optional(),
     password: roomPasswordSchema.optional(),
+    // Room controls (docs/decisions/2026-08-14-room-controls-and-staging.md). Every one of
+    // them is editable AFTER creation through `update-room-settings`, so these are opening
+    // positions rather than commitments - the create form is allowed to be short.
+    maxPlayers: maxPlayersSchema.default(defaultRoomSettings.maxPlayers),
+    maxSpectators: maxSpectatorsSchema.default(defaultRoomSettings.maxSpectators),
+    spectatorsAllowed: z.boolean().default(defaultRoomSettings.spectatorsAllowed),
+    hideJoinCode: z.boolean().default(defaultRoomSettings.hideJoinCode),
   })
-  .refine((body) => body.visibility !== "public" || body.title !== undefined, {
+  .refine((body) => body.listing !== "public" || body.title !== undefined, {
     error: "a public room needs a title - it is the row people read in the lobby",
     path: ["title"],
   });
-// Parsed shape (defaults applied - `visibility` is always present after a parse).
+// Parsed shape (defaults applied - `listing` is always present after a parse).
 export type CreateRoomRequest = z.infer<typeof createRoomRequestSchema>;
 // Wire shape: what a caller must actually SEND. Distinct from the parsed type since
-// `visibility` has a default - callers that build request bodies (the harness, the bots CLI,
+// `listing` has a default - callers that build request bodies (the harness, the bots CLI,
 // the workerd suite) type against this one, or they would be forced to restate the default.
 export type CreateRoomRequestInput = z.input<typeof createRoomRequestSchema>;
 
@@ -79,9 +92,9 @@ export const createRoomResponseSchema = z.strictObject({
   // Unix ms when the room's idle-expiry alarm would fire if nothing ever connects.
   expiresAt: z.number().int().positive(),
   // Echoed back so the creating surface can show the truth the server recorded (lock badge,
-  // "listed in the lobby" confirmation) without re-deriving it from its own request body.
-  visibility: roomVisibilitySchema,
-  hasPassword: z.boolean(),
+  // "listed in the lobby" confirmation, the caps that were actually applied) without
+  // re-deriving any of it from its own request body.
+  settings: roomSettingsSchema,
   // Did the lobby row get written? The room exists either way (the registry is a cache and a
   // D1 failure may never cost anyone a game), but "created, and NOT listed because the
   // migration is missing" is a sentence the creating surface must be able to say out loud -

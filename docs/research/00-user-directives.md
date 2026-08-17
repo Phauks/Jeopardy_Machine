@@ -128,3 +128,10 @@ Research round for the full-color player-identity icons that replace the rejecte
 
 - **Avatar set: Cube Pets + Mini Characters** (proof-verified single universe, shared recolor mechanism). Sprite pipeline builds against both; Blocky is out.
 - **Autonomy scope granted: build as far as possible** - M3 (realtime rooms) -> M4 (play surfaces) -> M5 prep, each milestone gate-verified. PRs are opened with green CI; owner merges on return (nothing deploys unattended).
+
+## No legacy code (owner, 2026-08-14)
+
+- **There are no users and no backwards-compatibility obligation.** Do not carry deprecation shims, redirects for renamed routes, compatibility branches, or "kept for old clients" code paths. Rename freely and delete the old thing in the same commit.
+- Applies to: route renames (no redirects), protocol shapes (change them; the wire version refuses mismatches and the PWA reload is the upgrade path), document schemas (edit the schema and update fixtures rather than writing a migration for a format nobody has), and config/env vars.
+- **Keeps its value:** the migration MACHINERY in the protocol package (proven by a synthetic fixture, not by real legacy) - it exists for the day documents are in strangers' Downloads folders, which is a real future, not a legacy debt. Same for the WS version handshake.
+- First application: `/dev/echo` redirect deleted (the page is `/dev/rooms`), and the lobby hand-off now points at the real join screen instead of the harness.

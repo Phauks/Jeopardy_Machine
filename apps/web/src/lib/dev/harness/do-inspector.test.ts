@@ -15,9 +15,16 @@ const inspection: RoomInspection = {
   room: {
     code: "BQKX7",
     lifecycle: "active",
-    visibility: "public",
-    title: "Pub quiz night",
-    hostLabel: "Board Game Club",
+    settings: {
+      listing: "public",
+      entry: "password",
+      maxPlayers: 24,
+      maxSpectators: 50,
+      spectatorsAllowed: true,
+      hideJoinCode: true,
+      title: "Pub quiz night",
+      hostLabel: "Board Game Club",
+    },
     hasPassword: true,
     createdAt: 1_760_000_000_000,
     lastActivityAt: 1_760_000_060_000,
@@ -25,6 +32,10 @@ const inspection: RoomInspection = {
     paused: true,
     stateVersion: 12,
     connections: { total: 5, host: 1, player: 3, display: 1, spectator: 0, unjoined: 0 },
+    participants: {
+      players: { seated: 3, connected: 2, max: 24 },
+      spectators: { connected: 0, max: 50, allowed: true },
+    },
     roster: { players: 3, connected: 2, teams: 1 },
     alarm: {
       nextWakeAt: now + 30_000,
@@ -51,6 +62,30 @@ describe("the DO inspector block", () => {
     expect(body).toContain("3 seated");
     expect(body).toContain("1h 30m");
     expect(body).toContain("state");
+  });
+
+  it("renders the room controls and the split census, streamer mode included", () => {
+    const { body } = render(DoInspector, { props: { inspection, now, error: null } });
+    expect(body).toContain("join code hidden");
+    // Both budgets, each as its own fraction - one number could never say which door refuses.
+    expect(body).toContain("players 2/24 (3 seated)");
+    expect(body).toContain("spectators 0/50");
+  });
+
+  it("says out loud when spectators are turned off", () => {
+    const off: RoomInspection = {
+      ...inspection,
+      room: {
+        ...inspection.room,
+        settings: { ...inspection.room.settings, spectatorsAllowed: false },
+        participants: {
+          ...inspection.room.participants,
+          spectators: { connected: 0, max: 50, allowed: false },
+        },
+      },
+    };
+    const { body } = render(DoInspector, { props: { inspection: off, now, error: null } });
+    expect(body).toContain("spectators off");
   });
 
   it("says plainly when a live room has NO registry row - the drift behind an empty lobby", () => {

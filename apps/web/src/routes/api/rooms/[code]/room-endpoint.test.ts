@@ -5,20 +5,32 @@
 // second opinion travels beside the DO's reading instead of replacing it.
 import { describe, expect, it } from "vitest";
 import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
-import { DELETE, GET } from "./+server.ts";
-import type { RoomInspection } from "@jeopardy/protocol/room/diagnostics";
+import { DELETE, GET, PATCH } from "./+server.ts";
+import type {
+  RoomInspection,
+  UpdateRoomSettingsResponse,
+} from "@jeopardy/protocol/room/diagnostics";
 import type { RequestHandler } from "@sveltejs/kit";
 
 type Event = Parameters<NonNullable<RequestHandler>>[0];
 
 const hostToken = "a".repeat(32);
 
+const settings = {
+  listing: "public",
+  entry: "open",
+  maxPlayers: 100,
+  maxSpectators: 50,
+  spectatorsAllowed: true,
+  hideJoinCode: false,
+  title: "Repro room",
+  hostLabel: "Agent",
+};
+
 const diagnostics = {
   code: "BQKX7",
   lifecycle: "lobby",
-  visibility: "public",
-  title: "Repro room",
-  hostLabel: "Agent",
+  settings,
   hasPassword: false,
   createdAt: 1_760_000_000_000,
   lastActivityAt: 1_760_000_000_000,
@@ -26,6 +38,10 @@ const diagnostics = {
   paused: false,
   stateVersion: 0,
   connections: { total: 1, host: 1, player: 0, display: 0, spectator: 0, unjoined: 0 },
+  participants: {
+    players: { seated: 0, connected: 0, max: 100 },
+    spectators: { connected: 0, max: 50, allowed: true },
+  },
   roster: { players: 0, connected: 0, teams: 0 },
   alarm: { nextWakeAt: 1_760_007_200_000, entries: [] },
   storage: { totalBytes: 10, keys: [{ key: "meta", bytes: 10 }] },
@@ -33,7 +49,9 @@ const diagnostics = {
 
 // A DO stand-in that enforces the same token rule the real one does, so a route that
 // "forgot" to forward the header would fail here too.
-function namespace(options: { token?: string; missingRoom?: boolean } = {}) {
+function namespace(
+  options: { token?: string; missingRoom?: boolean; refuseSettings?: boolean } = {},
+) {
   const expected = options.token ?? hostToken;
   const seen: { url: string; token: string | null }[] = [];
   return {
@@ -48,11 +66,20 @@ function namespace(options: { token?: string; missingRoom?: boolean } = {}) {
         if (request.headers.get(hostTokenHeader) !== expected) {
           return Promise.resolve(Response.json({ error: "bad-host-token" }, { status: 403 }));
         }
-        return Promise.resolve(
-          request.url.endsWith("/close")
-            ? Response.json({ closed: true, code: "BQKX7" })
-            : Response.json(diagnostics),
-        );
+        if (request.url.endsWith("/close")) {
+          return Promise.resolve(Response.json({ closed: true, code: "BQKX7" }));
+        }
+        if (request.url.endsWith("/settings")) {
+          // The real DO answers with the settings AFTER the edit; the refusal case is the
+          // 409 below, which the route must relay rather than flatten into a 404.
+          if (options.refuseSettings === true) {
+            return Promise.resolve(Response.json({ error: "title-required" }, { status: 409 }));
+          }
+          return Promise.resolve(
+            Response.json({ code: "BQKX7", settings: { ...settings, hideJoinCode: true } }),
+          );
+        }
+        return Promise.resolve(Response.json(diagnostics));
       },
     }),
   };
@@ -62,7 +89,7 @@ function namespace(options: { token?: string; missingRoom?: boolean } = {}) {
 // so this row's deadline is relative to now rather than a frozen literal.
 const registryRow = {
   code: "BQKX7",
-  visibility: "public",
+  listing: "public",
   phase: "lobby",
   player_count: 0,
   expires_at: Date.now() + 7_200_000,
@@ -92,14 +119,24 @@ function event(options: {
   token?: string | null;
   namespace?: unknown;
   database?: unknown;
+  // Present = a PATCH body; absent = the GET/DELETE shape.
+  patch?: unknown;
 }): Event {
   const headers = new Headers();
   if (options.token !== null && options.token !== undefined) {
     headers.set(hostTokenHeader, options.token);
   }
+  const request =
+    options.patch === undefined
+      ? new Request("https://test/api/rooms/BQKX7", { headers })
+      : new Request("https://test/api/rooms/BQKX7", {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify(options.patch),
+        });
   return {
     params: { code: options.code ?? "BQKX7" },
-    request: new Request("https://test/api/rooms/BQKX7", { headers }),
+    request,
     platform: { env: { GAME_ROOM: options.namespace, DB: options.database } },
     setHeaders: () => undefined,
   } as unknown as Event;
@@ -153,6 +190,92 @@ describe("GET /api/rooms/<CODE> - the DO inspector", () => {
 
   it("answers 503 where the realtime binding does not exist (vite dev)", async () => {
     expect((await GET(event({ token: hostToken, namespace: undefined }))).status).toBe(503);
+  });
+});
+
+describe("PATCH /api/rooms/<CODE> - changing a live room's settings", () => {
+  it("forwards the host token and answers with the settings AFTER the edit", async () => {
+    const durableObject = namespace();
+    const response = await PATCH(
+      event({
+        token: hostToken,
+        namespace: durableObject,
+        database: database(),
+        patch: { settings: { hideJoinCode: true } },
+      }),
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as UpdateRoomSettingsResponse;
+    expect(body.settings.hideJoinCode).toBe(true);
+    expect(body.registry).toEqual({ status: "ok" });
+    // The token is checked INSIDE the DO, so the route's whole job is carrying it there.
+    expect(durableObject.seen[0]?.token).toBe(hostToken);
+    expect(durableObject.seen[0]?.url).toContain("/settings");
+  });
+
+  it("refuses a malformed patch before it reaches the room", async () => {
+    const durableObject = namespace();
+    // An empty patch changes nothing, and `unlisted` is not a listing value any more.
+    for (const patch of [{ settings: {} }, { settings: { listing: "unlisted" } }, {}]) {
+      // oxlint-disable-next-line no-await-in-loop
+      const response = await PATCH(event({ token: hostToken, namespace: durableObject, patch }));
+      expect(response.status).toBe(400);
+    }
+    expect(durableObject.seen).toHaveLength(0);
+  });
+
+  it("relays the room's own refusal (a public room needs a title) as 409", async () => {
+    const response = await PATCH(
+      event({
+        token: hostToken,
+        namespace: namespace({ refuseSettings: true }),
+        patch: { settings: { listing: "public" } },
+      }),
+    );
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "title-required" });
+  });
+
+  it("is host-only, like every other door on this route", async () => {
+    const durableObject = namespace();
+    expect(
+      (
+        await PATCH(
+          event({
+            token: null,
+            namespace: durableObject,
+            patch: { settings: { listing: "private" } },
+          }),
+        )
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await PATCH(
+          event({
+            token: "c".repeat(32),
+            namespace: namespace(),
+            patch: { settings: { listing: "private" } },
+          }),
+        )
+      ).status,
+    ).toBe(403);
+    expect(durableObject.seen).toHaveLength(0);
+  });
+
+  it("never echoes a password back, even when the patch set one", async () => {
+    const raw = await (
+      await PATCH(
+        event({
+          token: hostToken,
+          namespace: namespace(),
+          database: database(),
+          patch: { settings: { password: "sequoia-2026" } },
+        }),
+      )
+    ).text();
+    expect(raw).not.toContain("sequoia-2026");
+    expect(raw).not.toContain('password":"');
   });
 });
 

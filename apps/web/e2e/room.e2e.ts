@@ -258,5 +258,25 @@ describe("single-origin rooms end to end", () => {
     await page.getByText("room:").locator("strong").filter({ hasText: "lobby" }).waitFor({
       timeout: 10_000,
     });
+
+    // Streamer mode from the Room settings panel, over the socket door this host now holds:
+    // the change is applied by the DO and comes back as the broadcast every display reacts to.
+    // By its HEADING, not by its text: the create panel mentions the Room settings panel in
+    // prose, and a hasText filter would happily match that instead.
+    const settingsPanel = page
+      .locator("section")
+      .filter({ has: page.getByRole("heading", { name: "Room settings" }) });
+    await settingsPanel.getByRole("combobox").first().selectOption("socket");
+    await settingsPanel.getByText("hide join code (streamer mode)").click();
+    await settingsPanel.locator("[data-broadcast]").filter({ hasText: "HIDDEN" }).waitFor({
+      timeout: 10_000,
+    });
+
+    // Run all: sequential, with a summary line. The rate-limit probe is SKIPPED here (this
+    // connection is the host, which is exempt from the cap by design) - skipped, never failed.
+    await page.getByRole("button", { name: "Run all" }).click();
+    await page.locator("[data-run-summary]").filter({ hasText: "passed" }).waitFor({
+      timeout: 30_000,
+    });
   });
 });

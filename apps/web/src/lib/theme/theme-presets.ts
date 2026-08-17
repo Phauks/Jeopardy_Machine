@@ -6,6 +6,8 @@
 // replaced by protocol imports; keeping the field names identical now is what makes that a
 // mechanical swap.
 
+import type { ThemeEnvironment, ThemeStaging } from "@jeopardy/protocol";
+
 /** Curated face ids - must stay equal to the theme document's fontFace enum. */
 export type ThemeFontFace = "anton" | "oswald" | "bitter" | "six-caps" | "alfa-slab-one";
 
@@ -42,6 +44,15 @@ export type ThemePreset = {
    * render kinds arrive with the M7 customizer + media pipeline (tokens.css SYNC BLOCK). */
   background: ThemeFill;
   effectsLevel: ThemeEffectsLevel;
+  /**
+   * The theme document's two PRESENTATION slots, typed straight from the protocol enums
+   * (packages/protocol/src/theme/theme.ts) rather than restated - these two arrived after the
+   * schema, so there is nothing to keep in sync by hand. `environment` is the 3D scenery,
+   * `staging` is the pre-game seating chart. Absent = the surface's own default, which is what
+   * every preset but Terra Verde wants.
+   */
+  environment?: ThemeEnvironment;
+  staging?: ThemeStaging;
 };
 
 /** Direction A - faithful-retro TV (research 05-ui-design.md section 2): the #060CE9-family
@@ -126,6 +137,13 @@ export const terraVerdePreset: ThemePreset = {
     accentColor: "#a3c968",
   },
   background: { kind: "gradient", from: "#0a2019", to: "#04100b", angleDeg: 180 },
+  // The event's own lobby, chosen by the DOCUMENT rather than by a query string: campfires in
+  // a forest clearing (docs/decisions/2026-08-15-staged-lobby.md - campfires ships alongside
+  // boats partly because it IS the Terra Verde lobby). The forest KIT is a later pass, so the
+  // display resolves this scenery to the studio stage today and starts drawing trees the day
+  // the models land - no screen changes either way (diorama-environment.ts).
+  environment: "forest",
+  staging: "campfires",
 };
 
 /** Stable render order for pickers; ids must match the settings preset enum in

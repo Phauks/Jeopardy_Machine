@@ -14,11 +14,24 @@
   import { prefersReducedMotion } from "svelte/motion";
   import { supportsWebGl, readDioramaPalette } from "#lib/diorama/diorama-environment.ts";
   import type { DioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
-  import type { DioramaOccupant, DioramaScene } from "#lib/diorama/diorama-scene.ts";
+  import type { DioramaOccupant, DioramaScene, StagingConfig } from "#lib/diorama/diorama-scene.ts";
 
   type Props = {
     /** Who is in the room right now. Reconciled on every change; existing avatars stay put. */
     occupants: readonly DioramaOccupant[];
+    /**
+     * The staged lobby (src/lib/staging/): stations, who is aboard each, and who is still
+     * waiting. `null` is the free-roaming diorama this component has always rendered - the
+     * interstitial and winner screens, where nobody is choosing anything.
+     */
+    staging?: StagingConfig | null;
+    /**
+     * Told when the renderer actually came up, so the CALLER can decide what a device without
+     * WebGL sees. The diorama alone can degrade to nothing (it is decoration), but a staged
+     * lobby cannot: "am I in the water or on a boat" has to survive, which is what
+     * staged-lobby.svelte uses this for.
+     */
+    onAvailability?: ((available: boolean) => void) | null;
     /** "none" renders nothing at all - the clean 2D lobby, per the environments direction. */
     environment?: DioramaEnvironment;
     /** Entities celebrating outright (the winner screen). */
@@ -40,6 +53,8 @@
   };
   let {
     occupants,
+    staging = null,
+    onAvailability = null,
     environment = "studio",
     celebratingEntityIds = [],
     beat = null,
@@ -55,11 +70,17 @@
   let available = $state(false);
 
   $effect(() => {
-    if (environment === "none") return;
+    if (environment === "none") {
+      onAvailability?.(false);
+      return;
+    }
     const hostElement = host;
     const canvasElement = canvas;
     if (hostElement === null || canvasElement === null) return;
-    if (!supportsWebGl()) return;
+    if (!supportsWebGl()) {
+      onAvailability?.(false);
+      return;
+    }
 
     let created: DioramaScene | null = null;
     let cancelled = false;
@@ -73,9 +94,13 @@
         seed,
       });
       created.resize(hostElement.clientWidth, hostElement.clientHeight);
+      // Staging BEFORE the first frame: an arrival must appear where they belong rather than
+      // pop into the water a frame after materializing on the wander grid.
+      created.setStaging(staging);
       created.start();
       scene = created;
       available = true;
+      onAvailability?.(true);
     });
 
     const observer = new ResizeObserver((entries) => {
@@ -91,13 +116,19 @@
       created = null;
       scene = null;
       available = false;
+      onAvailability?.(false);
     };
   });
 
-  // Roster, celebration, and reduced motion are pushed into the scene as they change; each is
-  // its own effect so a roster update does not restart a celebration and vice versa.
+  // Roster, staging, celebration, and reduced motion are pushed into the scene as they change;
+  // each is its own effect so a roster update does not restart a celebration and vice versa.
   $effect(() => {
     scene?.setOccupants(occupants);
+  });
+  $effect(() => {
+    // Every team creation, rename, recolour, and join lands here. The scene reconciles rather
+    // than rebuilds, so this running often is cheap by construction.
+    scene?.setStaging(staging);
   });
   $effect(() => {
     scene?.setCelebrating(celebratingEntityIds);

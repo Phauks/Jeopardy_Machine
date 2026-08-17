@@ -11,7 +11,7 @@
 // meta.password, entry.sessionToken, or any authored clue text. The storage sizes are
 // measured from serialized values and the values themselves are discarded.
 import { limits } from "@jeopardy/protocol/limits";
-import { nextWakeAt } from "./storage.ts";
+import { nextWakeAt, roomSettingsPayload } from "./storage.ts";
 import type { ConnectionCensus, RoomDiagnostics } from "@jeopardy/protocol/room/diagnostics";
 import type { AlarmSchedule, RoomMeta, StoredRoster, StoredTeams } from "./storage.ts";
 
@@ -32,9 +32,7 @@ export function buildRoomDiagnostics(input: DiagnosticsInput): RoomDiagnostics {
   return {
     code: meta.code,
     lifecycle: meta.lifecycle,
-    visibility: meta.visibility,
-    title: meta.title,
-    hostLabel: meta.hostLabel,
+    settings: roomSettingsPayload(meta),
     hasPassword: meta.password !== null,
     createdAt: meta.createdAt,
     lastActivityAt: meta.lastActivityAt,
@@ -42,6 +40,21 @@ export function buildRoomDiagnostics(input: DiagnosticsInput): RoomDiagnostics {
     paused: meta.pausedAt !== null,
     stateVersion: meta.stateVersion,
     connections: input.connections,
+    // The two budgets, each counted where its truth lives: player SEATS survive a dropped
+    // phone (the roster), spectators hold no seat at all (live connections). A host looking at
+    // "24/24 spectators, 3/40 players" can see instantly which door is the one refusing people.
+    participants: {
+      players: {
+        seated: players.length,
+        connected: players.filter((entry) => entry.connected).length,
+        max: meta.settings.maxPlayers,
+      },
+      spectators: {
+        connected: input.connections.spectator,
+        max: meta.settings.maxSpectators,
+        allowed: meta.settings.spectatorsAllowed,
+      },
+    },
     roster: {
       players: players.length,
       connected: players.filter((entry) => entry.connected).length,
@@ -68,6 +81,11 @@ function alarmEntries(
   const entries: RoomDiagnostics["alarm"]["entries"] = [
     { source: "idle-expiry", label: paused ? "room (paused)" : "room", dueAt: expiresAt },
   ];
+  // Present only while the room is empty, which is exactly when "why is my room about to
+  // disappear" gets asked - and the deadline it names is minutes away, not hours.
+  if (schedule.emptyRoomAt !== null) {
+    entries.push({ source: "empty-room", label: "room (empty)", dueAt: schedule.emptyRoomAt });
+  }
   for (const [kind, entry] of Object.entries(schedule.engineTimers)) {
     entries.push({ source: "engine-timer", label: kind.slice(0, 60), dueAt: entry.dueAt });
   }

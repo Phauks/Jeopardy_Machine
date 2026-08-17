@@ -3,6 +3,10 @@
 //
 // GET    /api/rooms/<CODE>  - diagnostics: what the DO believes about itself right now, beside
 //                             what the registry believes about it. Read-only, no secrets.
+// PATCH  /api/rooms/<CODE>  - change the room's settings (listing, caps, spectators, streamer
+//                             mode, password, title). The DO applies them, broadcasts
+//                             room-settings to everyone connected, and re-projects the lobby
+//                             row; this route answers with the settings AFTER the edit.
 // DELETE /api/rooms/<CODE>  - close the room: everyone gets the polite screen, the lobby row
 //                             is deleted, the code stays spent until the expiry alarm.
 //
@@ -11,6 +15,7 @@
 // the web Worker forwarding a request must never be the thing that authorizes it, or every
 // future internal caller inherits host powers by accident.
 import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
+import { updateRoomSettingsRequestSchema } from "@jeopardy/protocol/room/room-settings";
 import { forgetRoom, readRegistryRow, registryStatusFromError } from "#lib/server/room-registry.ts";
 import { normalizeRoomCode } from "#lib/realtime/room-url.ts";
 import type { RegistryDatabase } from "#lib/server/room-registry.ts";
@@ -19,7 +24,9 @@ import type {
   RegistryRowState,
   RoomDiagnostics,
   RoomInspection,
+  UpdateRoomSettingsResponse,
 } from "@jeopardy/protocol/room/diagnostics";
+import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { RegistryStatus } from "@jeopardy/protocol/room/registry";
 import type { RequestHandler } from "@sveltejs/kit";
 
@@ -39,6 +46,42 @@ export const GET: RequestHandler = async ({ params, request, platform, setHeader
   const room = (await answer.json()) as RoomDiagnostics;
   const { row, registry } = await readRowSafely(platform?.env.DB, room.code);
   return Response.json({ room, registry, registryRow: row } satisfies RoomInspection);
+};
+
+export const PATCH: RequestHandler = async ({ params, request, platform }) => {
+  const target = resolveTarget(params["code"], request, platform);
+  if ("response" in target) return target.response;
+
+  // Parsed HERE only to fail fast on a malformed body: the DO parses it again and is the one
+  // that decides, because it is the only place that knows how many people are already in the
+  // room (a cap cannot drop below them) and whether the room has a title to be listed under.
+  const body = updateRoomSettingsRequestSchema.safeParse(await request.json().catch(() => null));
+  if (!body.success) return Response.json({ error: "bad-request" }, { status: 400 });
+
+  const answer = await target.stub.fetch(
+    new Request("https://game-room/settings", {
+      method: "POST",
+      headers: { [hostTokenHeader]: target.hostToken, "content-type": "application/json" },
+      body: JSON.stringify(body.data),
+    }),
+  );
+  if (answer.status === 409) {
+    // The DO refused the change itself (title-required / below-current). Relayed verbatim
+    // because the reason IS the message a host has to act on.
+    const refusal = (await answer.json().catch(() => null)) as { error?: string } | null;
+    return Response.json({ error: refusal?.error ?? "rejected" }, { status: 409 });
+  }
+  if (!answer.ok) return relayRefusal(answer);
+  const updated = (await answer.json()) as { code: string; settings: RoomSettings };
+  // The lobby row's listing facts are the DO's write (registry-writer.ts relist), so this
+  // route only reports what the row now says - which is what makes "you are public but NOT
+  // listed because the migration is missing" sayable at the moment of the change too.
+  const { registry } = await readRowSafely(platform?.env.DB, updated.code);
+  return Response.json({
+    code: updated.code,
+    settings: updated.settings,
+    registry,
+  } satisfies UpdateRoomSettingsResponse);
 };
 
 export const DELETE: RequestHandler = async ({ params, request, platform }) => {

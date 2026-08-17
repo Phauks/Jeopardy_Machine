@@ -20,6 +20,8 @@
 // |               | message's buzzSoundId alone (only-winner-heard is server-resolved)       |
 // | buzz-rejected | myBuzz=rejected with reason + lockedUntil (per-phone, silent, local)     |
 // | roster        | replace view.roster wholesale (whole-payload sync by protocol design)    |
+// | room-settings | replace view.settings wholesale - sent on join and on every host edit,   |
+// |               | which is how a join code that just became hidden leaves the projector    |
 // | room-closed   | connection=closed, show the polite end screen                            |
 // | error         | identity-locked / rate-limited surface as toasts; action-rejected is a   |
 // |               | console-side notice (the engine state did not change)                    |
@@ -35,6 +37,7 @@
 //   alarms; this store only RENDERS pendingTimers, never dispatches expiry actions.
 // - `expireTimer` becomes a host-only action relay (the force-expire console affordance).
 // - `paused` needs a room-level message (not yet in the M3 catalog) - flagged for reconcile.
+import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
 import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
@@ -74,6 +77,16 @@ export class WsRoomStore implements RoomStore {
       wagerRange: null,
       finalWagerRanges: [],
       paused: false,
+      // The room's defaults until the socket says otherwise. `hideJoinCode: false` is the
+      // right shell value: the connecting screen shows no code anyway, and a room that turns
+      // out to be in streamer mode hides it the moment `room-settings` arrives.
+      settings: {
+        ...defaultRoomSettings,
+        entry: "open",
+        title: "",
+        hostLabel: "",
+      },
+      refusal: null,
     };
   }
 

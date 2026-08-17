@@ -132,6 +132,72 @@ describe("room client messages", () => {
   });
 });
 
+// docs/decisions/2026-08-14-room-controls-and-staging.md: the host-only room controls, and
+// the broadcast that makes a hidden join code vanish from the projector at once.
+describe("room control messages", () => {
+  it("carries a sparse settings patch and refuses an empty one", () => {
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "update-room-settings",
+        settings: { hideJoinCode: true },
+      }).success,
+    ).toBe(true);
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "update-room-settings",
+        settings: {},
+      }).success,
+    ).toBe(false);
+    // The patch is nested on purpose - it is the same object the HTTP door takes.
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "update-room-settings",
+        hideJoinCode: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("broadcasts the settings back with a stamp, and never the password", () => {
+    const settings = {
+      listing: "public",
+      entry: "password",
+      maxPlayers: 24,
+      maxSpectators: 50,
+      spectatorsAllowed: true,
+      hideJoinCode: true,
+      title: "Pub quiz night",
+      hostLabel: "Board Game Club",
+    };
+    expect(
+      roomServerMessageSchema.safeParse({
+        version: v,
+        type: "room-settings",
+        settings,
+        at: 1_760_000_000_000,
+      }).success,
+    ).toBe(true);
+    expect(
+      roomServerMessageSchema.safeParse({
+        version: v,
+        type: "room-settings",
+        settings: { ...settings, password: "sequoia-2026" },
+        at: 1_760_000_000_000,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("keeps the two spectator refusals distinct from room-full", () => {
+    for (const reason of ["room-full", "spectators-full", "spectators-not-allowed"]) {
+      expect(
+        roomServerMessageSchema.safeParse({ version: v, type: "refused", reason }).success,
+      ).toBe(true);
+    }
+  });
+});
+
 describe("room server messages", () => {
   it("round-trips welcome, snapshot, event, and buzz-won", () => {
     for (const raw of [

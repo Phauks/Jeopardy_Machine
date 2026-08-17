@@ -53,11 +53,14 @@ const liveRow = {
   code: "BQKX7",
   title: "Pub quiz night",
   host_label: "Board Game Club",
-  visibility: "public",
+  listing: "public",
   has_password: 1,
   phase: "active",
   player_count: 12,
   player_cap: limits.room.playerSoftCap,
+  spectator_count: 3,
+  spectator_cap: limits.room.spectatorSoftCap,
+  spectators_allowed: 1,
   created_at: 1_760_000_000_000,
   last_seen_at: 1_760_000_060_000,
   expires_at: 1_760_007_200_000,
@@ -71,17 +74,58 @@ describe("registering a room", () => {
       code: "BQKX7",
       title: "Robert'); DROP TABLE rooms;--",
       hostLabel: "Board Game Club",
-      visibility: "public",
+      listing: "public",
       hasPassword: true,
+      playerCap: 24,
+      spectatorCap: 40,
+      spectatorsAllowed: true,
       createdAt: 1_760_000_000_000,
       expiresAt: 1_760_007_200_000,
     });
     const call = database.calls[0];
     expect(call?.sql).not.toContain("DROP TABLE");
     expect(call?.values).toContain("Robert'); DROP TABLE rooms;--");
-    // Booleans become D1's 0/1, and the cap comes from the limits module, not the caller.
+    // Booleans become D1's 0/1...
     expect(call?.values).toContain(1);
-    expect(call?.values).toContain(limits.room.playerSoftCap);
+    // ...and the cap stored is the ROOM's own maxPlayers, which is what the lobby fraction
+    // has to mean - not the product limit it happens to sit under.
+    expect(call?.values).toContain(24);
+    expect(call?.values).not.toContain(limits.room.playerSoftCap);
+    // The second budget rides along, and a fresh room starts with nobody watching: the count
+    // is the DO's to report, because a spectator is a connection and holds no roster seat.
+    expect(call?.values).toContain(40);
+    expect(call?.sql).toContain("spectator_count, spectator_cap, spectators_allowed");
+  });
+
+  it("stores 'spectators off' as a real fact rather than a zero ceiling", async () => {
+    const database = fakeDatabase();
+    await registerRoom(database, {
+      code: "BQKX7",
+      title: "Staff rehearsal",
+      hostLabel: "",
+      listing: "private",
+      hasPassword: false,
+      playerCap: 8,
+      spectatorCap: limits.room.spectatorSoftCap,
+      spectatorsAllowed: false,
+      createdAt: 1,
+      expiresAt: 2,
+    });
+    // ...spectators_allowed is the LAST bound flag before the timestamps; a cap of zero and a
+    // host who allows no audience are different rows and read as different lobby lines.
+    expect(database.calls[0]?.values).toEqual([
+      "BQKX7",
+      "Staff rehearsal",
+      "",
+      "private",
+      0,
+      8,
+      limits.room.spectatorSoftCap,
+      0,
+      1,
+      1,
+      2,
+    ]);
   });
 
   it("upserts, because an expired room's code is reusable", () => {
@@ -96,7 +140,7 @@ describe("listing public rooms", () => {
   it("asks only for live public rooms, newest first, and maps rows to the wire shape", async () => {
     const database = fakeDatabase([[liveRow]]);
     const rooms = await listPublicRooms(database, 1_760_000_100_000);
-    expect(database.calls[0]?.sql).toContain("visibility = 'public'");
+    expect(database.calls[0]?.sql).toContain("listing = 'public'");
     expect(database.calls[0]?.sql).toContain("ended_at IS NULL");
     expect(database.calls[0]?.sql).toContain("expires_at > ?");
     expect(database.calls[0]?.sql).toContain("ORDER BY created_at DESC");
@@ -105,15 +149,27 @@ describe("listing public rooms", () => {
         code: "BQKX7",
         title: "Pub quiz night",
         hostLabel: "Board Game Club",
-        visibility: "public",
+        listing: "public",
         hasPassword: true,
         phase: "active",
         playerCount: 12,
         playerCap: limits.room.playerSoftCap,
+        spectatorCount: 3,
+        spectatorCap: limits.room.spectatorSoftCap,
+        spectatorsAllowed: true,
         createdAt: 1_760_000_000_000,
         lastSeenAt: 1_760_000_060_000,
       },
     ]);
+  });
+
+  it("reports a row's spectator budget, including 'no audience allowed'", async () => {
+    const database = fakeDatabase([[{ ...liveRow, spectator_count: 0, spectators_allowed: 0 }]]);
+    const [room] = await listPublicRooms(database, 1);
+    // Zero watching is a REPORTED zero, never an absent field: the lobby renders "0" for a
+    // room nobody is watching and nothing at all for a server that does not report it.
+    expect(room?.spectatorCount).toBe(0);
+    expect(room?.spectatorsAllowed).toBe(false);
   });
 
   it("clamps the listing cap to the operational limit - a caller cannot lift it", async () => {
@@ -161,13 +217,13 @@ describe("reading one room's row (the inspector's second opinion)", () => {
     });
   });
 
-  it("calls an ended, expired, or unlisted room not-listed without hiding the row", async () => {
+  it("calls an ended, expired, or private room not-listed without hiding the row", async () => {
     const database = fakeDatabase([
       [{ ...liveRow, ended_at: 1_760_000_090_000 }],
       [{ ...liveRow, ended_at: null, expires_at: 1 }],
-      [{ ...liveRow, ended_at: null, visibility: "unlisted" }],
+      [{ ...liveRow, ended_at: null, listing: "private" }],
     ]);
-    // One pass per canned row above: ended, expired, unlisted.
+    // One pass per canned row above: ended, expired, private.
     for (const attempt of [0, 1, 2]) {
       // oxlint-disable-next-line no-await-in-loop
       const row = await readRegistryRow(database, "BQKX7", 1_760_000_100_000);
@@ -226,11 +282,14 @@ describe("schema drift gate", () => {
       "code",
       "title",
       "host_label",
-      "visibility",
+      "listing",
       "has_password",
       "phase",
       "player_count",
       "player_cap",
+      "spectator_count",
+      "spectator_cap",
+      "spectators_allowed",
       "created_at",
       "last_seen_at",
       "expires_at",

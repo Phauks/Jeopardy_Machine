@@ -23,8 +23,21 @@ export const limits = {
   room: {
     // Soft cap = the supported product promise (2-100 players); hard cap = the refusal point,
     // headroom included so a team rebalance mid-join never bounces player 101 of a full room.
+    // The host's own `maxPlayers` setting rides BELOW these: hosts tune down, never up
+    // (docs/design/expansion-and-boundaries.md boundary 2.7).
     playerSoftCap: 100,
     playerHardCap: 128,
+    // Spectators are a SEPARATE budget from players (docs/decisions/2026-08-14-room-controls-
+    // and-staging.md): a streamed room's audience must never be able to crowd out the people
+    // who came to play, so the two are counted, capped and refused independently. The soft cap
+    // is the default a room starts with; the hard cap is the ceiling a host cannot lift.
+    spectatorSoftCap: 50,
+    spectatorHardCap: 100,
+    // How long a room with ZERO connected participants survives before it closes itself.
+    // Distinct from idleExpiryMs, which protects rooms that are OCCUPIED but dormant: this one
+    // answers "everyone left", and 15 minutes is long enough for a venue to lose its Wi-Fi and
+    // come back while short enough that abandoned rooms stop squatting on codes and lobby slots.
+    emptyRoomGraceMs: 15 * 60 * 1000,
     // 5 uppercase-alphanumeric chars ~= 33 million codes - collision-safe for idFromName rooms
     // while staying shoutable across a noisy hall.
     roomCodeLength: 5,
