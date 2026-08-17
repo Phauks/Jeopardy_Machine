@@ -101,6 +101,20 @@ export type RoomStore = {
   assignPlayerToTeam(playerId: string, teamId: string): void;
 
   // Play (phone side).
+  /**
+   * Report that the armed buzzer has actually been PAINTED - the frame on which the player
+   * could first see the button go hot.
+   *
+   * This is the client's half of buzz latency compensation
+   * (docs/decisions/2026-08-17-buzz-latency-compensation.md "What clients owe"): the room ranks
+   * presses by reaction time, and reaction time is measured from the paint, never from the
+   * moment the message arrived. Only the surface knows when that happened, so only the surface
+   * can say. Idempotent per arming, and cheap enough to call from an effect on every frame.
+   *
+   * A surface that never calls it is ranked by arrival - never worse than the pre-M6 behavior,
+   * never compensated either. Nothing here is required for a buzz to WORK.
+   */
+  markArmedPainted(armId: number): void;
   buzz(): void;
   commitWager(amount: number): void;
   commitFinalWager(amount: number): void;

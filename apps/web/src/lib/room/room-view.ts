@@ -85,6 +85,28 @@ export type PendingTimerView = {
   firesAt: number;
 };
 
+/**
+ * The arming the room is currently running, as the protocol's `arm-window` message describes
+ * it - and the one field the protocol cannot supply: when THIS client painted it.
+ *
+ * The room ranks buzzes by reaction time rather than by arrival order
+ * (docs/decisions/2026-08-17-buzz-latency-compensation.md), and the quantity being ranked is
+ * the human's thumb: the clock starts when the player could first see the button go hot, not
+ * when the message arrived. So `paintedAt` is stamped by the SURFACE, on the frame the armed
+ * state actually reached the screen (`RoomStore.markArmedPainted`), and stays null until then -
+ * a buzz with no paint behind it carries no timing at all, which the room ranks by arrival,
+ * exactly as it did before compensation existed.
+ */
+export type RoomArmingView = {
+  armId: number;
+  /** How long the room may hold buzzes before crowning a winner; 0 = compensation is off. */
+  compensationMs: number;
+  /** True for a re-arm after a wrong answer, so a surface can word it differently. */
+  rebound: boolean;
+  /** Local clock at the moment this client painted the armed state; null until it has. */
+  paintedAt: number | null;
+};
+
 /** The judged-flash payload (A4 "Score delta flash"): cleared when the next clue opens. */
 export type LastJudgedView = {
   entityId: string;
@@ -143,6 +165,12 @@ export type RoomView = {
   content: RoomContentView | null;
   myBuzz: MyBuzzView;
   pendingTimers: PendingTimerView[];
+  /**
+   * The open arming, or null when the buzzers are not armed (and on stores that hold no
+   * window - a local simulation adjudicates a buzz the instant it is pressed, so there is
+   * nothing to measure and nothing to hold).
+   */
+  arming: RoomArmingView | null;
   lastJudged: LastJudgedView | null;
   wagerRange: WagerRangeView | null;
   finalWagerRanges: WagerRangeView[];

@@ -165,6 +165,10 @@ export class LocalSimRoomStore implements RoomStore {
       content: this.content,
       myBuzz: this.myBuzz,
       pendingTimers: this.pendingTimers,
+      // No arming window: this store IS the adjudicator and it crowns a winner in the same tick
+      // as the press, so there is nothing to hold and no round trip to measure (contrast the ws
+      // store, where the room holds the race briefly to rank it by reaction time).
+      arming: null,
       lastJudged: this.lastJudged,
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
@@ -560,6 +564,15 @@ export class LocalSimRoomStore implements RoomStore {
   }
 
   // --- play actions ----------------------------------------------------------------------
+
+  markArmedPainted(armId: number): void {
+    // Nothing to record: a simulated room has no arming window and no network to compensate
+    // for. Its buzz is adjudicated in the same tick as the press, so there is no ranking to
+    // influence and no round trip to measure - which is why `view.arming` is null here and a
+    // surface's paint report lands nowhere. Present so the seam has one shape, not two
+    // (docs/decisions/2026-08-17-buzz-latency-compensation.md is about real rooms only).
+    void armId;
+  }
 
   buzz(): void {
     if (this.myPlayerId === null) return;

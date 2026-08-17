@@ -94,6 +94,54 @@ export function prunePendingTimers(
   return timers.filter((timer) => allowed.includes(timer.kind));
 }
 
+/**
+ * Every timer kind, as data, so a `snapshot.timers` entry can be checked against the set the
+ * engine actually has. `Record<TimerKind, true>` rather than an array: adding a kind to the
+ * engine's union without adding it here is a compile error, which is the only version of this
+ * list worth having.
+ */
+const knownTimerKinds: Record<TimerKind, true> = {
+  "auto-arm": true,
+  "selection-shot-clock": true,
+  "buzz-window": true,
+  "answer-window": true,
+  "everyone-answers-window": true,
+  "wager-entry": true,
+  "final-wager": true,
+  "final-writing": true,
+  "round-time-limit": true,
+};
+
+/**
+ * Turn the room's live countdowns (`snapshot.timers`, REMAINING milliseconds) into the hints
+ * surfaces already render. This is what stops a reconnecting phone or a reopened host console
+ * showing a frozen clock: the engine's `timer-set` events say a window opened, and a client
+ * that arrived after they were broadcast has no way to learn about them at all (user-flows C6).
+ *
+ * `durationMs` is set to the remaining time on purpose. The room reports what is LEFT, never
+ * what was originally set, and the two clocks are not synchronized - so a bar seeded this way
+ * starts full and empties exactly when the window closes. It renders "how long you have",
+ * which is the true statement; it does not pretend to know how much has already gone.
+ *
+ * Kinds this build does not recognise are dropped rather than guessed at: the wire type is a
+ * string so an older client meets a newer room's timer without failing the whole snapshot.
+ */
+export function pendingTimersFromRoom(
+  timers: readonly { kind: string; remainingMs: number }[],
+  at: number,
+): PendingTimerView[] {
+  const hints: PendingTimerView[] = [];
+  for (const timer of timers) {
+    if (!Object.hasOwn(knownTimerKinds, timer.kind)) continue;
+    hints.push({
+      kind: timer.kind as TimerKind,
+      durationMs: timer.remainingMs,
+      firesAt: at + timer.remainingMs,
+    });
+  }
+  return hints;
+}
+
 export type FoldContext = {
   /** This connection's seat, or null for host/display/spectator - decides "was that me". */
   myPlayerId: string | null;

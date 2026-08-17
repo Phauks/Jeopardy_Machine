@@ -41,9 +41,19 @@ async function newPage(): Promise<Page> {
   return context.newPage();
 }
 
-/** Create a room the way a host does: the front door's button, which hands off to the console. */
+/**
+ * Create a room the way a host does: fill the form, press the button, land on the console.
+ *
+ * The two text fields are filled because they are REQUIRED - unconditionally, private rooms
+ * included, since the 2026-08-17 front-door pass (the console, the display's title card and
+ * this tab's rejoin offer all render them). This suite predates that change and clicked a
+ * button that had since become disabled until they were filled; it is local-only, so CI never
+ * said so. Filling them is also the more honest walk: it is what a host actually does.
+ */
 async function createRoomFromFrontDoor(page: Page): Promise<string> {
   await page.goto(`${e2eOrigin}/`);
+  await page.getByLabel(/Room name/).fill("Surfaces walk");
+  await page.getByLabel(/Hosted by/).fill("The e2e suite");
   await page.getByRole("button", { name: "Create room" }).click();
   await page.waitForURL(/\/room\/[A-Z0-9]+\/host$/, { timeout: 20_000 });
   const code = /\/room\/([A-Z0-9]+)\/host$/.exec(page.url())?.[1];

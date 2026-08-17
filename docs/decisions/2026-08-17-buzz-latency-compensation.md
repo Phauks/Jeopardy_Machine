@@ -1,6 +1,6 @@
 # Buzz latency compensation
 
-> Decision record · 2026-08-17 · M6 · Status: **landed** (protocol + engine + realtime + bots; the web surfaces have their client half to wire, see "What clients owe")
+> Decision record · 2026-08-17 · M6 · Status: **landed**, both halves (protocol + engine + realtime + bots, then the web surfaces - see "What clients owe")
 
 ## The problem, stated honestly
 
@@ -112,6 +112,19 @@ Wiring a surface is three lines, and none of them require clock synchronization:
 3. Attach `timing: { armId, elapsedMs }` to the buzz action, elapsed measured from step 1.
 
 `packages/bots/src/bot.ts` is the reference implementation. Until a surface does this it is ranked by arrival: never penalized below M3 behavior, never compensated either.
+
+**Landed on the web surfaces 2026-08-17**, and the two places it lives are the two ends of the room-store seam:
+
+- `apps/web/src/lib/room/ws-room-store.svelte.ts` owns the wire. `arm-ack` is the FIRST statement of the `arm-window` branch, ahead of the state write, because the reply time is the measurement and anything done before it is charged to that phone as latency it does not have. The arming lands on `RoomView.arming` with a null paint time, and `buzz()` attaches `timing` only when there is a paint behind it - an unstamped buzz is the honest output for a surface that never showed the button, and the room ranks it by arrival.
+- `apps/web/src/lib/room/buzzer-screen.svelte` owns the paint. An `$effect` runs after the DOM is updated, which is the closest a component gets to "the player could see it", and it calls `store.markArmedPainted(armId)` there. The store keeps the FIRST paint: a re-render, or the screen's coarse clock ticking five times a second, must not move t0 forward under a player who has been staring at a hot button for half a second.
+
+Two things fell out of wiring it, both worth naming:
+
+**The paint is the only defensible t0, and only the surface knows it.** Measuring from message receipt would credit this phone for its own render work - tens of milliseconds of framework, layout and paint that are not reaction time by any definition. So the store cannot compute it and does not try; the seam grew one method (`RoomStore.markArmedPainted`) rather than a guess. The local simulation implements it as a no-op and reports `arming: null`, because a store that adjudicates a press in the same tick as the press has no race to rank and no network to compensate.
+
+**The window holds the announcement; it must never look like it holds your button.** The presser's own confirmation is already instant (optimistic `myBuzz: pending` set before the send, plus flash and haptic before any store work), but the button then sat there hot for the length of the window - which reads as "that did not register" and invites a second press at a room that has already heard the first. It now says BUZZED and drops its pulse for exactly as long as the room is deciding. Nothing about that beat waits on the network; it is the local optimistic state given a face.
+
+A third fix rode along, from the same message: `snapshot.timers` seeds the timer hints every surface already renders (`pendingTimersFromRoom` in `room-fold.ts`), so a phone that slept through the arm and a console reopened mid-answer come back to a running countdown rather than a frozen one. `durationMs` is set to the REMAINING time on purpose - the room reports what is left, never what was originally set, so a bar seeded this way starts full and empties exactly when the window closes. It states how long you have, and does not pretend to know how much has gone.
 
 ## Consequences
 

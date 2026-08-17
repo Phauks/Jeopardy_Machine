@@ -3,11 +3,14 @@
 // render - the repo's component-test pattern) is asserted for that state's signature. This is
 // the "every state" gate the milestone asks for; interaction timing lives in the contract
 // tests, visual truth in the /dev routes.
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import BuzzerScreen from "#lib/room/buzzer-screen.svelte";
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
 import { viewEntityForPlayer } from "#lib/room/room-view.ts";
+import type { RoomStore } from "#lib/room/room-store.ts";
+import type { RoomView } from "#lib/room/room-view.ts";
 
 function playerStore(seed = "buzzer-states"): LocalSimRoomStore {
   const store = new LocalSimRoomStore({ roomCode: "TESTA", role: "player", seed });
@@ -19,6 +22,12 @@ function playerStore(seed = "buzzer-states"): LocalSimRoomStore {
     skinToneId: null,
   });
   return store;
+}
+
+/** A store whose view is whatever a test needs - the only way to reach states the sim, which
+ * adjudicates a buzz in the same tick as the press, can never produce. */
+function viewOnlyStore(view: RoomView): RoomStore {
+  return { mode: "ws", view } as unknown as RoomStore;
 }
 
 function markup(store: LocalSimRoomStore): string {
@@ -58,6 +67,46 @@ describe("buzzer screen states (A4 table)", () => {
     const body = markup(store);
     expect(body).toContain("BUZZ");
     expect(body).toContain("hot");
+  });
+
+  it("buzzed, waiting on the room: the press is confirmed instead of re-offered", () => {
+    // The room may hold the ANNOUNCEMENT for up to `compensationMs` while it ranks the field
+    // by reaction time (docs/decisions/2026-08-17-buzz-latency-compensation.md). It never holds
+    // the presser's own confirmation, and the button must not snap back to hot in the meantime
+    // - a phone that looks unpressed invites a second press at a room that already heard.
+    const store = playerStore();
+    store.startGame();
+    store.selectCell(0, 0);
+    store.armBuzzers();
+    const armed = store.view;
+    // Side by side, so the assertions are about the DIFFERENCE rather than about substrings
+    // that could be anywhere in the markup.
+    const hot = render(BuzzerScreen, { props: { store: viewOnlyStore(armed) } }).body;
+    const waiting = render(BuzzerScreen, {
+      props: { store: viewOnlyStore({ ...armed, myBuzz: { status: "pending", at: Date.now() } }) },
+    }).body;
+    expect(hot).toContain("BUZZ<");
+    expect(hot).toContain("pulse");
+    expect(waiting).toContain("BUZZED<");
+    expect(waiting).toContain("sent");
+    // No longer inviting a press it has already sent.
+    expect(waiting).not.toContain("pulse");
+  });
+
+  it("reports the paint of the armed button, or the room silently ranks by arrival", () => {
+    // A SOURCE-level gate, and the reason is the whole point of it: nothing renders this. If
+    // the report is dropped, every buzz goes out unstamped, every room falls back to arrival
+    // order, and no screen anywhere says the race stopped being about thumbs. The store's side
+    // is held by ws-room-store.test.ts; this is the half only the component can supply.
+    const source = readFileSync(
+      new URL("./buzzer-screen.svelte", import.meta.url).pathname,
+      "utf8",
+    );
+    expect(source).toContain("store.markArmedPainted(arming.armId)");
+    // Inside an effect, because an effect runs AFTER the DOM is updated - which is the closest
+    // a component gets to "the player could see it". A call during setup would stamp t0 before
+    // the button existed and hand this phone free milliseconds.
+    expect(source).toMatch(/\$effect\(\(\) => \{[^}]*markArmedPainted/);
   });
 
   it("you won the buzz: full-screen YOU + answer aloud + ring timer", () => {

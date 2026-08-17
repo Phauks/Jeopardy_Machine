@@ -574,6 +574,139 @@ describe("ws room store: reconnection restores the screen", () => {
   });
 });
 
+describe("ws room store: the client half of buzz latency compensation", () => {
+  // docs/decisions/2026-08-17-buzz-latency-compensation.md "What clients owe". Every one of
+  // these is silent when it breaks: the room falls back to arrival order and nothing on any
+  // screen says the race stopped being about thumbs.
+  function armed(now: () => number): Harness {
+    const room = harness({ now });
+    room.open();
+    room.serve({
+      type: "welcome",
+      roomCode,
+      role: "player",
+      playerId: "p-1",
+      sessionToken: "c".repeat(32),
+    });
+    room.serve(snapshotFrame());
+    room.sent.length = 0;
+    return room;
+  }
+
+  it("acks an arming as its very first act, because the reply IS the measurement", () => {
+    let clock = 1000;
+    const room = armed(() => clock);
+    room.serve({
+      type: "arm-window",
+      arm: { armId: 4, at: 900, compensationMs: 250, rebound: false },
+    });
+    // FIRST frame out, not merely one of them: the server times its own broadcast against this
+    // reply, so anything sent ahead of it would be charged to this phone as latency.
+    expect(room.sent[0]).toEqual({ version: protocolVersion, type: "arm-ack", armId: 4 });
+    expect(room.sent).toHaveLength(1);
+    // The arming is on the view, and NOT yet painted - nothing has reached a screen.
+    expect(room.store.view.arming).toEqual({
+      armId: 4,
+      compensationMs: 250,
+      rebound: false,
+      paintedAt: null,
+    });
+  });
+
+  it("measures elapsed from the PAINT, not from the moment the frame arrived", () => {
+    let clock = 1000;
+    const room = armed(() => clock);
+    room.serve({
+      type: "arm-window",
+      arm: { armId: 4, at: 900, compensationMs: 250, rebound: false },
+    });
+    // 80ms of this device's own work between reading the frame and showing the hot button.
+    // That is not reaction time and must not be billed as any.
+    clock = 1080;
+    room.store.markArmedPainted(4);
+    expect(room.store.view.arming?.paintedAt).toBe(1080);
+    clock = 1300;
+    room.store.buzz();
+    expect(room.sent.at(-1)).toEqual({
+      version: protocolVersion,
+      type: "action",
+      action: { type: "buzz" },
+      timing: { armId: 4, elapsedMs: 220 },
+    });
+    // The presser's own confirmation does not wait for the room's verdict, whatever the
+    // compensation window is holding.
+    expect(room.store.view.myBuzz).toEqual({ status: "pending", at: 1300 });
+  });
+
+  it("keeps the FIRST paint as t0 and ignores a paint for another arming", () => {
+    let clock = 1000;
+    const room = armed(() => clock);
+    room.serve({
+      type: "arm-window",
+      arm: { armId: 4, at: 900, compensationMs: 250, rebound: false },
+    });
+    room.store.markArmedPainted(4);
+    // A re-render, or the buzzer screen's coarse clock ticking - it must not move t0 forward
+    // under a player who has been looking at a hot button for half a second.
+    clock = 1500;
+    room.store.markArmedPainted(4);
+    room.store.markArmedPainted(9);
+    expect(room.store.view.arming?.paintedAt).toBe(1000);
+  });
+
+  it("sends NO claim rather than a wrong one when nothing was painted", () => {
+    // The un-wired case the decision doc promises is safe: an arming this surface never showed
+    // (or no arming at all) produces a bare buzz, which the room ranks by arrival - exactly
+    // the pre-M6 behaviour, never a penalty.
+    const room = armed(() => 1000);
+    room.store.buzz();
+    expect(room.sent.at(-1)).toEqual({
+      version: protocolVersion,
+      type: "action",
+      action: { type: "buzz" },
+    });
+    room.serve({
+      type: "arm-window",
+      arm: { armId: 6, at: 900, compensationMs: 0, rebound: true },
+    });
+    room.store.buzz();
+    expect(room.sent.at(-1)).not.toHaveProperty("timing");
+  });
+
+  it("renders the room's live countdowns from the snapshot, and forgets the arming with it", () => {
+    // C6: a console reopened mid-answer, or a phone that slept through the arm. `timer-set`
+    // went out while it was away, so the snapshot's remaining-ms is the only source there is.
+    let clock = 5000;
+    const room = harness({ now: () => clock });
+    room.open();
+    room.serve({
+      type: "arm-window",
+      arm: { armId: 4, at: 900, compensationMs: 250, rebound: false },
+    });
+    room.serve(
+      snapshotFrame({
+        phase: "active",
+        game: { phase: "answering" },
+        timers: [
+          { kind: "answer-window", remainingMs: 3200 },
+          { kind: "round-time-limit", remainingMs: 900_000 },
+          // A window this phase cannot be waiting on, and a kind this build does not know:
+          // neither may reach a screen as a countdown nobody can explain.
+          { kind: "wager-entry", remainingMs: 4000 },
+          { kind: "quantum-flux", remainingMs: 50 },
+        ],
+      }),
+    );
+    expect(room.store.view.pendingTimers).toEqual([
+      { kind: "answer-window", durationMs: 3200, firesAt: 8200 },
+      { kind: "round-time-limit", durationMs: 900_000, firesAt: 905_000 },
+    ]);
+    // The arming resets with the rest of the ephemeral layer; the room re-sends `arm-window`
+    // to a connection that resumed into an open one, so it is measured afresh.
+    expect(room.store.view.arming).toBeNull();
+  });
+});
+
 describe("ws room store: what the surfaces send", () => {
   function joined(): Harness {
     const room = harness();

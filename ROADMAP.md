@@ -74,7 +74,7 @@ Progress 2026-08-13 - `packages/engine` (@jeopardy/engine) landed:
 
 ### M3 - Realtime rooms (DO + WebSockets)
 
-`GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, server-arrival buzz ordering (fairness compensation deferred to M6), alarms for room cleanup. **Single-origin connections** (owner decision, docs/decisions/2026-08-13-single-origin-binding.md): all clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to the DO via the cross-script binding - week-1 risk item is proving the upgrade passes through the SvelteKit-on-Workers path (fallback: thin custom entry ahead of the Kit handler). **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones - all through the single origin.
+`GameRoomDO` in `apps/realtime`: room codes via `idFromName`, WebSocket Hibernation, session-token reconnection, snapshot + patch protocol, buzz ordering (server-arrival at M3; latency compensation landed 2026-08-17 in M6, upstream of the engine), alarms for room cleanup. **Single-origin connections** (owner decision, docs/decisions/2026-08-13-single-origin-binding.md): all clients hit `wss://<web-origin>/room/<CODE>/ws` and the web Worker forwards upgrades to the DO via the cross-script binding - week-1 risk item is proving the upgrade passes through the SvelteKit-on-Workers path (fallback: thin custom entry ahead of the Kit handler). **Exit criteria:** vitest-pool-workers suite incl. hibernation-eviction tests; Playwright multi-context test proves deterministic buzz ordering with simulated phones - all through the single origin.
 
 Progress 2026-08-14 - landed; both exit criteria green:
 
@@ -181,7 +181,7 @@ Team mode (shared-phone first), the event's board built in the editor from the c
 
 Buzz latency compensation (arm-window + client-elapsed with RTT clamps), early-buzz lockout penalty, reconnection hardening under real phone conditions, host "resume crashed game" from DO state.
 
-Progress 2026-08-17 - the server side landed (docs/decisions/2026-08-17-buzz-latency-compensation.md):
+Progress 2026-08-17 - buzz latency compensation, both halves (docs/decisions/2026-08-17-buzz-latency-compensation.md):
 
 - [x] **Buzz latency compensation, upstream of the engine** (boundary 2.1 intact): an arming opens a HELD window in the DO, buzzes are ranked by credited reaction = `max(client's claimed elapsed, arrival - min(measured round trip, 250ms))`, and the engine still receives one ordered list with each action stamped at its credited press time. The clamp is the whole threat model: a lying client gains exactly what an honest client on the same connection is already given, never more than the ceiling in `limits.buzz` (which hosts cannot lift). The ordering arithmetic is a pure protocol module, tested adversarially
 - [x] **Per-connection RTT measurement, hibernation-safe**: the arm broadcast carries an id, every client acks it immediately, and arrival-minus-broadcast is that connection's round trip over exactly the path the buzz will travel - measured only while a room is actively playing, never keeping a room awake, never reusing a sample from a previous arming. The `ping`/`pong` auto-response stays exactly as it was (it answers without waking the DO, which is the point of it)
@@ -189,7 +189,7 @@ Progress 2026-08-17 - the server side landed (docs/decisions/2026-08-17-buzz-lat
 - [x] **Early-buzz lockout (#12) proven end to end**, and two defects fixed on the way: `buzz-rejected` was riding the PUBLIC event stream instead of reaching the one phone it concerns, and a mashed re-trigger never told the presser its new deadline. Team-wide penalties (#36) verified through the real path
 - [x] **Reconnection hardening (A5) + host resume (C6)**: snapshots now carry the room's live `timers` (a console reopening mid-answer had no countdown at all) and, during an open arming, the `arm-window` - so a phone that slept mid-clue resumes to the exact screen and can still race. A reconnect around a press neither loses the buzz nor duplicates it; a returning seat keeps its team and score; the final round fills a missing wager at the deadline rather than waiting on a dead phone. The alarm book is now pruned by phase, so no phantom countdown reaches a screen
 - [x] **The fairness harness** (`@jeopardy/bots/latency` + `/race`): seeded per-direction latency simulation, races judged against the SERVER'S own ordering module, and a CLI A/B (`--race N` vs `--race N --no-compensation`). Live measurement: same field, same seeds - with compensation the earliest thumb won 4/4; without it the best connection won 4/4
-- [ ] Client half on the web surfaces: ack the `arm-window`, stamp buzzes with elapsed-since-arm, render the snapshot's `timers`. Until then those surfaces are ranked by arrival (never worse than M3, never compensated) - owned by the M4 ws-store reconcile
+- [x] **The client half, on the real surfaces**: the ws store answers `arm-window` with `arm-ack` as its first act (the reply IS the measurement, so work done ahead of it would be billed to that phone as latency it does not have), the buzzer screen reports the frame on which the hot button was PAINTED, and a buzz carries `timing: { armId, elapsedMs }` measured from that paint - because the quantity being ranked is the thumb, and the thumb cannot start before the button is visible. `snapshot.timers` now seeds the timer hints every surface already renders, so a phone that slept through the arm and a console reopened mid-answer both come back to a running countdown instead of a frozen one. And the press stays confirmed on the presser's own phone for the whole holding window: the room delays the ANNOUNCEMENT, never your own button
 
 ### M7 - Suite features
 
@@ -222,7 +222,7 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 **Later**
 
 - M4 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
-- M6 fairness + resilience: server side landed 2026-08-17 (the web surfaces' client half rides the M4 reconcile)
+- M6 fairness + resilience: buzz compensation landed 2026-08-17, server and client; what remains in the milestone is host "resume crashed game" beyond the C6 snapshot recovery already proven
 - M7 -> M8 as appetite allows
 
 ## Open decisions (owner input needed)

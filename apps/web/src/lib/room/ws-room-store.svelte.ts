@@ -18,6 +18,8 @@
 // |               | static facts (teamsMode, board material) so `sync` restores everything     |
 // | event         | folds the batch through room-fold.ts and takes the state it carries; a     |
 // |               | stateVersion gap of more than one asks for `sync`                          |
+// | arm-window    | `arm-ack` goes back IMMEDIATELY (see the latency note below), and the     |
+// |               | arming lands on view.arming with a null paint time                        |
 // | buzz-won      | folded as the engine event of the same name; the room-audio callback gets  |
 // |               | the SERVER-resolved sound (team-first) rather than resolving it again      |
 // | buzz-rejected | myBuzz=rejected with reason + lockedUntil (per-phone, silent, local)       |
@@ -31,12 +33,37 @@
 //
 // TIMERS. The DO owns expiries through its alarm book, so this store only RENDERS the hints
 // (`pendingTimers`) and never dispatches an expiry action - a client that could forge time
-// could forge a buzz window. `expireTimer` is therefore the host's "skip the wait" relay.
+// could forge a buzz window. `expireTimer` is therefore the host's "skip the wait" relay. The
+// hints come from two places: `timer-set` events while a surface is watching, and
+// `snapshot.timers` (remaining ms) for a surface that arrived after those events went out.
+//
+// LATENCY COMPENSATION, this store's half (docs/decisions/2026-08-17-buzz-latency-
+// compensation.md "What clients owe"). The room ranks buzzes by REACTION TIME instead of by
+// whose Wi-Fi is fastest, and it needs exactly two things from here:
+//
+//   1. `arm-ack`, sent the instant `arm-window` is read and before anything else happens. The
+//      round trip IS the measurement - the server times its own broadcast against this reply -
+//      so every millisecond spent between reading the frame and answering it is charged to
+//      this phone as network latency that is not there. It is therefore the FIRST statement in
+//      that branch, ahead of the state write, and it is never batched or deferred.
+//   2. `timing: { armId, elapsedMs }` on the buzz, elapsed measured from the moment the armed
+//      button was PAINTED (`markArmedPainted`, called by the surface) rather than from the
+//      moment this frame arrived. Painting is when the player could first see the button go
+//      hot, and the thumb is the quantity being ranked.
+//
+// Neither implies clock synchronization: both numbers are differences on one machine's own
+// clock. Skipping either is safe and un-punished - the room falls back to arrival order for
+// this connection, which is exactly what it did before compensation existed.
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
 import { browserRoomSocket } from "#lib/room/room-socket.ts";
-import { emptyFold, foldEvent, prunePendingTimers } from "#lib/room/room-fold.ts";
+import {
+  emptyFold,
+  foldEvent,
+  pendingTimersFromRoom,
+  prunePendingTimers,
+} from "#lib/room/room-fold.ts";
 import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
@@ -59,6 +86,7 @@ import type {
 } from "#lib/room/room-store.ts";
 import type {
   ClueContentView,
+  RoomArmingView,
   RoomConnectionState,
   RoomContentView,
   RoomPlayerView,
@@ -169,6 +197,8 @@ export class WsRoomStore implements RoomStore {
   private teamsModeState = $state(false);
   private myPlayerIdState = $state<string | null>(null);
   private fold = $state.raw<RoomFoldState>(emptyFold());
+  /** The open arming, with the local paint time the surface stamps on it. */
+  private armingState = $state.raw<RoomArmingView | null>(null);
   private pausedState = $state(false);
   private boardRounds = $state.raw<BoardMaterial["rounds"] | null>(null);
   private clueTexts = $state.raw<Record<string, ClueContentView>>({});
@@ -223,6 +253,7 @@ export class WsRoomStore implements RoomStore {
       content: this.contentView(),
       myBuzz: this.fold.myBuzz,
       pendingTimers: this.fold.pendingTimers,
+      arming: this.armingState,
       lastJudged: this.fold.lastJudged,
       wagerRange: this.fold.wagerRange,
       finalWagerRanges: this.fold.finalWagerRanges,
@@ -395,6 +426,19 @@ export class WsRoomStore implements RoomStore {
       case "event":
         this.applyEventBatch(message);
         return;
+      case "arm-window":
+        // FIRST, ahead of the state write below and ahead of anything a surface will render:
+        // the reply time IS this connection's round-trip measurement, so work done before it
+        // is measured as latency that is not there. The arming's own paint time is stamped
+        // later, by the surface, once the hot button is actually on screen.
+        this.sendMessage({ type: "arm-ack", armId: message.arm.armId });
+        this.armingState = {
+          armId: message.arm.armId,
+          compensationMs: message.arm.compensationMs,
+          rebound: message.arm.rebound,
+          paintedAt: null,
+        };
+        return;
       case "buzz-won":
         this.noteVersion(message.stateVersion);
         this.applyEvents(
@@ -465,15 +509,24 @@ export class WsRoomStore implements RoomStore {
     this.pausedState = message.paused;
     this.applyRoster(message.roster);
     if (message.clueContent !== null) this.applyClueContent(message.clueContent);
-    // A snapshot re-founds the ephemeral layer on the state it describes: the timer hints it
-    // does not carry cannot be invented, and a stale buzz verdict from before a reconnect
-    // would show the wrong ring. Everything a phone genuinely needs to see again (the open
-    // clue, its phase, who has control) is in the state itself.
+    // A snapshot re-founds the ephemeral layer on the state it describes. A stale buzz verdict
+    // from before a reconnect would show the wrong ring, so everything derived from events is
+    // dropped - except the clocks, which the room now reports (`timers`, remaining ms). Those
+    // are the one part a returning client genuinely cannot rebuild: `timer-set` went out while
+    // it was away, and a console reopened mid-answer used to show no countdown at all
+    // (user-flows C6). Pruned by phase as well, because a timer no phase can be waiting on is
+    // a phantom whichever end produced it.
+    //
+    // The arming resets with it. If one is still open the room re-sends `arm-window` right
+    // after this snapshot (game-room-do.ts does it on join and on resume), so a phone that
+    // slept through the arm is measured afresh and can still race.
     const phase = (message.game as GameState | null)?.phase ?? null;
+    const timers = pendingTimersFromRoom(message.timers, this.now());
+    this.armingState = null;
     this.fold =
       phase === null
         ? emptyFold()
-        : { ...emptyFold(), pendingTimers: prunePendingTimers([], phase) };
+        : { ...emptyFold(), pendingTimers: prunePendingTimers(timers, phase) };
   }
 
   private applyEventBatch(message: Extract<RoomServerMessage, { type: "event" }>): void {
@@ -611,11 +664,40 @@ export class WsRoomStore implements RoomStore {
 
   // --- play (phone side) -------------------------------------------------------------------
 
+  markArmedPainted(armId: number): void {
+    const arming = this.armingState;
+    // Idempotent, and only ever for the arming currently open: the FIRST paint is t0, and a
+    // later frame (a re-render, a coarse clock tick) must not move the clock forward under a
+    // player who has been staring at a hot button for a second already.
+    if (arming === null || arming.armId !== armId || arming.paintedAt !== null) return;
+    this.armingState = { ...arming, paintedAt: this.now() };
+  }
+
   buzz(): void {
-    // Optimistic pending on the press (the pointerdown feedback contract); the room's verdict
-    // replaces it a round trip later, which is the one honest difference from the mock.
-    this.fold = { ...this.fold, myBuzz: { status: "pending", at: this.now() } };
-    this.sendAction({ type: "buzz" });
+    const at = this.now();
+    // Optimistic pending on the press (the pointerdown feedback contract), set BEFORE the send
+    // so the presser's own confirmation never waits on anything. The room may hold the
+    // announcement for up to `arming.compensationMs` while it ranks the field; it never holds
+    // this.
+    this.fold = { ...this.fold, myBuzz: { status: "pending", at } };
+    const arming = this.armingState;
+    if (arming === null || arming.paintedAt === null) {
+      // No arming, or one this surface never painted: send no claim at all rather than a
+      // number measured from the wrong thing. The room ranks an unstamped buzz by arrival.
+      this.sendAction({ type: "buzz" });
+      return;
+    }
+    this.sendMessage({
+      type: "action",
+      action: { type: "buzz" },
+      timing: {
+        armId: arming.armId,
+        // Reaction time: paint -> press, on this device's own clock, both ends measured here.
+        // Clamped to the schema's range (actionTimingSchema) so a clock that jumped backwards
+        // during the clue costs the buzz its compensation rather than the whole frame.
+        elapsedMs: Math.min(60_000, Math.max(0, Math.round(at - arming.paintedAt))),
+      },
+    });
   }
 
   commitWager(amount: number): void {
