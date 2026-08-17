@@ -72,8 +72,6 @@ export type PreGameRegions = {
   /** The room is already playing - joining now goes straight to the buzzer. */
   lateJoin: boolean;
   teams: TeamsRegionState;
-  /** The roster region's headline state: nobody is waiting on you once you are seated. */
-  waiting: boolean;
 };
 
 export function preGameRegionsFor(view: RoomView): PreGameRegions {
@@ -85,7 +83,6 @@ export function preGameRegionsFor(view: RoomView): PreGameRegions {
     seated,
     identityMode: seated ? "live" : "draft",
     lateJoin: view.phase !== "lobby",
-    waiting: seated,
     teams: {
       shown: view.teamsMode,
       actionable: seated,
@@ -118,7 +115,7 @@ export function myPlayer(view: RoomView): RoomPlayerView | null {
 export function teamNameProblem(
   name: string,
   regions: PreGameRegions,
-): "empty" | "too-long" | "at-cap" | "duplicate" | null {
+): "empty" | "too-long" | "at-cap" | null {
   if (regions.teams.atTeamCap) return "at-cap";
   const trimmed = name.trim();
   if (trimmed.length < limits.team.teamNameMinLength) return "empty";
@@ -137,8 +134,6 @@ export function teamNameProblemCopy(
       return `Team names stop at ${String(limits.team.teamNameMaxLength)} characters`;
     case "at-cap":
       return `This room already has the maximum ${String(limits.team.teamMaxCount)} teams`;
-    case "duplicate":
-      return "There is already a team by that name";
   }
 }
 

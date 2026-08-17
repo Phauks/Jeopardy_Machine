@@ -59,3 +59,55 @@ describe("avatar-picker server render", () => {
     expect(pressedCount).toBe(2);
   });
 });
+
+describe("the skin-tone row appears only where it can do something", () => {
+  // The honesty rule from the 2026-08-16 decision: pets have no skin cells, so offering them a
+  // tone would be a control that silently changes nothing. This is checked at the picker rather
+  // than left to callers, because it is the picker that knows which avatar is selected.
+  const human = avatarManifest.avatars.find((entry) => entry.kind === "human");
+  const pet = avatarManifest.avatars.find((entry) => entry.kind === "pet");
+  if (!human || !pet) throw new Error("roster needs both a human and a pet");
+  // Re-bound so the narrowing survives into the closure below.
+  const accentId = firstAccent.id;
+
+  function pickerFor(selectedAvatarId: string): string {
+    return render(AvatarPicker, {
+      props: {
+        avatars: avatarManifest.avatars,
+        accents: avatarManifest.accents,
+        skinTones: avatarManifest.skinTones,
+        selectedAvatarId,
+        selectedAccentId: accentId,
+      },
+    }).body;
+  }
+
+  it("offers every tone plus an explicit 'as drawn' when a human is selected", () => {
+    const body = pickerFor(human.id);
+    expect(body).toContain('aria-label="Skin tone"');
+    for (const tone of avatarManifest.skinTones) {
+      expect(body, tone.id).toContain(`aria-label="Skin ${tone.label}"`);
+    }
+    // "Not chosen" is a swatch of its own, so a player can always get back to it.
+    expect(body).toContain('aria-label="Skin tone: as drawn"');
+    expect(body).toContain('aria-pressed="true"');
+  });
+
+  it("shows no tone control at all when a pet is selected", () => {
+    const body = pickerFor(pet.id);
+    expect(body).not.toContain('aria-label="Skin tone"');
+    expect(body).not.toContain("Skin tone: as drawn");
+  });
+
+  it("shows none when the caller offers no tones (the dev gallery, the old callers)", () => {
+    const body = render(AvatarPicker, {
+      props: {
+        avatars: avatarManifest.avatars,
+        accents: avatarManifest.accents,
+        selectedAvatarId: human.id,
+        selectedAccentId: accentId,
+      },
+    }).body;
+    expect(body).not.toContain('aria-label="Skin tone"');
+  });
+});

@@ -71,11 +71,22 @@
   });
   let attempted = $state(false);
 
+  // The seated name needs a buffer of its own, and the reason is a real bug without one: a
+  // nickname below the minimum length is not sent to the room, so if the field showed the
+  // ROOM's copy it would snap back to the old name the moment you cleared it to retype. This
+  // adopts whatever the room says whenever the room's answer actually changes - on join, on
+  // resume, and when the host renames you - and otherwise holds what is being typed.
+  let seatedNickname = $state("");
+  $effect(() => {
+    const roomName = me?.nickname;
+    if (roomName !== undefined) seatedNickname = roomName;
+  });
+
   const character = $derived<CharacterDraft>(
     me === null
       ? draft
       : {
-          nickname: me.nickname,
+          nickname: seatedNickname,
           avatarId: me.avatarId,
           accentId: me.accentId ?? avatarManifest.accents[0]?.id ?? "gold",
           buzzSoundId: me.buzzSoundId,
@@ -90,16 +101,16 @@
 
   function changeCharacter(patch: Partial<CharacterDraft>): void {
     if (regions.seated) {
-      // Live: forward straight to the room. Nickname is held back until it is long enough to
-      // be legal, so clearing the field to retype it never sends an empty name to the roster.
+      // Live: forward straight to the room. The nickname is held back until it is long enough
+      // to be legal, so clearing the field to retype it never sends an empty name to the
+      // roster - the buffer above is what keeps the field showing the half-typed one meanwhile.
       const { nickname, ...rest } = patch;
+      if (nickname !== undefined) seatedNickname = nickname;
       const sendable =
         nickname !== undefined && nickname.trim().length >= limits.player.nicknameMinLength
           ? { ...rest, nickname: nickname.trim() }
           : rest;
       if (Object.keys(sendable).length > 0) store.updateIdentity(sendable);
-      // The field still has to show what is being typed while it is too short to send.
-      if (nickname !== undefined) draft = { ...draft, nickname };
       return;
     }
     draft = { ...draft, ...patch };
