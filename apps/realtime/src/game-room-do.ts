@@ -1817,6 +1817,10 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "unauthorized", "forcing a timer is host-only");
       return;
     }
+    // Same rule as a relayed action: held presses resolve first. A host reaching for "skip
+    // the wait" during an armed window would otherwise fire the buzz-window timeout and kill
+    // a clue that somebody had already rung in on (M6).
+    await this.flushArmWindow();
     // The alarm book keeps STALE entries on purpose (a phase moved on, an undo rewound time)
     // - they fire as harmless engine rejections. So "the timer the room is on" is the first
     // entry the engine still accepts, not simply the earliest deadline: walk them in due

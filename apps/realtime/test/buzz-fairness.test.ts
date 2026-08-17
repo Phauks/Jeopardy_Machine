@@ -33,12 +33,18 @@ import type { CompactGameSpec, TestClient } from "./helpers.ts";
 const slowPhone = { profile: latencyProfiles.slow, reactionMs: 150 } as const;
 const fastPhone = { profile: latencyProfiles.fast, reactionMs: 250 } as const;
 
+// A CHEATING Bo is given a deliberately slow thumb, because the interesting question about a
+// liar is whether the clamp holds when the lie is the only thing that could win the race -
+// and because the margin then survives a loaded machine inflating Bo's own measured round
+// trip all the way to the ceiling. An honest Bo keeps the fast thumb the headline needs.
+const cheatReactionMs = 450;
+
 const racersFor = (extra: Partial<Racer> = {}): Racer[] => [
   { nickname: "Ada", roundTripMs: slowPhone.profile.roundTripMs, reactionMs: slowPhone.reactionMs },
   {
     nickname: "Bo",
     roundTripMs: fastPhone.profile.roundTripMs,
-    reactionMs: fastPhone.reactionMs,
+    reactionMs: extra.elapsedClaim === undefined ? fastPhone.reactionMs : cheatReactionMs,
     ...extra,
   },
 ];
@@ -57,10 +63,15 @@ async function racedClue(options: {
     profile: slowPhone.profile,
     seed: `${options.seed}-ada`,
   });
-  const bo = await connectBot(code, racerBot("Bo", fastPhone.reactionMs, options.cheat ?? {}), {
-    profile: fastPhone.profile,
-    seed: `${options.seed}-bo`,
-  });
+  const bo = await connectBot(
+    code,
+    racerBot(
+      "Bo",
+      options.cheat === undefined ? fastPhone.reactionMs : cheatReactionMs,
+      options.cheat ?? {},
+    ),
+    { profile: fastPhone.profile, seed: `${options.seed}-bo` },
+  );
   await host.waitFor("roster", (message) => message.roster.players.length === 2);
   host.sendAction({ type: "start-game" });
   await host.takeEvent("round-started");
@@ -222,6 +233,33 @@ describe("the compensation window never swallows a clue", () => {
     host.sendAction({ type: "select-cell", category: 0, row: 0 });
     await host.takeEvent("clue-presented");
     host.sendAction({ type: "arm-buzzers" });
+    const won = await host.waitFor("buzz-won", undefined, 8000);
+    expect(won.playerId).toBe(bot.playerId);
+    expect(
+      host.engineEvents.some(
+        (event) => event.type === "clue-finished" && event.resolution === "dead",
+      ),
+    ).toBe(false);
+  }, 20_000);
+
+  it("resolves held presses before the host's own skip-the-wait can kill the clue", async () => {
+    // The host reaching for "no takers" in the same breath as somebody ringing in. The press
+    // is still in the holding pen, so the impatience must queue behind it - otherwise the
+    // buzz-window timeout closes the clue as a triple stumper on a player who had buzzed.
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code, compactGame, "fair-skip-race");
+    const host = await connectHost(code, hostToken);
+    const bot = await connectBot(code, racerBot("Ada", 0, { buzzProbability: 0 }));
+    await host.waitFor("roster", (message) => message.roster.players.length === 1);
+    host.sendAction({ type: "start-game" });
+    await host.takeEvent("round-started");
+    host.sendAction({ type: "select-cell", category: 0, row: 0 });
+    await host.takeEvent("clue-presented");
+    host.sendAction({ type: "arm-buzzers" });
+    await host.takeEvent("buzzers-armed");
+
+    bot.buzz();
+    host.send({ type: "expire-timer" });
     const won = await host.waitFor("buzz-won", undefined, 8000);
     expect(won.playerId).toBe(bot.playerId);
     expect(

@@ -12,7 +12,11 @@
 //
 // Everything here is storage-shaped (JSON, no class instances) because the whole window is
 // persisted: hibernation can evict the instance between the arm and the buzz, and losing a
-// queued press would mean a clue nobody won.
+// queued press would mean a clue nobody won. That costs one storage write per BUZZ (bounded
+// by the player hard cap and the per-connection message rate), which is the deliberate trade:
+// a buzz is the one frame in this product that must never be dropped. Round-trip samples are
+// NOT worth their own write - they ride whatever buzz writes next, and a sample lost to an
+// eviction simply means that connection is compensated for nothing.
 import { limits } from "@jeopardy/protocol/limits";
 import {
   adjudicationDeadlineMs,
