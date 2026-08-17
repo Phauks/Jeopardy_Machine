@@ -48,9 +48,11 @@ describe("the roster panel through the room's states", () => {
     // Connection state is a word, never a colour alone.
     expect(body).toContain(">here<");
     expect(body).toContain(`data-player-id="${first?.playerId ?? ""}"`);
-    // Their team's name rides the row (this fixture room plays in teams).
+    // Their team's name rides the row (this fixture room plays in teams), and so does the
+    // personal buzz sound the C3 sound check walks through.
     const teamName = store.view.roster.teams[0]?.name ?? "";
     expect(body).toContain(teamName);
+    expect(body).toContain('title="Personal buzz sound"');
   });
 
   it("shows a disconnected player as away rather than dropping them from the list", () => {

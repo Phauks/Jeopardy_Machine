@@ -198,6 +198,12 @@
           <span class="state" class:connected={player.connected}>
             {player.connected ? "here" : "away"}
           </span>
+          <!-- Their own buzz sound, which is what the room hears in individuals mode and what
+               the C3 sound check walks through; in teams mode the TEAM's sound is the room's and
+               this one plays on their phone alone (user-flows "Teams & leadership"). -->
+          <span class="badge sound" title="Personal buzz sound">
+            {buzzSoundLabel(player.buzzSoundId)}
+          </span>
           <div class="overflow">
             <button
               type="button"
@@ -545,6 +551,13 @@
 
   .team-badge {
     color: var(--control-text);
+  }
+
+  /* Present on every row so the column does not jitter, quiet enough not to compete with the
+     name - it is reference material for the sound check, not a headline. */
+  .badge.sound {
+    max-width: 5.5rem;
+    border-color: transparent;
   }
 
   .score {
