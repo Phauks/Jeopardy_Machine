@@ -8,7 +8,9 @@ Three consequences fall out of the append-only action log in `GameState.actionLo
 - **Crash recovery**: a room can rebuild a live game by replaying its log.
 - **Simulation fixtures** (owner directive "Development simulation"): `fixtures/*.json` are complete replayable games - compact board + preset-plus-overrides settings + seed + action array - replayed by the test suite and reusable by M3 bots and the M4 sim panel.
 
-The engine is total: an invalid or stale action returns the same state object plus an `action-rejected` event; it never throws mid-game. One adjudication contract worth naming (owner directive "Only the winning buzz is heard"): `buzz-won` fires exactly once per arming - room audio keys off that event alone; losing buzzes get `buzz-rejected`, which is per-phone feedback, never room audio.
+The engine is total: an invalid or stale action returns the same state object plus an `action-rejected` event; it never throws mid-game. One adjudication contract worth naming (owner directive "Only the winning buzz is heard"): `buzz-won` fires exactly once per arming - room audio keys off that event alone; losing buzzes get `buzz-rejected`, which is per-phone feedback, never room audio (the room DO routes it to the one connection it concerns).
+
+Buzz ORDER is the driver's problem, not the engine's, and that is deliberate: the engine adjudicates whatever ordered list it is handed. Since M6 the room DO hands it a list ranked by latency-compensated reaction time instead of raw arrival, with each buzz's `at` rewritten to its credited press time - all upstream, all invisible here (docs/decisions/2026-08-17-buzz-latency-compensation.md; boundary 2.1 requires the state machine stay single and unbranched).
 
 Import via the exports map, never deep paths (no barrels):
 

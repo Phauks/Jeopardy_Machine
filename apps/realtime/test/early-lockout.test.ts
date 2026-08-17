@@ -86,11 +86,19 @@ describe("matrix #12 end to end: the early-buzz penalty", () => {
     await host.takeEvent("buzzers-armed");
 
     // Two more presses AFTER the arm, while the penalty runs. Each is held by the
-    // compensation window, adjudicated, and answered privately with the new deadline.
+    // compensation window, adjudicated, and answered privately with the new deadline. Waiting
+    // for each answer rather than sleeping a fixed span keeps the presses inside the running
+    // penalty even when the suite is loaded - a slept-through lockout would test nothing.
     for (let press = 0; press < 2; press += 1) {
+      const answered = rejections(masher).length + 1;
       masher.sendAction({ type: "buzz" });
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      const deadline = Date.now() + 5000;
+      while (rejections(masher).length < answered && Date.now() < deadline) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
     }
+    // Nobody won: every one of those presses was a penalty, not a buzz.
+    expect(host.messagesOf("buzz-won")).toEqual([]);
     const deadlines = rejections(masher).map((message) =>
       message.type === "buzz-rejected" ? message.lockedUntil : null,
     );

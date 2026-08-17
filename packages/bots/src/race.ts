@@ -76,11 +76,17 @@ export type RaceOutcome = {
   racers: readonly Racer[];
   /** Who the ROOM actually crowned (the nickname on the buzz-won message). */
   winner: string;
+  /**
+   * Whether the room had settings.buzzing.latencyCompensation ON. False is the harness's
+   * CONTROL arm - the same field over the same networks adjudicated by arrival order - and it
+   * changes what "the room behaved correctly" means, so it must be stated rather than inferred.
+   */
+  compensating?: boolean;
 };
 
 export type RaceVerdict = RaceOutcome &
   RacePrediction & {
-    /** The room agreed with the compensation arithmetic - the server is behaving. */
+    /** The room crowned who it should have, given its own setting - it is behaving. */
     matchedPrediction: boolean;
     /** The fastest thumb won, whoever's Wi-Fi it was on - the property being sold. */
     fastestThumbWon: boolean;
@@ -90,10 +96,12 @@ export type RaceVerdict = RaceOutcome &
 
 export function judgeRace(outcome: RaceOutcome): RaceVerdict {
   const prediction = predictRace(outcome.racers);
+  const compensating = outcome.compensating ?? true;
+  const expected = compensating ? prediction.byCompensation : prediction.byArrival;
   return {
     ...outcome,
     ...prediction,
-    matchedPrediction: outcome.winner === prediction.byCompensation,
+    matchedPrediction: outcome.winner === expected,
     fastestThumbWon: outcome.winner === prediction.byReaction,
     changedTheOutcome: outcome.winner !== prediction.byArrival,
   };
@@ -137,7 +145,10 @@ export function formatRaceReport(report: RaceReport): string {
         verdict.winner.padEnd(13).slice(0, 13),
         verdict.byArrival.padEnd(13).slice(0, 13),
         verdict.byReaction.padEnd(13).slice(0, 13),
-        verdict.matchedPrediction ? (verdict.fastestThumbWon ? "fair" : "as-claimed") : "MISMATCH",
+        // "fair" = the fastest thumb won. "arrival" = the network decided it and the room
+        // agrees it should have (the control arm, or an evenly-matched field). "MISMATCH" =
+        // the room crowned somebody its own settings say it should not have: a defect.
+        verdict.matchedPrediction ? (verdict.fastestThumbWon ? "fair" : "arrival") : "MISMATCH",
       ].join(" "),
     );
   }

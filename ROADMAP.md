@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-16 (the reconcile between the two parallel milestones: the spectator budget reaches the lobby row, the theme document gains its `environment` + `staging` slots, streamer mode reaches the display, and the room's caps refuse in human copy. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-17 (M6 server side: buzz latency compensation upstream of the engine with its threat model and clamp, per-arming round-trip measurement, the early-buzz penalty and the A5/C6 recovery promises proven against the DO, and a bot-driven fairness harness that measures the claim. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -153,6 +153,16 @@ Team mode (shared-phone first), the event's board built in the editor from the c
 
 Buzz latency compensation (arm-window + client-elapsed with RTT clamps), early-buzz lockout penalty, reconnection hardening under real phone conditions, host "resume crashed game" from DO state.
 
+Progress 2026-08-17 - the server side landed (docs/decisions/2026-08-17-buzz-latency-compensation.md):
+
+- [x] **Buzz latency compensation, upstream of the engine** (boundary 2.1 intact): an arming opens a HELD window in the DO, buzzes are ranked by credited reaction = `max(client's claimed elapsed, arrival - min(measured round trip, 250ms))`, and the engine still receives one ordered list with each action stamped at its credited press time. The clamp is the whole threat model: a lying client gains exactly what an honest client on the same connection is already given, never more than the ceiling in `limits.buzz` (which hosts cannot lift). The ordering arithmetic is a pure protocol module, tested adversarially
+- [x] **Per-connection RTT measurement, hibernation-safe**: the arm broadcast carries an id, every client acks it immediately, and arrival-minus-broadcast is that connection's round trip over exactly the path the buzz will travel - measured only while a room is actively playing, never keeping a room awake, never reusing a sample from a previous arming. The `ping`/`pong` auto-response stays exactly as it was (it answers without waking the DO, which is the point of it)
+- [x] **The setting: `buzzing.latencyCompensation` (default ON) + `compensationWindowMs` (default 250ms)**. On by default because the unfairness is the median room rather than the exotic one, because a toggle nobody finds is a disclaimer rather than a setting, and because an un-wired client degrades to exactly M3's arrival order. The window equals the credit ceiling, which makes the algorithm complete (it can never exclude a buzz that could have won) and usually closes far sooner - as soon as no later arrival could win
+- [x] **Early-buzz lockout (#12) proven end to end**, and two defects fixed on the way: `buzz-rejected` was riding the PUBLIC event stream instead of reaching the one phone it concerns, and a mashed re-trigger never told the presser its new deadline. Team-wide penalties (#36) verified through the real path
+- [x] **Reconnection hardening (A5) + host resume (C6)**: snapshots now carry the room's live `timers` (a console reopening mid-answer had no countdown at all) and, during an open arming, the `arm-window` - so a phone that slept mid-clue resumes to the exact screen and can still race. A reconnect around a press neither loses the buzz nor duplicates it; a returning seat keeps its team and score; the final round fills a missing wager at the deadline rather than waiting on a dead phone. The alarm book is now pruned by phase, so no phantom countdown reaches a screen
+- [x] **The fairness harness** (`@jeopardy/bots/latency` + `/race`): seeded per-direction latency simulation, races judged against the SERVER'S own ordering module, and a CLI A/B (`--race N` vs `--race N --no-compensation`). Live measurement: same field, same seeds - with compensation the earliest thumb won 4/4; without it the best connection won 4/4
+- [ ] Client half on the web surfaces: ack the `arm-window`, stamp buzzes with elapsed-since-arm, render the snapshot's `timers`. Until then those surfaces are ranked by arrival (never worse than M3, never compensated) - owned by the M4 ws-store reconcile
+
 ### M7 - Suite features
 
 **Theme customizer** (owner priority - pull earlier if appetite allows): a visual editor over the theme document - pick fonts per slot from the curated self-hosted set, full color control, background (solid/gradient/pattern/uploaded image via R2 with auto-dim overlay), effects level (flat vs bevel-and-glow), live board preview, WCAG-contrast warnings; themes export/import and share like content packs. Also: CSV/spreadsheet import (+ J-Archive-shaped and Quizlet/Anki TSV), zip bundle export with media, print stylesheet, board sizes beyond 6x5, everyone-answers mode for large crowds, cosmetics module (player colors/avatars; buzzer sounds stay curated-pack-only - owner cut uploads 2026-08-13, boundary 2.10), single-file offline HTML export.
@@ -178,13 +188,14 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 
 - [ ] M1 board format + editor core (protocol schemas landed 2026-08-13 - see the M1 progress list; visual editor remains)
 - [x] M2 game engine (landed 2026-08-13 - see the M2 progress list; everyone-answers is engine-complete but not yet driven by the hotseat page)
-- [x] M3 realtime rooms (landed 2026-08-14 - see the M3 progress list; fairness compensation stays M6)
+- [x] M3 realtime rooms (landed 2026-08-14 - see the M3 progress list; fairness compensation landed 2026-08-17 in M6)
 - [x] M3.5 room visibility, passwords, public lobby (landed 2026-08-14 - registry in D1, lobby on the root page; listing renamed public/private and room controls added the same day)
 
 **Later**
 
 - M4 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
-- M6 -> M8 as appetite allows
+- M6 fairness + resilience: server side landed 2026-08-17 (the web surfaces' client half rides the M4 reconcile)
+- M7 -> M8 as appetite allows
 
 ## Open decisions (owner input needed)
 
