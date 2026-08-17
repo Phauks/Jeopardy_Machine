@@ -58,6 +58,11 @@ export function refusalCopy(reason: RefusalReason): RefusalCopy {
       return { headline: "That team is locked", advice: "Pick another team, or play on your own." };
     case "unknown-team":
       return { headline: "That team is gone", advice: "It was disbanded - pick another one." };
+    case "teams-full":
+      return {
+        headline: "This room has all the teams it can hold",
+        advice: "Join one of the teams that is already here.",
+      };
     case "password-required":
       return { headline: "This room needs a password", advice: "The host has it." };
     case "bad-password":

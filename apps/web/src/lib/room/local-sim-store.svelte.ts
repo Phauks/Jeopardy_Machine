@@ -11,6 +11,7 @@
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
+import { limits } from "@jeopardy/protocol/limits";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
@@ -379,6 +380,7 @@ export class LocalSimRoomStore implements RoomStore {
         avatarId: request.avatarId,
         accentId: request.accentId,
         buzzSoundId: request.buzzSoundId,
+        skinToneId: request.skinToneId,
         teamId,
         connected: true,
         joinedAt: Date.now(),
@@ -424,6 +426,7 @@ export class LocalSimRoomStore implements RoomStore {
             avatarId: patch.avatarId !== undefined ? patch.avatarId : player.avatarId,
             accentId: patch.accentId !== undefined ? patch.accentId : player.accentId,
             buzzSoundId: patch.buzzSoundId !== undefined ? patch.buzzSoundId : player.buzzSoundId,
+            skinToneId: patch.skinToneId !== undefined ? patch.skinToneId : player.skinToneId,
           }
         : player,
     );
@@ -431,6 +434,11 @@ export class LocalSimRoomStore implements RoomStore {
 
   createTeam(name: string): void {
     if (this.myPlayerId === null) return;
+    // The cap is refused HERE, not only in the form that offers the button: the pre-game
+    // screen is live, so the last slot can be taken by someone else between the render that
+    // enabled the control and the tap. Refusing in the store is what makes that a notice on a
+    // working screen instead of a 21st team appearing locally and vanishing on reconcile.
+    if (this.rosterTeams.length >= limits.team.teamMaxCount) return this.refuse("teams-full");
     const myPlayerId = this.myPlayerId;
     const teamId = `team-local-${String(Date.now() % 1_000_000)}`;
     this.rosterTeams = [
@@ -446,7 +454,16 @@ export class LocalSimRoomStore implements RoomStore {
     if (team === undefined) return this.refuse("unknown-team");
     if (team.locked) return this.refuse("team-locked");
     this.refusalState = null;
+    // The same call whether you have a team or not - assignTeam REPLACES teamId, so joining
+    // from another team is a move, not an error. That is what makes "change your mind" work on
+    // the pre-game screen without a leave-then-join dance the room could be interrupted during.
     this.assignTeam(this.myPlayerId, teamId);
+  }
+
+  leaveTeam(): void {
+    if (this.myPlayerId === null) return;
+    this.refusalState = null;
+    this.assignTeam(this.myPlayerId, null);
   }
 
   private assignTeam(playerId: string, teamId: string | null): void {

@@ -115,7 +115,13 @@ export class WsRoomStore implements RoomStore {
 
   joinTeam(teamId: string): void {
     void teamId;
+    // The same message whether this is a first join or a move between teams: the server
+    // replaces the session's teamId either way, so there is no separate "move" verb.
     notWired("joinTeam", "`team-join`");
+  }
+
+  leaveTeam(): void {
+    notWired("leaveTeam", "`team-leave`");
   }
 
   updateTeam(patch: TeamPatch, teamId?: string): void {

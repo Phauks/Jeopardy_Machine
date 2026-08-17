@@ -3,29 +3,49 @@
   // accent swatches + the full avatar grid rendered in the chosen accent. Purely
   // presentational and prop-driven - selection state and persistence belong to the caller,
   // so the same component serves the dev gallery today and the join flow later.
-  import type { AvatarAccent, AvatarEntry } from "#lib/avatars/avatar-manifest.ts";
-  import { avatarSpriteUrl } from "#lib/avatars/avatar-manifest.ts";
+  import type { AvatarAccent, AvatarEntry, AvatarSkinTone } from "#lib/avatars/avatar-manifest.ts";
+  import { avatarSpriteUrl, avatarTakesSkinTone } from "#lib/avatars/avatar-manifest.ts";
 
   type Props = {
     avatars: readonly AvatarEntry[];
     accents: readonly AvatarAccent[];
     selectedAvatarId?: string | null;
     selectedAccentId: string;
+    /**
+     * The curated skin-tone axis. Pass it to offer the control; the picker still shows it ONLY
+     * when the selected avatar is one it applies to, because a pet has no skin cells and a
+     * control that silently does nothing is worse than no control
+     * (tools/avatar-bake/src/skin-tone-palette.mjs).
+     */
+    skinTones?: readonly AvatarSkinTone[];
+    /** null = not chosen, which renders the pack's own colors. Never inferred. */
+    selectedSkinToneId?: string | null;
     onSelectAvatar?: (avatarId: string) => void;
     onSelectAccent?: (accentId: string) => void;
+    onSelectSkinTone?: (skinToneId: string | null) => void;
   };
   let {
     avatars,
     accents,
     selectedAvatarId = null,
     selectedAccentId,
+    skinTones = [],
+    selectedSkinToneId = null,
     onSelectAvatar,
     onSelectAccent,
+    onSelectSkinTone,
   }: Props = $props();
 
   const selectedAccent = $derived(
     accents.find((accent) => accent.id === selectedAccentId) ?? accents[0],
   );
+  const selectedAvatar = $derived(
+    avatars.find((avatar) => avatar.id === selectedAvatarId) ?? null,
+  );
+  // The grid cells stay accent-only even when a tone is chosen: tinting 27 sprites would mean
+  // 27 canvas recolors on a phone to answer a question the big preview beside them is already
+  // answering at full size (#lib/avatars/avatar-animated.svelte).
+  const showSkinTones = $derived(skinTones.length > 0 && avatarTakesSkinTone(selectedAvatar));
 </script>
 
 <div class="avatar-picker">
@@ -44,6 +64,37 @@
       ></button>
     {/each}
   </div>
+
+  {#if showSkinTones}
+    <div class="tone-row" role="group" aria-label="Skin tone">
+      <!-- "Not chosen" is a first-class option with its own swatch, not the absence of a
+           choice: it is what every player starts as, and it must be possible to go back to it
+           (the neutral-default rule in tools/avatar-bake/src/skin-tone-palette.mjs). -->
+      <button
+        type="button"
+        class="tone-swatch as-drawn"
+        class:selected={selectedSkinToneId === null}
+        aria-label="Skin tone: as drawn"
+        aria-pressed={selectedSkinToneId === null}
+        onclick={() => {
+          onSelectSkinTone?.(null);
+        }}
+      ></button>
+      {#each skinTones as tone (tone.id)}
+        <button
+          type="button"
+          class="tone-swatch"
+          class:selected={tone.id === selectedSkinToneId}
+          style="--swatch-color: {tone.hex}"
+          aria-label="Skin {tone.label}"
+          aria-pressed={tone.id === selectedSkinToneId}
+          onclick={() => {
+            onSelectSkinTone?.(tone.id);
+          }}
+        ></button>
+      {/each}
+    </div>
+  {/if}
 
   <div class="avatar-grid" role="group" aria-label="Avatar">
     {#each avatars as avatar (avatar.id)}
@@ -101,9 +152,47 @@
   }
 
   .accent-swatch:focus-visible,
+  .tone-swatch:focus-visible,
   .avatar-cell:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;
+  }
+
+  .tone-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .tone-swatch {
+    width: 1.9rem;
+    height: 1.9rem;
+    /* Squircles, not circles: the accent row above is round, and at a glance the two rows must
+       not read as one palette split over two lines. */
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background: var(--swatch-color);
+    cursor: pointer;
+    padding: 0;
+  }
+
+  /* "As drawn" cannot be a colour - there is no single colour it means - so it is the only
+     swatch drawn as an outline. */
+  .tone-swatch.as-drawn {
+    background: transparent;
+    border-color: var(--surface-border);
+    background-image: linear-gradient(
+      135deg,
+      transparent 45%,
+      var(--surface-text-muted) 45%,
+      var(--surface-text-muted) 55%,
+      transparent 55%
+    );
+  }
+
+  .tone-swatch.selected {
+    border-color: currentColor;
+    box-shadow: 0 0 0 2px var(--swatch-color, var(--surface-border));
   }
 
   .avatar-grid {

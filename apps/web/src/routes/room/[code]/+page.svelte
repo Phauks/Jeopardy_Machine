@@ -1,13 +1,19 @@
 <script lang="ts">
-  // The player path (/room/CODE): the whole pre-game journey, then the buzzer.
+  // The player path (/room/CODE): ONE pre-game surface, then the buzzer.
   //
-  //   character -> team -> lobby -> playing
+  // It used to be four screens in a chain - character -> team -> lobby -> playing - selected by
+  // `playerRouteStageFor`. That is exactly what the standing UI law adopted on 2026-08-16
+  // forbids (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md: "state changes
+  // in place; it does not swap screens. No wizard chains."), so the three pre-game screens are
+  // now three REGIONS of #lib/room/pre-game-screen.svelte and this route chooses between just
+  // two things.
   //
-  // Which one is showing is `playerRouteStageFor` and nothing else (#lib/room/pre-game-stage.ts)
-  // - a pure function of room state plus one local choice. Nothing here sets a screen variable,
-  // which is what makes the unclicked transitions correct for free: a kick puts you back on the
-  // team screen because your teamId went null, and the host starting the game puts every phone
-  // on the buzzer wherever it happened to be.
+  // The remaining swap is the exception the law names: the buzzer replacing the pre-game
+  // surface is the GAME changing state, not navigation. `playerSurfaceFor` is still a pure
+  // function of room state and nothing here sets a screen variable, which is what keeps the
+  // unclicked transitions correct for free - the host starting the game moves every phone at
+  // once, wherever it happened to be, and a kick just empties your teamId in a region that
+  // never went away.
   //
   // MOCK MODE until the M3 reconcile: the store is a local simulation seeded from the fixture
   // roster - each tab is its own isolated room (docs/design/surfaces.md). Players never see
@@ -17,12 +23,9 @@
   import { browser } from "$app/env";
   import { page } from "$app/state";
   import BuzzerScreen from "#lib/room/buzzer-screen.svelte";
-  import CharacterScreen from "#lib/room/character-screen.svelte";
-  import LobbyScreen from "#lib/room/lobby-screen.svelte";
-  import TeamScreen from "#lib/room/team-screen.svelte";
+  import PreGameScreen from "#lib/room/pre-game-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
-  import { joinBlock } from "#lib/room/room-refusal.ts";
-  import { playerRouteStageFor } from "#lib/room/pre-game-stage.ts";
+  import { playerSurfaceFor } from "#lib/room/pre-game.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
@@ -36,10 +39,6 @@
   onDestroy(() => {
     store.destroy();
   });
-
-  // The only piece of screen state on this route, and it is a CHOICE rather than a position:
-  // "I do not want a team". Everything else is derived (see pre-game-stage.ts for why).
-  let soloAccepted = $state(false);
 
   // Local-only audio on the phone: previews and personal buzz feedback (never room audio -
   // the display route owns the room channel). Primed lazily from the first user gesture.
@@ -60,12 +59,7 @@
   const stagingThemeId = $derived(page.url.searchParams.get("staging") ?? theme.staging ?? null);
 
   const view = $derived(store.view);
-  const stage = $derived(playerRouteStageFor(view, { soloAccepted }));
-  // The room's settings, respected before the first tap: a full room or a host who takes no
-  // spectators refuses in the room's own words rather than after a wasted character screen
-  // (#lib/room/room-refusal.ts). It is a courtesy, not the gate - the room refuses on join
-  // regardless, and this only saves the trip.
-  const blocked = $derived(joinBlock(view));
+  const surface = $derived(playerSurfaceFor(view));
 </script>
 
 <svelte:head>
@@ -74,32 +68,16 @@
 </svelte:head>
 
 <div class="room-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  {#if stage === "character"}
-    <CharacterScreen
-      {roomCode}
-      roster={view.roster}
-      teamsMode={view.teamsMode}
-      lateJoin={view.phase !== "lobby"}
-      {blocked}
-      onConfirm={(choice) => {
-        localAudio.prime();
-        // Deliberately joined WITHOUT a team: the next screen is where the team is picked, and
-        // it needs you already standing in the holding area for the choice to be a visible
-        // move rather than an appearance out of nowhere.
-        store.join(choice);
-      }}
-      onPreviewSound={previewSound}
-    />
-  {:else if stage === "team"}
-    <TeamScreen
+  {#if surface === "pre-game"}
+    <PreGameScreen
       {store}
+      {roomCode}
       {stagingThemeId}
-      onPlaySolo={() => {
-        soloAccepted = true;
+      onPreviewSound={previewSound}
+      onBeforeJoin={() => {
+        localAudio.prime();
       }}
     />
-  {:else if stage === "lobby"}
-    <LobbyScreen {store} {stagingThemeId} onPreviewSound={previewSound} />
   {:else}
     <BuzzerScreen
       {store}

@@ -6,12 +6,19 @@ import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { avatarManifest, avatarSheetUrl, avatarSpriteUrl } from "#lib/avatars/avatar-manifest.ts";
+import {
+  avatarManifest,
+  avatarSheetUrl,
+  avatarSpriteUrl,
+  avatarTakesSkinTone,
+  skinToneById,
+} from "#lib/avatars/avatar-manifest.ts";
 import {
   avatarModelById,
   avatarModelManifest,
   avatarModelUrl,
 } from "#lib/avatars/avatar-models.ts";
+import { defaultRecolorTolerance, luminance, parseHexColor } from "#lib/avatars/palette-recolor.ts";
 import { themePresets } from "#lib/theme/theme-presets.ts";
 
 const spritesDirectory = fileURLToPath(new URL("../../../static/avatars/", import.meta.url));
@@ -89,6 +96,104 @@ describe("avatar manifest integrity", () => {
   it("declares the served base path and the baked sprite size", () => {
     expect(avatarManifest.basePath).toBe("/avatars/");
     expect(avatarManifest.spriteSize).toBe(192);
+  });
+});
+
+describe("the recolor inputs the sprite manifest carries (v3)", () => {
+  it("gives every avatar the targets and tolerance the browser recolor needs", () => {
+    for (const avatar of avatarManifest.avatars) {
+      expect(avatar.recolorTargets.length, avatar.id).toBeGreaterThan(0);
+      for (const target of avatar.recolorTargets) {
+        expect(target, avatar.id).toMatch(/^#[0-9a-f]{6}$/);
+      }
+      if (avatar.tolerance !== null) expect(avatar.tolerance, avatar.id).toBeGreaterThan(0);
+    }
+  });
+
+  it("agrees EXACTLY with the display tier's copy - both come from one roster entry", () => {
+    // The duplication is deliberate (the model manifest is kept out of every phone's bundle),
+    // so this is the assertion that keeps it from becoming a fork. A sheet recoloured from
+    // targets the stills were not baked from would put two different colours of the same
+    // avatar on one screen.
+    for (const avatar of avatarManifest.avatars) {
+      const model = avatarModelById(avatar.id);
+      expect(model?.recolorTargets, avatar.id).toEqual(avatar.recolorTargets);
+      expect(model?.tolerance, avatar.id).toBe(avatar.tolerance);
+    }
+  });
+});
+
+describe("the skin-tone axis", () => {
+  it("offers a curated set with unique ids, player-facing labels, and hex colors", () => {
+    expect(avatarManifest.skinTones.length).toBeGreaterThanOrEqual(4);
+    const ids = avatarManifest.skinTones.map((tone) => tone.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const tone of avatarManifest.skinTones) {
+      expect(tone.id).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(tone.hex).toMatch(/^#[0-9a-f]{6}$/);
+      expect(tone.label.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("spans a real range rather than crowding the light end", () => {
+    // The standard failure of this feature is six pale options and one dark one. The ramp is
+    // required to reach genuinely deep and to step monotonically, so no tone is a token.
+    const luminances = avatarManifest.skinTones.map((tone) => luminance(parseHexColor(tone.hex)));
+    const lightest = luminances[0];
+    const darkest = luminances[luminances.length - 1];
+    expect(lightest).toBeDefined();
+    expect(darkest).toBeDefined();
+    expect(lightest ?? 0).toBeGreaterThan(190);
+    expect(darkest ?? 255).toBeLessThan(90);
+    for (let index = 1; index < luminances.length; index += 1) {
+      expect(luminances[index] ?? 0, `tone ${String(index + 1)}`).toBeLessThan(
+        luminances[index - 1] ?? 0,
+      );
+    }
+  });
+
+  it("names the shared Mini Characters skin cells and a tolerance to match them by", () => {
+    expect(avatarManifest.skinRecolor.targets.length).toBeGreaterThan(0);
+    for (const target of avatarManifest.skinRecolor.targets) {
+      expect(target).toMatch(/^#[0-9a-f]{6}$/);
+    }
+    expect(avatarManifest.skinRecolor.tolerance).toBeGreaterThan(0);
+  });
+
+  it("NEVER shares a cell with a human's accent target - the two controls cannot fight", () => {
+    // The safety property the whole feature rests on. Accent and tone run as two passes over
+    // the same pixels; a cell both could claim would be repainted twice and the player would
+    // watch their shirt change when they picked a face. Held by distance, not by equality, so
+    // "close enough for either tolerance to catch it" also fails.
+    const { targets: skinCells, tolerance: skinTolerance } = avatarManifest.skinRecolor;
+    for (const avatar of avatarManifest.avatars.filter((entry) => entry.kind === "human")) {
+      const accentTolerance = avatar.tolerance ?? defaultRecolorTolerance;
+      const guard = Math.max(skinTolerance, accentTolerance);
+      for (const garment of avatar.recolorTargets) {
+        for (const skin of skinCells) {
+          const [red, green, blue] = parseHexColor(garment);
+          const [skinRed, skinGreen, skinBlue] = parseHexColor(skin);
+          const distance = Math.hypot(red - skinRed, green - skinGreen, blue - skinBlue);
+          expect(distance, `${avatar.id}: ${garment} vs skin ${skin}`).toBeGreaterThan(guard);
+        }
+      }
+    }
+  });
+
+  it("is offered for the twelve humans and withheld from the fifteen pets", () => {
+    const humans = avatarManifest.avatars.filter((entry) => avatarTakesSkinTone(entry));
+    expect(humans.length).toBe(12);
+    for (const pet of avatarManifest.avatars.filter((entry) => entry.kind === "pet")) {
+      expect(avatarTakesSkinTone(pet), pet.id).toBe(false);
+    }
+  });
+
+  it("resolves a chosen tone, and resolves 'not chosen' to null rather than a default", () => {
+    const first = avatarManifest.skinTones[0];
+    if (!first) throw new Error("manifest has no skin tones");
+    expect(skinToneById(first.id)?.hex).toBe(first.hex);
+    expect(skinToneById(null)).toBeNull();
+    expect(skinToneById("no-such-tone")).toBeNull();
   });
 });
 
