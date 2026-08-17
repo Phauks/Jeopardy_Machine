@@ -150,7 +150,9 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal - whose checklist includes the PWA drills: airplane-mode editor test and a service-worker-update-during-game drill (docs/decisions/2026-08-13-pwa.md). **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
 
 - [x] Sound pack bundled: `tools/audio-bake` (fetch + per-page license re-verification + trim/normalize/uniform-onset/encode, deterministic), 21 CC0 files under `apps/web/static/sounds/` with a manifest and credits table, `RoomAudio.prime()` decoding the real pack, the time-up double-beep synthesized in-app. Record of what shipped: docs/content/media-and-sounds.md section 10
+- [x] Picture-round images acquired: `tools/event-media-bake` (Commons license + sha1 re-verification, downscale to 2560 px, WebP), 8 files committed beside the event documents, the pack's media refs now `bundled` with real sha256/bytes instead of zero placeholders, and the 37.2 MB over-cap original closed
 - [ ] **Owner still owes the lobby track pick** - the slot is built and a CC0 placeholder ships in it (media-and-sounds.md section 10, "Lobby track: PLACEHOLDER")
+- [ ] **Owner still owes three look-at-the-picture checks** on img-02/04/05 (event README, "Still open on the images")
 
 ### M6 - Fairness + resilience polish
 

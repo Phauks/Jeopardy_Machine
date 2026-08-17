@@ -17,8 +17,12 @@
         "author": "Yellowstone National Park (NPS)",
         "license": "Public domain",
         "commonsSha1": "8f1d6903c28e8275d5d3eca2e9e4f2f7d68ea4fa",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/9/91/Spring_Old_Faithful_eruption_from_Observation_Point.jpg",
+        "sourceBytes": 37209547,
+        "sourceSha256": "26c3e637b6bcafb13aa2395b4825db245c1b8e0d01ce7c88ebb429801ecf9648",
+        "sourcePixels": "8688x5792",
+        "committedPixels": "2560x1707",
         "note": "8688x5792. Original is 37.2 MB - exceeds the 10 MiB image cap in @jeopardy/protocol/limits; downscale/recompress at acquisition (2560 px long edge is plenty)."
       },
       "01a00137-5a82-780a-afee-898bbee378c5": {
@@ -27,8 +31,12 @@
         "author": "Gentry George, U.S. Fish and Wildlife Service",
         "license": "Public domain",
         "commonsSha1": "ce57610995acccd2d0bd10827abf48016b24f91b",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/8/83/Half_dome_in_Yosemite_national_park.jpg",
+        "sourceBytes": 659961,
+        "sourceSha256": "2f77b474467e7e08a0f0fcc71418cc850cbf19379172e43e5733f2e4f673cd63",
+        "sourcePixels": "3380x5048",
+        "committedPixels": "1714x2560",
         "note": "3380x5048, portrait - check the crop on a 16:9 projector before event night."
       },
       "01a00137-5a83-7df0-9e30-6ad611a6f3a7": {
@@ -37,8 +45,12 @@
         "author": "NPS / Damon Joyce",
         "license": "Public domain",
         "commonsSha1": "bb2650c4ee93c2919dd06b3259d8ff48c67f961b",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/0/07/Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_%2818686376391%29.jpg",
+        "sourceBytes": 1539033,
+        "sourceSha256": "d627f236634b2d9c4f2b9afffb6969f051d4f1505db83b23ef99bd2d47d6a310",
+        "sourcePixels": "2000x1500",
+        "committedPixels": "2000x1500",
         "note": "2000x1500 - clears the 1920 px projection target."
       },
       "01a00137-5a84-7884-925d-c18d6b2cb7ac": {
@@ -47,8 +59,12 @@
         "author": "USGS / Lyn Topinka",
         "license": "Public domain",
         "commonsSha1": "a9d4dd56d765ddef39dab20b0c8385a884e2ff56",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Crater_Lake_from_rim-USGS.jpg",
+        "sourceBytes": 1157505,
+        "sourceSha256": "22902eab83971c76d58d597560452c091fffb70741dbec6699214596aad9181e",
+        "sourcePixels": "3275x2160",
+        "committedPixels": "2560x1688",
         "note": "3275x2160. Media doc flag: confirm visually that Wizard Island is prominent before locking."
       },
       "01a00137-5a85-7cf9-9d73-5b8852a3b233": {
@@ -57,8 +73,12 @@
         "author": "NPS Photo",
         "license": "Public domain",
         "commonsSha1": "0029f1f2a1100ea7b0a31d39eab6973c96a4a240",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/7/78/Sunset_over_an_interdunal_area_%28fc947575-155d-451f-67bd-cd7fbd10c9ce%29.JPG",
+        "sourceBytes": 3492675,
+        "sourceSha256": "21ae76f6c1fd6da74adb18b0fc6919c06c929ed6f989cd40597f4583061a3056",
+        "sourcePixels": "3648x2736",
+        "committedPixels": "2560x1920",
         "note": "3648x2736. Media doc flag: confirm dunes (not just sky) dominate the frame."
       },
       "01a00137-5a86-7e1a-944b-bd648d780c1d": {
@@ -67,8 +87,12 @@
         "author": "Carsten Steger",
         "license": "CC BY-SA 4.0",
         "commonsSha1": "8d2225977948dd70a6ea25623c70c5ba71114f73",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Aerial_image_of_Grand_Prismatic_Spring_%28view_from_the_south%29.jpg",
+        "sourceBytes": 5422003,
+        "sourceSha256": "71592367489fcdb9e0b0adcddbf45ce7ee720a6f4c731a8528d5eaadad9d6beb",
+        "sourcePixels": "4800x3400",
+        "committedPixels": "2560x1813",
         "note": "4800x3400. BENCH swap for img-01 (same answer). CC BY-SA: if this ships, the credits slide is mandatory (TASL row in README)."
       },
       "01a00137-5a87-7fae-bc97-a922a14636e9": {
@@ -77,8 +101,12 @@
         "author": "NPS Photo / Emily Mesner",
         "license": "Public domain",
         "commonsSha1": "dee2f47df2108193f4335efe83b79ad2db4cc2a8",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Denali%2C_Denali_National_Park_and_Preserve.jpg",
+        "sourceBytes": 9657176,
+        "sourceSha256": "bebf65ef2f9c5226fc1d552d6f8466a63e522582c1ac489a042be678ba1e6485",
+        "sourcePixels": "7222x4820",
+        "committedPixels": "2560x1709",
         "note": "7222x4820. BENCH image (answer: Denali). Just under the 10 MiB cap; recompress anyway at acquisition."
       },
       "01a00137-5a88-726d-b565-1dd8bd05d422": {
@@ -87,8 +115,12 @@
         "author": "Jon Zander (Digon3)",
         "license": "CC BY-SA 3.0",
         "commonsSha1": "43f415b696f022c09921e0a7e2bedf5832cbe208",
-        "verified": "2026-08-14",
-        "sha256": "placeholder-zeros until the original is downloaded (checklist step 6 in docs/content/media-and-sounds.md section 5); recompute from the exact acquired bytes",
+        "verified": "2026-08-17",
+        "sourceUrl": "https://upload.wikimedia.org/wikipedia/commons/f/f7/Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg",
+        "sourceBytes": 5371554,
+        "sourceSha256": "e1f0494441d5550efc56559f58ae56c2696302180f177bec987ce5060c8cb482",
+        "sourcePixels": "3827x1570",
+        "committedPixels": "2560x1050",
         "note": "3827x1570 panorama. BENCH image (answer: Bryce Canyon). CC BY-SA: credits slide mandatory if shipped."
       }
     }
@@ -1790,97 +1822,97 @@
       {
         "id": "01a00137-5a81-74f4-b4af-f3c3514b0b15",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 37209547,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 1144730,
+        "sha256": "0cd291ff6748f5d7041d3a8af1f5b560ec9207bd9f345b1eb9f9aed6d10aba29",
         "alt": "A geyser erupting in a steaming basin, viewed from a hillside overlook",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/9/91/Spring_Old_Faithful_eruption_from_Observation_Point.jpg"
+          "state": "bundled",
+          "path": "media/img-01.webp"
         }
       },
       {
         "id": "01a00137-5a82-780a-afee-898bbee378c5",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 659961,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 321804,
+        "sha256": "600f30e1620de2d32252d9b8493e1810e04eeca7f6ad6df1fb6abb16e72ede40",
         "alt": "A sheer granite dome rising above a forested valley",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/8/83/Half_dome_in_Yosemite_national_park.jpg"
+          "state": "bundled",
+          "path": "media/img-02.webp"
         }
       },
       {
         "id": "01a00137-5a83-7df0-9e30-6ad611a6f3a7",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 1539033,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 142062,
+        "sha256": "789c3e8ef6531079a99dfd80e3bf72959ee3e6a3f6f26c3d229b0d480fbd4c1a",
         "alt": "A freestanding red sandstone arch on a slickrock rim",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/0/07/Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_%2818686376391%29.jpg"
+          "state": "bundled",
+          "path": "media/img-03.webp"
         }
       },
       {
         "id": "01a00137-5a84-7884-925d-c18d6b2cb7ac",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 1157505,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 269290,
+        "sha256": "9ccfb5fe9cca6b6b7879da9b461598dc91846e85b969545334f63c65557589d2",
         "alt": "A deep blue lake filling a volcanic caldera, with a cone-shaped island",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Crater_Lake_from_rim-USGS.jpg"
+          "state": "bundled",
+          "path": "media/img-04.webp"
         }
       },
       {
         "id": "01a00137-5a85-7cf9-9d73-5b8852a3b233",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 3492675,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 147662,
+        "sha256": "cfef60a7a17d4f3fa3b3d932860bfaf02fc1f15ebc555139f6acf6c00e9f354e",
         "alt": "Rippled white gypsum dunes under an evening sky",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/7/78/Sunset_over_an_interdunal_area_%28fc947575-155d-451f-67bd-cd7fbd10c9ce%29.JPG"
+          "state": "bundled",
+          "path": "media/img-05.webp"
         }
       },
       {
         "id": "01a00137-5a86-7e1a-944b-bd648d780c1d",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 5422003,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 714746,
+        "sha256": "d0558e0e01730125e4d5e87c631dfa466843310b7ca7e91496734d3a11d70eb4",
         "alt": "Aerial view of a rainbow-colored hot spring ringed by orange bacterial mats",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Aerial_image_of_Grand_Prismatic_Spring_%28view_from_the_south%29.jpg"
+          "state": "bundled",
+          "path": "media/img-06.webp"
         }
       },
       {
         "id": "01a00137-5a87-7fae-bc97-a922a14636e9",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 9657176,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 178248,
+        "sha256": "b07f73dc4b623c6a33b71a0ae9ffa0f07725bee12ca5022667f1eb4e564ae701",
         "alt": "A vast snow-covered mountain massif under clear skies",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/d/d3/Denali%2C_Denali_National_Park_and_Preserve.jpg"
+          "state": "bundled",
+          "path": "media/img-07.webp"
         }
       },
       {
         "id": "01a00137-5a88-726d-b565-1dd8bd05d422",
         "kind": "image",
-        "mime": "image/jpeg",
-        "bytes": 5371554,
-        "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "mime": "image/webp",
+        "bytes": 637896,
+        "sha256": "0c27bc2c86d3e7d0f7e2e8a5d11caa3d5c371c3aa5b51eb54e9cf2c64b55031a",
         "alt": "An amphitheater of orange rock spires seen from the rim",
         "storage": {
-          "state": "remote",
-          "url": "https://upload.wikimedia.org/wikipedia/commons/f/f7/Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg"
+          "state": "bundled",
+          "path": "media/img-08.webp"
         }
       }
     ],

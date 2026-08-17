@@ -363,7 +363,7 @@ Searches run this pass — Pixabay: "funk rock", "quirky funk", "funky groove", 
 
 ## 10. Bundled - what actually shipped (M5 asset pass, 2026-08-17)
 
-This section is the record of what came out of the worklist above and into the repository. Everything here is produced by the committed pipeline in `tools/audio-bake/` (its README documents re-baking, determinism, and the honest caveats); the credits table per file is `apps/web/static/sounds/LICENSES.md`; the machine-readable index is `apps/web/src/lib/room/sound-manifest.json`.
+This section is the record of what came out of the worklist above and into the repository. Sounds are produced by the committed pipeline in `tools/audio-bake/`, images by `tools/event-media-bake/` (its README documents re-baking, determinism, and the honest caveats); the credits table per file is `apps/web/static/sounds/LICENSES.md`; the machine-readable index is `apps/web/src/lib/room/sound-manifest.json`.
 
 ### Sounds - 21 files, 5,129 KiB
 
@@ -381,6 +381,29 @@ Every file is CC0 1.0, verified by re-reading each Freesound page's license line
 **Onset verification (the fairness invariant):** all 21 files land inside the 8-15 ms window, measured on the ENCODED file decoded back - 19 at 10.0 ms, one at 10.6 ms, one (ding) at 8.2 ms. This is checked three ways: the bake refuses to emit a file outside the window, `pnpm -F @jeopardy/audio-bake verify` re-measures the committed bytes with ffmpeg, and `apps/web/src/lib/room/sound-manifest.gate.test.ts` re-hashes every file so a recorded measurement can only describe the bytes in git.
 
 **Duration windows:** buzz-ins 0.559-1.460 s (all inside the owner's 0.5-1.5 s window); cues 0.289-1.343 s (all under 3 s).
+
+### Images - 8 files, 3,473 KiB
+
+The picture round's eight Commons files are acquired and committed at `events/board-game-club-x-els/media/img-0N.webp`, produced by `tools/event-media-bake`. The credits table (a row per file, public-domain files included, per checklist 5.5) is in that event's README; the per-file provenance record lives in the pack's own `ext` bag.
+
+| ID     | Commons original        | Committed      | Bytes       |
+| ------ | ----------------------- | -------------- | ----------- |
+| img-01 | 8688x5792, 37,209,547 B | 2560x1707 webp | 1,144,730 B |
+| img-02 | 3380x5048, 659,961 B    | 1714x2560 webp | 321,804 B   |
+| img-03 | 2000x1500, 1,539,033 B  | 2000x1500 webp | 142,062 B   |
+| img-04 | 3275x2160, 1,157,505 B  | 2560x1688 webp | 269,290 B   |
+| img-05 | 3648x2736, 3,492,675 B  | 2560x1920 webp | 147,662 B   |
+| img-06 | 4800x3400, 5,422,003 B  | 2560x1813 webp | 714,746 B   |
+| img-07 | 7222x4820, 9,657,176 B  | 2560x1709 webp | 178,248 B   |
+| img-08 | 3827x1570, 5,371,554 B  | 2560x1050 webp | 637,896 B   |
+
+**Sizing:** at most 2560 px on the long edge, never upscaled (img-03 was already under and kept its native 2000 px), never under 1920 px - the projection floor from section 1. img-01, flagged here since 2026-08-14 as 37.2 MB against a 10 MiB cap, is now 3% of that cap.
+
+**Format: WebP at quality 82**, chosen over JPEG because the repository already commits WebP for all 243 avatar sprites (one asset story, not two), it is 25-35% smaller than visually equivalent JPEG against a hard per-image cap and an export-zip budget, and every browser that can run this app decodes it (Safari 14+ is a lower bar than the Web Audio the buzzers already need). No cropping or color adjustment - just a downscale and a re-encode with metadata stripped.
+
+**Verification at acquisition:** each file page was re-read live via the Commons API, and both its license short name and its **Commons sha1** had to match what the 2026-08-14 pass recorded before anything downloaded; the downloaded bytes' sha1 was then checked against the API's. All eight passed unchanged. Re-running the bake before event night is exactly the "files still live + licenses unchanged" row of that event's pre-event checklist.
+
+**Still needs a human:** the visual confirmations this worklist flagged - Wizard Island prominent in img-04, dunes rather than sky dominating img-05, and the 16:9 crop on the portrait img-02 - have not been done. A pipeline can prove a file is the vetted one, correctly sized and legally clear; it cannot tell you the picture reads from the back of the room.
 
 ### Honest caveats
 

@@ -1,0 +1,11 @@
+{
+  "name": "@jeopardy/event-media-bake",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Offline image pipeline for the event picture round: re-verifies each Wikimedia Commons file's license and sha1, downloads the original, downscales and encodes WebP into events/board-game-club-x-els/media/, and rewrites the event pack's media refs. Never bundled into shipped Workers.",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "scripts": {
+    "bake": "node src/bake.mjs"
+  }
+}
