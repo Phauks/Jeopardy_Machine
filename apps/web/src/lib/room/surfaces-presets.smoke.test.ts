@@ -14,7 +14,13 @@ import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
 function midGameStore(role: "player" | "display" | "host"): LocalSimRoomStore {
   const store = new LocalSimRoomStore({ roomCode: "TESTA", role, seed: "smoke" });
   if (role === "player") {
-    store.join({ nickname: "Smoke", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Smoke",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
   }
   store.startGame();
   store.selectCell(0, 0);

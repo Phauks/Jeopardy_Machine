@@ -8,9 +8,8 @@
 // host-console.states.test.ts, and for the same reason.
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
-import CharacterScreen from "#lib/room/character-screen.svelte";
 import DisplayScreen from "#lib/room/display-screen.svelte";
-import TeamScreen from "#lib/room/team-screen.svelte";
+import PreGameScreen from "#lib/room/pre-game-screen.svelte";
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
 import { joinBlock, refusalCopy } from "#lib/room/room-refusal.ts";
 import { refusalReasonSchema } from "@jeopardy/protocol/room/server-messages";
@@ -99,19 +98,15 @@ describe("the join screens respect the room's door", () => {
     const blocked = joinBlock(store.view);
     expect(blocked?.headline).toBe("This room is full");
 
-    const { body } = render(CharacterScreen, {
-      props: {
-        roomCode,
-        roster: store.view.roster,
-        teamsMode: true,
-        blocked,
-        onConfirm: () => undefined,
-      },
-    });
+    const { body } = render(PreGameScreen, { props: { store, roomCode } });
     expect(body).toContain("This room is full");
     expect(body).toContain("disabled");
-    // The choices stay usable: a seat may free up while you are picking a creature.
+    // The choices stay usable: a seat may free up while you are picking a creature. On the
+    // unified surface that is stronger than it was on the old character screen - the teams and
+    // the roster stay usable too, so a refused player can still watch the room fill.
     expect(body).toContain("Choose your character");
+    expect(body).toContain('aria-label="Teams"');
+    expect(body).toContain('aria-label="Who is here"');
   });
 
   it("refuses a spectator when the host allows no audience, and lets one in otherwise", () => {
@@ -122,15 +117,27 @@ describe("the join screens respect the room's door", () => {
 
   it("never blocks a player who already has a seat, whatever the cap became", () => {
     const store = roomStore({ maxPlayers: 1 }, { role: "player", seedRoster: "empty" });
-    store.join({ nickname: "Lorax", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Lorax",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     // Nobody is ever ejected by a settings edit (room-settings.ts) - and a full room is not a
     // reason to bounce the person already standing in it back to the character screen.
     expect(joinBlock(store.view)).toBeNull();
   });
 
-  it("turns the room's own refusal into a sentence on the team screen", () => {
+  it("turns the room's own refusal into a sentence in the teams region", () => {
     const store = roomStore({}, { role: "player", seedRoster: "empty" });
-    store.join({ nickname: "Lorax", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Lorax",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     store.createTeam("The Lorax Society");
     const teamId = store.view.roster.teams[0]?.teamId ?? "";
     store.updateTeam({ locked: true }, teamId);
@@ -138,16 +145,28 @@ describe("the join screens respect the room's door", () => {
     store.joinTeam(teamId);
     expect(store.view.refusal?.reason).toBe("team-locked");
 
-    const { body } = render(TeamScreen, { props: { store, onPlaySolo: () => undefined } });
+    const { body } = render(PreGameScreen, { props: { store, roomCode } });
     expect(body).toContain("That team is locked");
     expect(body).not.toContain("team-locked");
   });
 
   it("refuses the join itself at the cap, with the protocol's own reason", () => {
     const store = roomStore({ maxPlayers: 1 }, { role: "player", seedRoster: "empty" });
-    store.join({ nickname: "First", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "First",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     const seated = store.view.myPlayerId;
-    store.join({ nickname: "Second", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Second",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     // The refused join changes nothing: no seat taken, no identity replaced.
     expect(store.view.roster.players).toHaveLength(1);
     expect(store.view.myPlayerId).toBe(seated);

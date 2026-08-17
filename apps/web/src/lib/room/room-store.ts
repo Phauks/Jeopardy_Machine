@@ -19,6 +19,8 @@ export type JoinRequest = {
   avatarId: string | null;
   accentId: string | null;
   buzzSoundId: string | null;
+  /** Humans only; null = the pack's own colors, never inferred (protocol room/identity.ts). */
+  skinToneId: string | null;
   /** Teams mode only: tap an existing card or found a new team (creator becomes leader). */
   team?: { kind: "join"; teamId: string } | { kind: "create"; name: string };
 };
@@ -29,6 +31,7 @@ export type IdentityPatch = {
   avatarId?: string | null;
   accentId?: string | null;
   buzzSoundId?: string | null;
+  skinToneId?: string | null;
 };
 
 /** Sparse team-tier edit; leader-only (or host override naming the team). */
@@ -59,7 +62,15 @@ export type RoomStore = {
   // Personal tier (any player, self only) + team tier (leader or host).
   updateIdentity(patch: IdentityPatch): void;
   createTeam(name: string): void;
+  /**
+   * Join a team, or MOVE to one from another - the same call either way, because the roster
+   * stores one teamId per player and replacing it is the whole operation. Changing your mind
+   * before the game starts is allowed (user-flows "Teams & leadership"), and doing it as one
+   * message rather than leave-then-join means the room never sees you briefly teamless.
+   */
   joinTeam(teamId: string): void;
+  /** Step back to the holding area without picking another team. */
+  leaveTeam(): void;
   updateTeam(patch: TeamPatch, teamId?: string): void;
   kickFromTeam(playerId: string): void;
   handOffLeadership(playerId: string): void;

@@ -14,7 +14,8 @@
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
 // | team-create     | player, lobby only (creator becomes leader - user-flows A2)           |
-// | team-join       | player, lobby only, target team unlocked                              |
+// | team-join       | player, lobby only, target team unlocked (also how a MOVE is sent)    |
+// | team-leave      | player, lobby only (back to the holding area; never refused)          |
 // | team-update     | the team's leader, or host (rename/color/buzz-sound/lock)             |
 // | team-kick       | the team's leader (own team), or host (any player, any team)          |
 // | team-handoff    | the team's leader, or host                                            |
@@ -81,6 +82,9 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     avatarId: curatedAssetIdSchema.optional(),
     accentId: curatedAssetIdSchema.optional(),
     buzzSoundId: curatedAssetIdSchema.optional(),
+    // Absent when the player never touched the control, which is the neutral default and not
+    // a value the server may fill in (identity.ts).
+    skinToneId: curatedAssetIdSchema.optional(),
     team: joinTeamIntentSchema.optional(),
     hostToken: hostTokenSchema.optional(),
     // The shared room secret, when the room has one (docs/decisions/2026-08-14-room-
@@ -97,6 +101,10 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({ ...envelopeFields, type: z.literal("action"), action: relayedActionSchema }),
   z.strictObject({ ...envelopeFields, type: z.literal("team-create"), name: teamNameSchema }),
   z.strictObject({ ...envelopeFields, type: z.literal("team-join"), teamId: teamIdSchema }),
+  // Step out of a team back to the holding area, without picking another. Its own message
+  // rather than `team-join` with a null teamId: those are different intents and the authority
+  // matrix treats them differently (a locked team can refuse a join; nothing refuses a leave).
+  z.strictObject({ ...envelopeFields, type: z.literal("team-leave") }),
   z.strictObject({
     ...envelopeFields,
     type: z.literal("team-update"),
@@ -119,6 +127,9 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     avatarId: curatedAssetIdSchema.nullable().optional(),
     accentId: curatedAssetIdSchema.nullable().optional(),
     buzzSoundId: curatedAssetIdSchema.nullable().optional(),
+    // Sparse like its siblings: absent = leave the tone alone, explicit null = go back to the
+    // pack's own colors (identity.ts explains why those are two different things).
+    skinToneId: curatedAssetIdSchema.nullable().optional(),
   }),
   z.strictObject({
     ...envelopeFields,

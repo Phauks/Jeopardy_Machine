@@ -63,6 +63,11 @@ export const refusalReasonSchema = z.enum([
   "late-join-disabled",
   "team-locked",
   "unknown-team",
+  // Team-create hit limits.team.teamMaxCount. A TEAM-tier refusal like the two above: the
+  // connection survives and the player joins one of the teams that already exist. Distinct
+  // from room-full because the room may have plenty of seats left - what is exhausted is the
+  // number of teams the board can show, which is a fact about the room and not about them.
+  "teams-full",
   // Password rooms (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Both reasons
   // KEEP the socket so the phone can prompt and retry on the same connection - the only
   // difference between them is whether the client sent a password at all, which the client

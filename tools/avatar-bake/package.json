@@ -8,6 +8,7 @@
   "scripts": {
     "download": "node src/download.mjs",
     "bake": "node src/bake.mjs",
+    "sync-manifest": "node src/sync-manifest.mjs",
     "analyze": "node src/bake.mjs --analyze"
   },
   "devDependencies": {

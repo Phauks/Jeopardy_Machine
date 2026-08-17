@@ -56,6 +56,7 @@ describe("room-store contract: lobby and roster tier", () => {
       avatarId: "fish",
       accentId: "moss",
       buzzSoundId: "loon",
+      skinToneId: null,
       team: { kind: "create", name: "Team Sequoia Two" },
     });
     const me = store.view.roster.players.find((entry) => entry.playerId === store.view.myPlayerId);
@@ -74,6 +75,7 @@ describe("room-store contract: lobby and roster tier", () => {
       avatarId: null,
       accentId: null,
       buzzSoundId: null,
+      skinToneId: null,
       team: { kind: "join", teamId: lockedTeam?.teamId ?? "" },
     });
     expect(store.view.myPlayerId).toBeNull();
@@ -81,7 +83,13 @@ describe("room-store contract: lobby and roster tier", () => {
 
   it("post-join customization updates the personal tier; leader ops move the team tier", () => {
     const store = new LocalSimRoomStore({ roomCode: "TESTA", role: "player", seed: "custom" });
-    store.join({ nickname: "Newt", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Newt",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     store.updateIdentity({ nickname: "Newt Prime", buzzSoundId: "gong" });
     const me = store.view.roster.players.find((entry) => entry.playerId === store.view.myPlayerId);
     expect(me?.nickname).toBe("Newt Prime");
@@ -223,7 +231,13 @@ describe("room-store contract: game flow through the action layer", () => {
     startAndPresent(store);
     const first = store.view.game?.entityOrder[0];
     store.hostAward(first ?? "", "correct");
-    store.join({ nickname: "Latecomer", avatarId: null, accentId: null, buzzSoundId: null });
+    store.join({
+      nickname: "Latecomer",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
     const seatId = store.view.myPlayerId;
     expect(seatId).not.toBeNull();
     expect(store.view.game?.players[seatId ?? ""]).toBeDefined();
@@ -274,7 +288,13 @@ describe("room-store contract: game flow through the action layer", () => {
 // its own view - the store is role "player" so responses are redacted too.
 function playerInGame(): { store: LocalSimRoomStore; now: () => number } {
   const store = new LocalSimRoomStore({ roomCode: "TESTA", role: "player", seed: "stage" });
-  store.join({ nickname: "Stagehand", avatarId: null, accentId: null, buzzSoundId: null });
+  store.join({
+    nickname: "Stagehand",
+    avatarId: null,
+    accentId: null,
+    buzzSoundId: null,
+    skinToneId: null,
+  });
   return { store, now: () => Date.now() };
 }
 

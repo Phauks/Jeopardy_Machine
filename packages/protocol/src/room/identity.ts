@@ -52,5 +52,16 @@ export const personalIdentitySchema = z.strictObject({
   // In individuals mode this is the room-audible buzz sound; in teams mode it plays only on
   // the player's own phone (owner directive: team-scoped buzz sounds).
   buzzSoundId: curatedAssetIdSchema.nullable(),
+  // The human models' skin tone (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md).
+  //
+  // OPTIONAL AND NULLABLE, and the two mean different things on purpose. Absent = a client
+  // that predates the field, which is why it is optional rather than required-nullable: this
+  // is an additive change and an older phone's join must keep validating. Present-and-null =
+  // this player has not chosen a tone, and their avatar renders in the pack's own colors.
+  // Neither ever means "guess one" - nothing anywhere may infer a tone from a nickname, an
+  // avatar, or a locale (the decision's "never inferred, never defaulted from anything but a
+  // neutral"). Like every other curated id the protocol checks the shape only; whether it
+  // names a tone this build ships is the client's lookup problem.
+  skinToneId: curatedAssetIdSchema.nullable().optional(),
 });
 export type PersonalIdentity = z.infer<typeof personalIdentitySchema>;
