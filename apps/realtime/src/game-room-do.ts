@@ -230,11 +230,15 @@ export class GameRoomDO extends Server {
 
   private wireRoster(): RosterPayload {
     const room = this.room;
-    if (room === null || room === undefined) return { players: [], teams: [] };
+    if (room === null || room === undefined) return { players: [], teams: [], spectatorCount: 0 };
     const players = Object.values(room.roster)
       .toSorted((a, b) => a.joinedAt - b.joinedAt)
       .map(toWireRosterEntry);
-    return { players, teams: Object.values(room.teams) };
+    // The audience travels as a COUNT, from live connections - spectators hold no roster seat
+    // and no identity, so this is the only fact about them that exists. Always sent by this
+    // server (the field is optional on the wire so "not reported" stays expressible for a
+    // producer that cannot count, never so that a real room can go quiet about its audience).
+    return { players, teams: Object.values(room.teams), spectatorCount: this.spectatorCount() };
   }
 
   private broadcastRoster(): void {
@@ -1368,10 +1372,22 @@ export class GameRoomDO extends Server {
   ): Promise<void> {
     const room = await this.load();
     if (room === null) return;
-    const playerId = attachment.playerId;
+    // WHO is being seated. A phone may only ever move itself; the HOST may name any player,
+    // which is how the console's roster panel rebalances teams (user-flows C2 "drag to
+    // rebalance", host supremacy under guiding principle 4).
+    const isHost = attachment.role === "host";
+    if (message.playerId !== undefined && !isHost && message.playerId !== attachment.playerId) {
+      this.sendError(connection, "unauthorized", "only the host seats other players");
+      return;
+    }
+    const playerId = message.playerId ?? attachment.playerId;
     const entry = playerId === null ? undefined : room.roster[playerId];
     if (entry === undefined) {
-      this.sendError(connection, "unauthorized", "only players join teams");
+      this.sendError(
+        connection,
+        isHost ? "unknown-player" : "unauthorized",
+        isHost ? undefined : "only players join teams",
+      );
       return;
     }
     if (!this.teamEditsAllowed()) {
@@ -1383,7 +1399,9 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "unknown-team");
       return;
     }
-    if (team.locked) {
+    // A lock stops JOINERS, not the host: it is the leader's anti-nuisance tool, and the host
+    // out-ranks every team decision (docs/design/user-flows.md "Teams & leadership").
+    if (team.locked && !isHost) {
       this.sendError(connection, "rejected", "team is locked");
       return;
     }

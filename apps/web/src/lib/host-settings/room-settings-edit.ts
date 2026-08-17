@@ -14,6 +14,14 @@
 import type { RoomSettingsPatch, SettingsRejection } from "@jeopardy/protocol/room/room-settings";
 import type { RoomView } from "#lib/room/room-view.ts";
 
+/**
+ * An empty value is a real state (an unnamed room), and it needs a word: without one the
+ * pending line reads "title  -> Compost Quiz" and a host has to guess what the gap meant.
+ */
+function spokenValue(value: string): string {
+  return value.trim().length === 0 ? "(none)" : value;
+}
+
 export type SettingsRefusalCopy = {
   reason: SettingsRejection;
   headline: string;
@@ -60,10 +68,64 @@ export function roomSettingsRefusal(
 }
 
 /**
+ * What a typed room setting would CHANGE, in words, or null when it would change nothing.
+ *
+ * This exists because of one piece of owner feedback (2026-08-17): "I don't understand SAVE
+ * CAPS". A button labelled with a verb and a noun tells a host what it is called, not what it
+ * would do to their room - and the room half of the panel is the half where a mistaken press
+ * reaches every phone. So the panel states the pending edit ("player cap 30 -> 24") beside the
+ * button, and the button is dead until there is one. Same shape for both typed groups, because
+ * both have the same problem: a value being typed must not reach the room letter by letter, so
+ * they are the only controls in the panel that need a deliberate press at all.
+ */
+export function pendingChangeSummary(
+  changes: { label: string; from: string; to: string }[],
+): string | null {
+  const real = changes.filter((change) => change.from !== change.to);
+  if (real.length === 0) return null;
+  return real
+    .map((change) => `${change.label} ${spokenValue(change.from)} -> ${spokenValue(change.to)}`)
+    .join(", ");
+}
+
+/** The caps a host has typed, against the caps the room is running - null when identical. */
+export function pendingCapsSummary(
+  view: RoomView,
+  draft: { maxPlayers: number; maxSpectators: number },
+): string | null {
+  return pendingChangeSummary([
+    {
+      label: "player cap",
+      from: String(view.settings.maxPlayers),
+      to: String(Math.round(draft.maxPlayers)),
+    },
+    {
+      label: "spectator cap",
+      from: String(view.settings.maxSpectators),
+      to: String(Math.round(draft.maxSpectators)),
+    },
+  ]);
+}
+
+/** The room's name/host label a host has typed, against the room's - null when identical. */
+export function pendingNameSummary(
+  view: RoomView,
+  draft: { title: string; hostLabel: string },
+): string | null {
+  return pendingChangeSummary([
+    { label: "title", from: view.settings.title, to: draft.title },
+    { label: "hosted by", from: view.settings.hostLabel, to: draft.hostLabel },
+  ]);
+}
+
+/**
  * The room's settings as one line of chrome for the panel header - what a host glances at to
  * know what they have got before they change anything.
  */
 export function roomSettingsSummary(view: RoomView): string {
+  // Never a plausible-looking line about a room nobody has heard from yet (room-view.ts,
+  // `settingsKnown`): the console would be reporting the protocol's defaults as this room's.
+  if (!view.settingsKnown) return "Waiting for the room to report its settings";
   const settings = view.settings;
   const parts = [
     settings.listing === "public" ? "Public" : "Private",

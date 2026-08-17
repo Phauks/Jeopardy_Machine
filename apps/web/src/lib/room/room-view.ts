@@ -49,6 +49,17 @@ export type RoomTeamView = {
 export type RoomRosterView = {
   players: RoomPlayerView[];
   teams: RoomTeamView[];
+  /**
+   * How many spectators are watching, or NULL when this room has not reported its audience.
+   *
+   * Spectators hold no seat and give no identity, so a count is the only honest thing there is
+   * to show (the protocol's `rosterPayload.spectatorCount`, filled from live connections by the
+   * DO). Null is not zero and must not render as zero: "nobody is watching" and "nobody has
+   * counted" are different facts, and a console that prints the second as the first is
+   * inventing a number - the same rule the lobby's capacity lines follow
+   * (src/lib/lobby/room-capacity.ts).
+   */
+  spectatorCount: number | null;
 };
 
 /**
@@ -146,6 +157,18 @@ export type RoomView = {
    * password is the one settings field that never leaves the DO.
    */
   settings: RoomSettings;
+  /**
+   * Has the ROOM actually told us the settings above, or are they still the shell a store
+   * carries so surfaces can render before the first message lands?
+   *
+   * False means "not loaded yet" and a surface that edits or reports room settings must SAY so
+   * rather than draw the protocol defaults - a host who reads "40 players, spectators on" off a
+   * console that has heard nothing from the room has been told something untrue about their own
+   * room (owner, 2026-08-17: "I don't think the room I created shows the correct settings").
+   * The local-sim store is the authority for its own room and reports true; the ws store
+   * reports false until the `room-settings` message arrives.
+   */
+  settingsKnown: boolean;
   /**
    * Why the room turned this connection away, in the protocol's own vocabulary, or null. The
    * REASON travels rather than a sentence, so the copy lives in one place

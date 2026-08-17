@@ -46,5 +46,16 @@ export type RosterEntry = z.infer<typeof rosterEntrySchema>;
 export const rosterPayloadSchema = z.strictObject({
   players: z.array(rosterEntrySchema).max(limits.room.playerHardCap),
   teams: z.array(teamDocSchema).max(limits.team.teamMaxCount),
+  // THE AUDIENCE, as a number and never as a list. Spectators hold no seat and give no
+  // identity - a spectator is a live connection and nothing else - so the only honest thing a
+  // roster can carry about them is how many there are, counted from connections by the one
+  // party that can see them (the DO).
+  //
+  // OPTIONAL, and absent is NOT zero: absent means "this producer does not report its
+  // audience", which is the state a client must render as unknown rather than as an empty
+  // room (the same rule the lobby's capacity lines follow - apps/web/src/lib/lobby/
+  // room-capacity.ts). A host console showing "0 watching" for a room nobody has counted is
+  // the invented-number bug that rule exists to prevent.
+  spectatorCount: z.int().nonnegative().max(limits.room.spectatorHardCap).optional(),
 });
 export type RosterPayload = z.infer<typeof rosterPayloadSchema>;

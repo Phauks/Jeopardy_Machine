@@ -24,7 +24,7 @@
   import { page } from "$app/state";
   import BuzzerScreen from "#lib/room/buzzer-screen.svelte";
   import PreGameScreen from "#lib/room/pre-game-screen.svelte";
-  import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { createRoomStore, seedRosterFor } from "#lib/room/create-room-store.ts";
   import { playerSurfaceFor } from "#lib/room/pre-game.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
@@ -33,6 +33,9 @@
   const roomCode = (page.params.code ?? "DUMYX").toUpperCase();
   const store = createRoomStore({
     roomCode,
+    // The dummy roster belongs to the fixture room and to ?demo, never to a code somebody just
+    // created (create-room-store.ts): a real room starts empty and says so.
+    seedRoster: seedRosterFor(roomCode, page.url),
     role: "player",
     timerAutopilot: browser,
   });

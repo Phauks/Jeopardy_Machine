@@ -75,9 +75,17 @@ export type RoomStore = {
   updateTeam(patch: TeamPatch, teamId?: string): void;
   kickFromTeam(playerId: string): void;
   handOffLeadership(playerId: string): void;
-  // Host supremacy over the roster.
+  // Host supremacy over the roster (guiding principle 4; the console's roster panel is the one
+  // surface that calls these - src/lib/room/host-roster-panel.svelte).
   renamePlayer(playerId: string, nickname: string): void;
   kickFromRoom(playerId: string): void;
+  /**
+   * Seat ANOTHER player on a team - the host rebalancing from the console (user-flows C2's
+   * "drag to rebalance"). `joinTeam` is the same edit for the sender themself; this one names
+   * its target, rides `team-join` with a host-only `playerId`, and ignores the team's lock,
+   * because a lock is the leader's anti-nuisance tool and the host out-ranks it.
+   */
+  assignPlayerToTeam(playerId: string, teamId: string): void;
 
   // Play (phone side).
   buzz(): void;

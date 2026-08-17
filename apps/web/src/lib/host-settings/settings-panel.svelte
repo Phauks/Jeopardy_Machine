@@ -16,6 +16,15 @@
   // In place, never a screen (the standing UI law of that same decision): this renders as a
   // rail beside the console, which keeps running, keeps updating, and keeps its keyboard
   // shortcuts while the panel is open.
+  //
+  // NOT THEMED, and that is a rule rather than a taste (owner, 2026-08-17: "Display text size
+  // and other settings show the theme assets, which makes them difficult to read"). A control
+  // panel must never be painted by the thing it controls: this panel steers the type scale a
+  // theme renders at, so it wore the theme's display faces and the theme's contrast, and a
+  // slider label ended up in a condensed poster face on a color the theme chose for a board.
+  // Everything here paints from the fixed --control-* tokens (src/lib/theme/tokens.css). The
+  // one exception is the PREVIEW below, which is explicitly a picture of the display and is
+  // supposed to look like one; console-chrome.gate.test.ts holds that line.
   import {
     maximumTypeScale,
     minimumTypeScale,
@@ -23,7 +32,12 @@
     typeScaleStep,
     typeScaleStyle,
   } from "#lib/host-settings/device-preferences.ts";
-  import { roomSettingsRefusal, roomSettingsSummary } from "#lib/host-settings/room-settings-edit.ts";
+  import {
+    pendingCapsSummary,
+    pendingNameSummary,
+    roomSettingsRefusal,
+    roomSettingsSummary,
+  } from "#lib/host-settings/room-settings-edit.ts";
   import type { DevicePreferencesStore } from "#lib/host-settings/device-preferences.svelte.ts";
   import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -51,6 +65,26 @@
   let maxSpectatorsDraft = $state(view.settings.maxSpectators);
   let refusal = $state<{ headline: string; advice: string } | null>(null);
   let codeRevealed = $state(false);
+
+  // What each typed group WOULD change, stated beside its button. The button is dead until
+  // there is something to apply, which is what turns "Save caps" from a name into an action a
+  // host can predict (room-settings-edit.ts explains the reasoning).
+  const pendingCaps = $derived(
+    pendingCapsSummary(view, { maxPlayers: maxPlayersDraft, maxSpectators: maxSpectatorsDraft }),
+  );
+  const pendingName = $derived(
+    pendingNameSummary(view, { title: titleDraft, hostLabel: hostLabelDraft }),
+  );
+
+  function revertCaps(): void {
+    maxPlayersDraft = view.settings.maxPlayers;
+    maxSpectatorsDraft = view.settings.maxSpectators;
+  }
+
+  function revertName(): void {
+    titleDraft = view.settings.title;
+    hostLabelDraft = view.settings.hostLabel;
+  }
 
   /**
    * Send a room-settings edit, or explain why the room would refuse it. The console checks the
@@ -259,8 +293,22 @@
     </header>
     <p class="group-note">
       Server settings. Every change reaches every phone and every display in the room at once.
+      <strong>Switches take effect the moment you flip them.</strong> Anything you TYPE - the name,
+      the password, the caps - waits for its Apply button, so a half-typed name never reaches the
+      room.
     </p>
     <p class="summary">{roomSettingsSummary(view)}</p>
+
+    {#if !view.settingsKnown}
+      <!-- HONEST BLANK. Until the room has sent its settings, everything below would be the
+           protocol's defaults wearing this room's name - which is how a host ends up sure their
+           room is set to something it never was (owner, 2026-08-17). So the controls do not
+           render at all, and the panel says why. -->
+      <p class="not-loaded">
+        This console has not heard the room's settings yet. Nothing is shown here rather than
+        showing defaults that are not yours - the controls appear as soon as the room reports.
+      </p>
+    {:else}
 
     {#if refusal !== null}
       <p class="refusal" role="alert">
@@ -316,15 +364,24 @@
       <input id="room-title" type="text" bind:value={titleDraft} />
       <label for="room-host-label">Hosted by</label>
       <input id="room-host-label" type="text" bind:value={hostLabelDraft} />
-      <button
-        type="button"
-        class="chip"
-        onclick={() => {
-          applyRoomSettings({ title: titleDraft, hostLabel: hostLabelDraft });
-        }}
-      >
-        Save name
-      </button>
+      {#if pendingName !== null}
+        <p class="pending" role="status">Not applied yet: {pendingName}</p>
+      {/if}
+      <div class="row">
+        <button
+          type="button"
+          class="chip"
+          disabled={pendingName === null}
+          onclick={() => {
+            applyRoomSettings({ title: titleDraft, hostLabel: hostLabelDraft });
+          }}
+        >
+          Apply name to the room
+        </button>
+        {#if pendingName !== null}
+          <button type="button" class="chip subtle" onclick={revertName}>Discard</button>
+        {/if}
+      </div>
     </div>
 
     <div class="control">
@@ -361,7 +418,20 @@
       <p class="hint">Changing it never disconnects anyone already in the room.</p>
     </div>
 
+    <!-- HOW MANY PEOPLE FIT. Was a pair of number boxes under a button reading "Save caps",
+         which told a host the button's name and not its scope (owner, 2026-08-17: "I don't
+         understand SAVE CAPS"). Now the group says what it governs, the room's current numbers
+         are stated in words above the boxes, the pending edit is spelled out, and the button
+         names its own effect. -->
     <div class="control">
+      <span class="control-label">How many people fit</span>
+      <p class="current">
+        Right now: <strong>{view.roster.players.length}</strong> of
+        <strong>{view.settings.maxPlayers}</strong> player seats taken;
+        {view.settings.spectatorsAllowed
+          ? `up to ${String(view.settings.maxSpectators)} spectators may watch`
+          : "spectators are not allowed in"}.
+      </p>
       <label for="max-players">Player cap</label>
       <input id="max-players" type="number" min="1" bind:value={maxPlayersDraft} />
       <label for="max-spectators">Spectator cap</label>
@@ -376,26 +446,48 @@
         />
         Allow spectators
       </label>
-      <button
-        type="button"
-        class="chip"
-        onclick={() => {
-          applyRoomSettings({
-            maxPlayers: Math.round(maxPlayersDraft),
-            maxSpectators: Math.round(maxSpectatorsDraft),
-          });
-        }}
-      >
-        Save caps
-      </button>
-      <p class="hint">Nobody is ever removed by a cap - it only stops the next arrival.</p>
+      {#if pendingCaps !== null}
+        <p class="pending" role="status">Not applied yet: {pendingCaps}</p>
+      {/if}
+      <div class="row">
+        <button
+          type="button"
+          class="chip"
+          disabled={pendingCaps === null}
+          onclick={() => {
+            applyRoomSettings({
+              maxPlayers: Math.round(maxPlayersDraft),
+              maxSpectators: Math.round(maxSpectatorsDraft),
+            });
+          }}
+        >
+          Apply caps to the room
+        </button>
+        {#if pendingCaps !== null}
+          <button type="button" class="chip subtle" onclick={revertCaps}>Discard</button>
+        {/if}
+      </div>
+      <p class="hint">
+        Caps only stop the NEXT arrival. Nobody already in the room is ever removed by one, and
+        the room refuses a cap set below the people already here.
+      </p>
     </div>
+    {/if}
   </section>
 </aside>
 
 <style>
-  /* A rail beside the console, not over it: the board, the clue and the judge row all stay
-     visible and live while the panel is open (the persistent-layout law). */
+  /* THE PANEL IS CONTROL CHROME, NOT A THEMED SURFACE.
+     Every color and face below is a fixed --control-* token (src/lib/theme/tokens.css). It was
+     the theme's own tokens - --font-chrome for the labels, --surface-* for the ground, --accent
+     for the values - which meant the panel that SETS the display type scale was rendered in the
+     display's poster faces at whatever contrast the room's theme happened to give it (owner,
+     2026-08-17: "settings show the theme assets, which makes them difficult to read"). The rule
+     that replaces it: a control panel is never painted by the thing it controls. The single
+     exception is .preview below, which is a picture OF the theme and says so.
+
+     Type sizes stay in em so the host's console type scale still grows the panel with the rest
+     of the console - that is a legibility preference, not a theme. */
   .settings-panel {
     display: flex;
     flex-direction: column;
@@ -404,10 +496,11 @@
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
     padding: 0.8rem 0.9rem 1.2rem;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--board-radius);
-    background: var(--surface-raised);
-    color: var(--surface-text);
+    border: 1px solid var(--control-border);
+    border-radius: var(--control-radius);
+    background: var(--control-page);
+    color: var(--control-text);
+    font-family: var(--control-font);
   }
 
   .panel-head {
@@ -419,7 +512,6 @@
 
   .panel-head h2 {
     margin: 0;
-    font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-size: 1em;
@@ -430,18 +522,19 @@
     flex-direction: column;
     gap: 0.6rem;
     padding: 0.7rem 0.75rem 0.9rem;
-    border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
+    border-radius: var(--control-radius);
+    border: 1px solid var(--control-border);
+    background: var(--control-raised);
   }
 
   /* The two halves are visibly different objects. A host must never have to remember which
      column they are in. */
   .group.device {
-    border-left: 4px solid var(--surface-text-muted);
+    border-left: 4px solid var(--control-text-muted);
   }
 
   .group.room {
-    border-left: 4px solid var(--accent);
+    border-left: 4px solid var(--control-accent);
   }
 
   .group-head {
@@ -453,14 +546,12 @@
 
   .group-head h3 {
     margin: 0;
-    font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-size: 0.92em;
   }
 
   .badge {
-    font-family: var(--font-chrome);
     font-size: 0.62em;
     text-transform: uppercase;
     letter-spacing: 0.1em;
@@ -470,35 +561,60 @@
   }
 
   .badge.local {
-    color: var(--surface-text-muted);
+    color: var(--control-text-muted);
   }
 
   .badge.shared {
-    color: var(--accent);
+    color: var(--control-accent);
   }
 
   .group-note,
-  .hint {
+  .hint,
+  .current {
     margin: 0;
     font-size: 0.72em;
     line-height: 1.35;
-    color: var(--surface-text-muted);
+    color: var(--control-text-muted);
+  }
+
+  .current strong {
+    color: var(--control-text);
   }
 
   .summary {
     margin: 0;
-    font-family: var(--font-chrome);
     font-size: 0.72em;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--surface-text);
+    color: var(--control-text);
+  }
+
+  /* "Nothing has arrived yet" is a sentence, not an empty box: the honest state has to be as
+     visible as the controls it stands in for (room-view.ts, settingsKnown). */
+  .not-loaded {
+    margin: 0;
+    font-size: 0.78em;
+    line-height: 1.4;
+    padding: 0.5rem 0.6rem;
+    border: 1px dashed var(--control-border);
+    border-radius: var(--control-radius);
+    color: var(--control-text-muted);
   }
 
   .refusal {
     margin: 0;
     font-size: 0.78em;
     line-height: 1.35;
-    color: var(--score-negative);
+    color: var(--control-danger);
+  }
+
+  /* The pending line is the whole answer to "I don't understand SAVE CAPS": it states the edit
+     the button would send, in the room's units, before it is sent. */
+  .pending {
+    margin: 0;
+    font-size: 0.76em;
+    line-height: 1.35;
+    color: var(--control-accent);
   }
 
   .control {
@@ -517,12 +633,12 @@
   }
 
   .sub-label {
-    color: var(--surface-text-muted);
+    color: var(--control-text-muted);
   }
 
   .value {
-    font-family: var(--font-values);
-    color: var(--accent);
+    color: var(--control-accent);
+    font-variant-numeric: tabular-nums;
   }
 
   .toggle {
@@ -536,10 +652,12 @@
     display: flex;
     gap: 0.4rem;
     flex-wrap: wrap;
+    align-items: center;
   }
 
-  /* The live preview borrows the display's own type tokens, so what the host judges here is
-     what the room will see - it is the same calc, at the same scale. */
+  /* THE ONE THEMED THING HERE, deliberately: a preview borrows the display's own type tokens,
+     so what the host judges is what the room will see - same calc, same faces, same scale. It
+     is a picture of the board, framed by chrome that is not. */
   .preview {
     display: flex;
     align-items: baseline;
@@ -547,7 +665,8 @@
     gap: 0.5rem;
     overflow: hidden;
     padding: 0.4rem 0.5rem;
-    border-radius: var(--board-radius);
+    border-radius: var(--control-radius);
+    border: 1px solid var(--control-border);
     background: var(--board-cell-bg);
   }
 
@@ -570,10 +689,10 @@
 
   .revealed-code {
     margin: 0;
-    font-family: var(--font-values);
     font-size: 1.6em;
     letter-spacing: 0.12em;
-    color: var(--board-value-color);
+    font-variant-numeric: tabular-nums;
+    color: var(--control-accent);
   }
 
   input[type="text"],
@@ -582,34 +701,50 @@
     font: inherit;
     font-size: 0.85em;
     padding: 0.3rem 0.4rem;
-    border: 1px solid var(--surface-border);
-    border-radius: var(--board-radius);
-    background: var(--surface-page);
-    color: var(--surface-text);
+    border: 1px solid var(--control-border);
+    border-radius: var(--control-radius);
+    background: var(--control-page);
+    color: var(--control-text);
   }
 
   input[type="range"] {
     width: 100%;
+    accent-color: var(--control-accent);
+  }
+
+  input[type="checkbox"] {
+    accent-color: var(--control-accent);
   }
 
   .chip {
     align-self: flex-start;
-    font-family: var(--font-chrome);
+    font: inherit;
     font-size: 0.74em;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     padding: 0.3rem 0.65rem;
-    border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-page);
-    color: var(--surface-text);
+    border-radius: var(--control-radius);
+    border: 1px solid var(--control-border);
+    background: var(--control-raised);
+    color: var(--control-text);
     cursor: pointer;
+  }
+
+  /* A dead Apply button is the panel saying "there is nothing to apply" - which is half of why
+     the control is now predictable. */
+  .chip:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .chip.subtle {
+    color: var(--control-text-muted);
   }
 
   .chip:focus-visible,
   input:focus-visible,
   select:focus-visible {
-    outline: 3px solid var(--accent);
+    outline: 3px solid var(--control-accent);
     outline-offset: 2px;
   }
 

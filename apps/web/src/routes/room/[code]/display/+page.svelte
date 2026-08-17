@@ -10,7 +10,7 @@
   import { browser } from "$app/env";
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
-  import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { createRoomStore, seedRosterFor } from "#lib/room/create-room-store.ts";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
   import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
   import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
@@ -60,6 +60,9 @@
 
   const store = createRoomStore({
     roomCode,
+    // The dummy roster belongs to the fixture room and to ?demo, never to a code somebody just
+    // created (create-room-store.ts): a real room starts empty and says so.
+    seedRoster: seedRosterFor(roomCode, page.url),
     role: "display",
     timerAutopilot: browser,
     onEvent: onRoomEvent,

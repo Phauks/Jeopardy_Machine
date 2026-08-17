@@ -14,7 +14,8 @@
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
 // | team-create     | player, lobby only (creator becomes leader - user-flows A2)           |
-// | team-join       | player, lobby only, target team unlocked (also how a MOVE is sent)    |
+// | team-join       | player, lobby only, target team unlocked (also how a MOVE is sent);   |
+// |                 | the HOST may name `playerId` to seat somebody else (host supremacy)   |
 // | team-leave      | player, lobby only (back to the holding area; never refused)          |
 // | team-update     | the team's leader, or host (rename/color/buzz-sound/lock)             |
 // | team-kick       | the team's leader (own team), or host (any player, any team)          |
@@ -100,7 +101,19 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({ ...envelopeFields, type: z.literal("action"), action: relayedActionSchema }),
   z.strictObject({ ...envelopeFields, type: z.literal("team-create"), name: teamNameSchema }),
-  z.strictObject({ ...envelopeFields, type: z.literal("team-join"), teamId: teamIdSchema }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("team-join"),
+    teamId: teamIdSchema,
+    // WHO is being seated. Absent = the sender, which is every phone's own move between team
+    // cards. Present = the host seating somebody else from the console's roster panel, which
+    // is host supremacy over team membership (guiding principle 4, and the "drag to rebalance"
+    // of user-flows C2); a player sending it for anybody but themself is refused. It rides
+    // team-join rather than a new message because it is the same edit with a different actor -
+    // the alternative was a console that could only eject a mis-seated player and ask them to
+    // re-pick on their own phone.
+    playerId: playerIdSchema.optional(),
+  }),
   // Step out of a team back to the holding area, without picking another. Its own message
   // rather than `team-join` with a null teamId: those are different intents and the authority
   // matrix treats them differently (a locked team can refuse a join; nothing refuses a leave).

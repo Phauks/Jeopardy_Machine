@@ -67,7 +67,9 @@ export class WsRoomStore implements RoomStore {
       role: options.role,
       connection: "connecting",
       phase: "lobby",
-      roster: { players: [], teams: [] },
+      // Null audience, not zero: nothing has been heard from the room yet, and "nobody is
+      // watching" is a claim this store is in no position to make (room-view.ts).
+      roster: { players: [], teams: [], spectatorCount: null },
       teamsMode: false,
       myPlayerId: null,
       game: null,
@@ -78,15 +80,18 @@ export class WsRoomStore implements RoomStore {
       wagerRange: null,
       finalWagerRanges: [],
       paused: false,
-      // The room's defaults until the socket says otherwise. `hideJoinCode: false` is the
-      // right shell value: the connecting screen shows no code anyway, and a room that turns
-      // out to be in streamer mode hides it the moment `room-settings` arrives.
+      // A SHELL, and flagged as one. `hideJoinCode: false` is the right shell value (the
+      // connecting screen shows no code anyway, and streamer mode lands the moment
+      // `room-settings` arrives), but the numbers beside it are the protocol's defaults and not
+      // this room's - so `settingsKnown` stays false until the message lands and every surface
+      // that reports settings says "not loaded yet" instead of drawing a plausible fiction.
       settings: {
         ...defaultRoomSettings,
         entry: "open",
         title: "",
         hostLabel: "",
       },
+      settingsKnown: false,
       refusal: null,
     };
   }
@@ -139,6 +144,12 @@ export class WsRoomStore implements RoomStore {
   handOffLeadership(playerId: string): void {
     void playerId;
     notWired("handOffLeadership", "`team-handoff`");
+  }
+
+  assignPlayerToTeam(playerId: string, teamId: string): void {
+    void playerId;
+    void teamId;
+    notWired("assignPlayerToTeam", "`team-join` {teamId, playerId} (host seating somebody else)");
   }
 
   renamePlayer(playerId: string, nickname: string): void {
