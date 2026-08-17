@@ -309,169 +309,168 @@
         showing defaults that are not yours - the controls appear as soon as the room reports.
       </p>
     {:else}
+      {#if refusal !== null}
+        <p class="refusal" role="alert">
+          <strong>{refusal.headline}</strong>
+          {refusal.advice}
+        </p>
+      {/if}
 
-    {#if refusal !== null}
-      <p class="refusal" role="alert">
-        <strong>{refusal.headline}</strong>
-        {refusal.advice}
-      </p>
-    {/if}
+      <div class="control">
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={view.settings.hideJoinCode}
+            onchange={(event) => {
+              applyRoomSettings({ hideJoinCode: event.currentTarget.checked });
+            }}
+          />
+          Streamer mode (hide the join code)
+        </label>
+        <p class="hint">The code and QR stop rendering on the display and every shared surface.</p>
+        <!-- The reveal lives HERE and nowhere else: a reveal button on the streamed screen would
+             defeat the setting (docs/decisions/2026-08-14-room-controls-and-staging.md). -->
+        {#if view.settings.hideJoinCode}
+          {#if codeRevealed}
+            <p class="revealed-code">{view.roomCode}</p>
+          {:else}
+            <button
+              type="button"
+              class="chip"
+              onclick={() => {
+                codeRevealed = true;
+              }}
+            >
+              Show me the code
+            </button>
+          {/if}
+        {/if}
+      </div>
 
-    <div class="control">
-      <label class="toggle">
-        <input
-          type="checkbox"
-          checked={view.settings.hideJoinCode}
+      <div class="control">
+        <label for="room-listing">Listing</label>
+        <select
+          id="room-listing"
+          value={view.settings.listing}
           onchange={(event) => {
-            applyRoomSettings({ hideJoinCode: event.currentTarget.checked });
+            applyRoomSettings({ listing: event.currentTarget.value === "public" ? "public" : "private" });
           }}
+        >
+          <option value="private">Private - never in the lobby</option>
+          <option value="public">Public - anyone can find it</option>
+        </select>
+        <label for="room-title">Game title</label>
+        <input id="room-title" type="text" bind:value={titleDraft} />
+        <label for="room-host-label">Hosted by</label>
+        <input id="room-host-label" type="text" bind:value={hostLabelDraft} />
+        {#if pendingName !== null}
+          <p class="pending" role="status">Not applied yet: {pendingName}</p>
+        {/if}
+        <div class="row">
+          <button
+            type="button"
+            class="chip"
+            disabled={pendingName === null}
+            onclick={() => {
+              applyRoomSettings({ title: titleDraft, hostLabel: hostLabelDraft });
+            }}
+          >
+            Apply name to the room
+          </button>
+          {#if pendingName !== null}
+            <button type="button" class="chip subtle" onclick={revertName}>Discard</button>
+          {/if}
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="room-password">Password</label>
+        <input
+          id="room-password"
+          type="text"
+          autocomplete="off"
+          placeholder={view.settings.entry === "password" ? "set - type to replace" : "no password"}
+          bind:value={passwordDraft}
         />
-        Streamer mode (hide the join code)
-      </label>
-      <p class="hint">The code and QR stop rendering on the display and every shared surface.</p>
-      <!-- The reveal lives HERE and nowhere else: a reveal button on the streamed screen would
-           defeat the setting (docs/decisions/2026-08-14-room-controls-and-staging.md). -->
-      {#if view.settings.hideJoinCode}
-        {#if codeRevealed}
-          <p class="revealed-code">{view.roomCode}</p>
-        {:else}
+        <div class="row">
           <button
             type="button"
             class="chip"
             onclick={() => {
-              codeRevealed = true;
+              applyRoomSettings({ password: passwordDraft });
+              passwordDraft = "";
             }}
           >
-            Show me the code
+            Set password
           </button>
-        {/if}
-      {/if}
-    </div>
-
-    <div class="control">
-      <label for="room-listing">Listing</label>
-      <select
-        id="room-listing"
-        value={view.settings.listing}
-        onchange={(event) => {
-          applyRoomSettings({ listing: event.currentTarget.value === "public" ? "public" : "private" });
-        }}
-      >
-        <option value="private">Private - never in the lobby</option>
-        <option value="public">Public - anyone can find it</option>
-      </select>
-      <label for="room-title">Game title</label>
-      <input id="room-title" type="text" bind:value={titleDraft} />
-      <label for="room-host-label">Hosted by</label>
-      <input id="room-host-label" type="text" bind:value={hostLabelDraft} />
-      {#if pendingName !== null}
-        <p class="pending" role="status">Not applied yet: {pendingName}</p>
-      {/if}
-      <div class="row">
-        <button
-          type="button"
-          class="chip"
-          disabled={pendingName === null}
-          onclick={() => {
-            applyRoomSettings({ title: titleDraft, hostLabel: hostLabelDraft });
-          }}
-        >
-          Apply name to the room
-        </button>
-        {#if pendingName !== null}
-          <button type="button" class="chip subtle" onclick={revertName}>Discard</button>
-        {/if}
+          <button
+            type="button"
+            class="chip"
+            onclick={() => {
+              applyRoomSettings({ password: null });
+              passwordDraft = "";
+            }}
+          >
+            Remove password
+          </button>
+        </div>
+        <p class="hint">Changing it never disconnects anyone already in the room.</p>
       </div>
-    </div>
 
-    <div class="control">
-      <label for="room-password">Password</label>
-      <input
-        id="room-password"
-        type="text"
-        autocomplete="off"
-        placeholder={view.settings.entry === "password" ? "set - type to replace" : "no password"}
-        bind:value={passwordDraft}
-      />
-      <div class="row">
-        <button
-          type="button"
-          class="chip"
-          onclick={() => {
-            applyRoomSettings({ password: passwordDraft });
-            passwordDraft = "";
-          }}
-        >
-          Set password
-        </button>
-        <button
-          type="button"
-          class="chip"
-          onclick={() => {
-            applyRoomSettings({ password: null });
-            passwordDraft = "";
-          }}
-        >
-          Remove password
-        </button>
-      </div>
-      <p class="hint">Changing it never disconnects anyone already in the room.</p>
-    </div>
-
-    <!-- HOW MANY PEOPLE FIT. Was a pair of number boxes under a button reading "Save caps",
-         which told a host the button's name and not its scope (owner, 2026-08-17: "I don't
-         understand SAVE CAPS"). Now the group says what it governs, the room's current numbers
-         are stated in words above the boxes, the pending edit is spelled out, and the button
-         names its own effect. -->
-    <div class="control">
-      <span class="control-label">How many people fit</span>
-      <p class="current">
-        Right now: <strong>{view.roster.players.length}</strong> of
-        <strong>{view.settings.maxPlayers}</strong> player seats taken;
-        {view.settings.spectatorsAllowed
-          ? `up to ${String(view.settings.maxSpectators)} spectators may watch`
-          : "spectators are not allowed in"}.
-      </p>
-      <label for="max-players">Player cap</label>
-      <input id="max-players" type="number" min="1" bind:value={maxPlayersDraft} />
-      <label for="max-spectators">Spectator cap</label>
-      <input id="max-spectators" type="number" min="0" bind:value={maxSpectatorsDraft} />
-      <label class="toggle">
-        <input
-          type="checkbox"
-          checked={view.settings.spectatorsAllowed}
-          onchange={(event) => {
-            applyRoomSettings({ spectatorsAllowed: event.currentTarget.checked });
-          }}
-        />
-        Allow spectators
-      </label>
-      {#if pendingCaps !== null}
-        <p class="pending" role="status">Not applied yet: {pendingCaps}</p>
-      {/if}
-      <div class="row">
-        <button
-          type="button"
-          class="chip"
-          disabled={pendingCaps === null}
-          onclick={() => {
-            applyRoomSettings({
-              maxPlayers: Math.round(maxPlayersDraft),
-              maxSpectators: Math.round(maxSpectatorsDraft),
-            });
-          }}
-        >
-          Apply caps to the room
-        </button>
+      <!-- HOW MANY PEOPLE FIT. Was a pair of number boxes under a button reading "Save caps",
+           which told a host the button's name and not its scope (owner, 2026-08-17: "I don't
+           understand SAVE CAPS"). Now the group says what it governs, the room's current numbers
+           are stated in words above the boxes, the pending edit is spelled out, and the button
+           names its own effect. -->
+      <div class="control">
+        <span class="control-label">How many people fit</span>
+        <p class="current">
+          Right now: <strong>{view.roster.players.length}</strong> of
+          <strong>{view.settings.maxPlayers}</strong> player seats taken;
+          {view.settings.spectatorsAllowed
+            ? `up to ${String(view.settings.maxSpectators)} spectators may watch`
+            : "spectators are not allowed in"}.
+        </p>
+        <label for="max-players">Player cap</label>
+        <input id="max-players" type="number" min="1" bind:value={maxPlayersDraft} />
+        <label for="max-spectators">Spectator cap</label>
+        <input id="max-spectators" type="number" min="0" bind:value={maxSpectatorsDraft} />
+        <label class="toggle">
+          <input
+            type="checkbox"
+            checked={view.settings.spectatorsAllowed}
+            onchange={(event) => {
+              applyRoomSettings({ spectatorsAllowed: event.currentTarget.checked });
+            }}
+          />
+          Allow spectators
+        </label>
         {#if pendingCaps !== null}
-          <button type="button" class="chip subtle" onclick={revertCaps}>Discard</button>
+          <p class="pending" role="status">Not applied yet: {pendingCaps}</p>
         {/if}
+        <div class="row">
+          <button
+            type="button"
+            class="chip"
+            disabled={pendingCaps === null}
+            onclick={() => {
+              applyRoomSettings({
+                maxPlayers: Math.round(maxPlayersDraft),
+                maxSpectators: Math.round(maxSpectatorsDraft),
+              });
+            }}
+          >
+            Apply caps to the room
+          </button>
+          {#if pendingCaps !== null}
+            <button type="button" class="chip subtle" onclick={revertCaps}>Discard</button>
+          {/if}
+        </div>
+        <p class="hint">
+          Caps only stop the NEXT arrival. Nobody already in the room is ever removed by one, and
+          the room refuses a cap set below the people already here.
+        </p>
       </div>
-      <p class="hint">
-        Caps only stop the NEXT arrival. Nobody already in the room is ever removed by one, and
-        the room refuses a cap set below the people already here.
-      </p>
-    </div>
     {/if}
   </section>
 </aside>
