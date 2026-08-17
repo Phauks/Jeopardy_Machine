@@ -65,7 +65,9 @@ Layering rule for consumers: `background: var(--effect-cell-overlay), var(--boar
 
 ### App layout constants (in `tokens.css`, deliberately not themeable)
 
-`--board-gutter` (clamped viewport-relative gutter width - the thickness is trade dress, the color is `--board-bg`), `--board-radius`, and the board type scale (`--board-category-size`, `--board-value-size`, `--clue-text-size` - `clamp()` against viewport height per the distance-legibility rules in docs/research/05-ui-design.md §3). Projector-boost mode (a runtime legibility override, not a theme) will adjust these plus text tokens when it lands.
+`--board-gutter` (clamped viewport-relative gutter width - the thickness is trade dress, the color is `--board-bg`), `--board-radius`, and the board type scale (`--board-category-size`, `--board-value-size`, `--clue-text-size` - `clamp()` against viewport height per the distance-legibility rules in docs/research/05-ui-design.md §3).
+
+**Projector-boost landed 2026-08-16 as `--type-scale`**, and it is per SURFACE rather than global, which is the whole point: the three type tokens above are each `calc(clamp(...) * var(--type-scale))`, and a surface sets the token on itself. The host's cog (docs/design/surfaces.md, "Host settings") sets it from a per-device preference - one number for display surfaces, a different one for the console, because a projector is read across a room and a console at arm's length. It is not a theme document field and never travels: it is a property of the laptop and the venue.
 
 ## How presets work
 

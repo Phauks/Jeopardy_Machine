@@ -110,16 +110,24 @@ export const boatsStagingTheme: StagingTheme = {
 
   // Above the sail, clear of every avatar's head at any seat.
   nameplateOffset: [0, hullHeight + 1.75, -hullDepth / 2 + 0.15],
+  // In the water just off the bow: low enough to read as painted on the surface, far enough
+  // forward that the crew standing on the deck never covers their own names.
+  crewPlateOffset: [0, 0.12, hullDepth / 2 + 0.62],
 
   holdingSurface: {
-    // Wider and deeper than any pen: the water has to run past the edge of frame, or the
-    // diorama looks like a puddle on a floor rather than an open bay.
-    shape: { kind: "plane", width: 60, depth: 40 },
+    // 2026-08-16: was a 60x40 plane running past every edge of frame ("an open bay"). It read
+    // as no place at all - which is exactly what the owner reported. The water is now the
+    // holding band with a margin and a visible kerb, so "in the water" is somewhere you can
+    // see the edges of.
+    margin: 0.3,
     y: 0.02,
     color: "holding",
     // Slightly transparent so the themed ground beneath tints it - a green-tokened theme gets
     // green-tinged water without the theme naming a water colour.
     opacity: 0.82,
+    // A low dock rail around the water. Structure-coloured, so it belongs to the venue rather
+    // than to any team.
+    edge: { height: 0.13, thickness: 0.1, color: "structure" },
   },
   holdingMotion: "bob",
 };

@@ -84,6 +84,9 @@ export const campfiresStagingTheme: StagingTheme = {
   ],
 
   nameplateOffset: [0, 1.25, 0],
+  // Outside the ring of stools, on the near side: the plate belongs to the fire without
+  // standing between the camera and the people sitting at it.
+  crewPlateOffset: [0, 0.1, ringRadius + 0.72],
 
   // No drawn surface: the clearing IS the themed ground the diorama already paints, which is
   // the "holdingSurface: null" case the boats theme does not exercise.

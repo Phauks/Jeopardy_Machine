@@ -32,6 +32,8 @@ Same division of labour `wander.ts` established. `staging-layout.ts` decides whe
 
 Two anti-shuffle rules, both gate-tested, both learned from the same bug class the fixed spawn grid in `wander.ts` exists to prevent: a station keeps its spot when a new team is created, and a waiting player keeps their spot when somebody else boards.
 
+> **Half of that reversed 2026-08-16 - see "What the deployed version got wrong" below.** A station can no longer keep its exact spot, because clearance at every team count and a fixed spot are not simultaneously satisfiable. The waiting-player rule stands unchanged.
+
 ### 4. The move is the point
 
 `stepStagedAgent` walks an occupant to their seat at 1.15 units/second, facing the way they are travelling, and adopts the seat's own facing only on arrival. A team switch is therefore a visible crossing rather than a teleport - which is the owner's brief, and also the only way the change is legible from the back of a hall.
@@ -41,6 +43,33 @@ Two anti-shuffle rules, both gate-tested, both learned from the same bug class t
 **The diorama may degrade to nothing. The staging may not.** Guardrail 3 of the avatars-in-motion decision says the diorama is decoration and a browser without WebGL simply loses it. That is right for wandering pets. It is wrong for staging, because "which boat am I on" is an ANSWER, not scenery - and the team screen is unusable without it.
 
 So `staged-lobby.svelte` renders `staged-lobby-2d.svelte` - stations as cards in their team colours over a water band - until the renderer reports itself up, and keeps it forever on a device that has none. SSR renders it too, so a phone sees the staged layout before any JavaScript has decided what the device can do. Everything else the diorama guarantees is unchanged and still gate-tested: three stays behind the dynamic import, the whole staging layer is three-free, `prefers-reduced-motion` stands everyone still on their spot (the layout survives the freeze, the journey does not), and none of it renders behind a live clue.
+
+## What the deployed version got wrong (owner, 2026-08-16, and the fixes)
+
+Three reports from looking at the thing on a screen. All three were in the placement and the copy; none of them was in the theme system, which is the reassuring part.
+
+### "Boats overlap each other"
+
+**The bug.** The packing filled a row with as many stations as fit at the theme's authored size, wrapped, and then spread the rows over whatever depth the station band had left. Two and three teams looked right. From five teams up the row spacing was shorter than a boat is long, and the hulls sat inside each other; at twelve teams the whole harbour was a pile. The old test asserted "no overlap on the same row" - which was true, and useless, because the overlap was between rows.
+
+**The fix.** `stationGrid` searches every column count and keeps the arrangement that lets the stations stay biggest, then every station wears a uniform **scale** so its footprint fits the cell it was given. Non-overlap becomes a property of the grid rather than of the count: six boats land as 3x2 at full size, twelve as 4x3 at 64%, and neither number is written down anywhere. The crew scales with its station (six people at authored spacing on a 60% boat would be standing through each other), and the seat-wrap nudge for an overcrowded team is bounded by the footprint so the twentieth member cannot drift onto the neighbouring boat.
+
+**The holding area had the same class of bug, worse.** A fixed three rows of six gave eighteen slots for a crowd the diorama draws up to twenty-four of, and the slot index wraps - so the nineteenth waiting player stood _exactly_ on top of the first. Rows now come from `maxDioramaAvatars`, and the scatter jitter is bounded by whatever is left over once everybody has their personal space, so the guarantee survives the scatter.
+
+**The reversal this forces.** A grid that guarantees clearance for N stations is not the grid for N+1, so creating a team re-packs the stage. That kills the "a station keeps its spot" rule above. What replaces it is a promise that is actually keepable: nothing JUMPS. `easeStationPosition` slides each station to its new anchor, so the harbour visibly makes room for the new boat. Same trade as everywhere else in this system - the pure module decides, the scene copies, and the motion is unit-tested.
+
+**The test that would have caught it.** `staging-layout.test.ts` now asserts that no two station footprints intersect (a separating-axis check, not "the positions differ"), at fourteen team counts, on two canvas shapes, for both themes - plus that no two people in the holding area are closer than one avatar's width under the worst jitter the scatter can produce.
+
+### "I don't understand still in the water"
+
+Being unassigned was drawn as a POSITION and nothing else, and a position is not a state anybody can read from the back of a hall. Two causes, both fixed:
+
+- **No words.** `staging-copy.ts` gives the holding area a sign: what it is ("Waiting to board"), what to do about it ("Choose a team to board"), and how many people are in it. In the theme's own verb, so the clearing says "Waiting to join" without a second string existing. One function, used by the 3D sprite over the water AND by the 2D card, so the answer cannot depend on whether the projector laptop has WebGL.
+- **No boundary.** The water was a 60x40 plane running under the entire stage - which is to say, no edge anywhere, indistinguishable from the floor. It is now the holding band plus a margin, with a kerb around it; the 2D card gained a real border with the theme's noun on it. A place you can see the edges of.
+
+### "Names beneath the boats"
+
+Each station carries a crew plate under it: a sprite in 3D, a wrapped list in the 2D card, capped by the same rule in both (`crewPlate`, six names then "+4"). Overflow COUNTS rather than shrinking - a plate that stayed readable by getting smaller would be unreadable at exactly the moment it has the most to say - and long nicknames are cut rather than allowed to own the plate.
 
 ## Consequences
 

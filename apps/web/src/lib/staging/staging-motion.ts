@@ -109,6 +109,37 @@ function easeHeading(from: number, to: number, deltaSeconds: number): number {
   return from + Math.sign(delta) * maxTurn;
 }
 
+/**
+ * Units per second a STATION slides when the stage re-packs. Slower than a person walks, so a
+ * boat reads as a heavy thing being repositioned rather than as a chip sliding on a table.
+ */
+export const stationSlideSpeed = 0.9;
+
+/**
+ * Ease a station toward the anchor the layout gave it, and the counterpart to the reversal
+ * recorded in staging-layout.ts (2026-08-16). Guaranteeing clearance at every team count means
+ * the grid changes when a team is created, so stations DO move - and the difference between
+ * that reading as "the harbour makes room" and as a glitch is entirely whether they slide or
+ * jump. Pure, so the easing is unit-tested and diorama-scene.ts only copies the number.
+ *
+ * `frozen` snaps, for the same reason the walk does: prefers-reduced-motion removes journeys,
+ * never layouts.
+ */
+export function easeStationPosition(
+  current: { x: number; z: number },
+  target: { x: number; z: number },
+  deltaSeconds: number,
+  frozen = false,
+): { x: number; z: number } {
+  if (frozen) return { x: target.x, z: target.z };
+  const deltaX = target.x - current.x;
+  const deltaZ = target.z - current.z;
+  const distance = Math.hypot(deltaX, deltaZ);
+  const step = stationSlideSpeed * deltaSeconds;
+  if (distance <= step || distance === 0) return { x: target.x, z: target.z };
+  return { x: current.x + (deltaX / distance) * step, z: current.z + (deltaZ / distance) * step };
+}
+
 /** Deterministic per-entity phase offset, so a crowd never bobs in unison. */
 function phaseFor(entityId: string): number {
   let hash = 0;

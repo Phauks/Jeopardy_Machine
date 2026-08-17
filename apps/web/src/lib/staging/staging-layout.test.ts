@@ -3,20 +3,28 @@
 // overlap, waiting people who are never standing inside a boat, a layout that does not shuffle
 // when one person picks a team, and a team switch that produces an actual journey.
 import { describe, expect, it } from "vitest";
-import { boundsForAspect, seededRandom } from "#lib/diorama/wander.ts";
+import { boundsForAspect, maxDioramaAvatars, seededRandom } from "#lib/diorama/wander.ts";
 import {
   holdingPosition,
+  occupantSpacing,
   partitionForStaging,
   placeStaging,
   stagingBands,
   stationAnchors,
+  stationGrid,
 } from "#lib/staging/staging-layout.ts";
-import { holdingBobOffset, stepStagedAgent } from "#lib/staging/staging-motion.ts";
+import {
+  easeStationPosition,
+  holdingBobOffset,
+  stationSlideSpeed,
+  stepStagedAgent,
+} from "#lib/staging/staging-motion.ts";
 import { seatForMember } from "#lib/staging/staging-theme.ts";
 import { stagingThemes } from "#lib/staging/staging-theme-registry.ts";
 import { boatsStagingTheme } from "#lib/staging/staging-themes/boats.ts";
 import { campfiresStagingTheme } from "#lib/staging/staging-themes/campfires.ts";
 import type { StagedTarget, StagingStation } from "#lib/staging/staging-layout.ts";
+import type { StagingTheme } from "#lib/staging/staging-theme.ts";
 import type { WanderAgent } from "#lib/diorama/wander.ts";
 
 const bounds = boundsForAspect(16 / 9);
@@ -52,36 +60,81 @@ describe("the stage splits into a holding band and a station band", () => {
   });
 });
 
+/**
+ * Every team count a room can plausibly reach, plus the ones past it. The bug the owner
+ * reported ("boats overlap each other") was invisible at two and three teams and catastrophic
+ * at twelve, which is exactly why the assertion below runs over a range instead of a case.
+ */
+const teamCounts = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 16, 20];
+/** Two canvas shapes: a 16:9 projector and a wide letterbox band under a title card. */
+const penShapes = [
+  ["16:9 projector", boundsForAspect(16 / 9)],
+  ["wide band", boundsForAspect(3.2)],
+] as const;
+
+/** Do two stations' footprints overlap? Separating-axis, which is what "no overlap" means. */
+function footprintsOverlap(
+  left: { x: number; z: number; scale: number },
+  right: { x: number; z: number; scale: number },
+  theme: StagingTheme,
+): boolean {
+  const epsilon = 1e-9;
+  const width = ((theme.stationFootprint.width * (left.scale + right.scale)) / 2) * (1 - epsilon);
+  const depth = ((theme.stationFootprint.depth * (left.scale + right.scale)) / 2) * (1 - epsilon);
+  return Math.abs(left.x - right.x) < width && Math.abs(left.z - right.z) < depth;
+}
+
 describe.each(stagingThemes.map((theme) => [theme.id, theme] as const))(
   "%s: station packing",
   (_id, theme) => {
-    it("keeps every station inside the pen", () => {
-      for (const anchor of stationAnchors(stationsOf(8), theme, bounds)) {
-        expect(Math.abs(anchor.x)).toBeLessThanOrEqual(bounds.halfWidth);
-        expect(anchor.z).toBeLessThanOrEqual(bounds.halfDepth);
-        expect(anchor.z).toBeGreaterThanOrEqual(-bounds.halfDepth);
-      }
-    });
-
-    it("never overlaps two stations on the same row", () => {
-      const anchors = stationAnchors(stationsOf(6), theme, bounds);
-      const byRow = new Map<number, number[]>();
-      for (const anchor of anchors) {
-        const row = byRow.get(anchor.z) ?? [];
-        row.push(anchor.x);
-        byRow.set(anchor.z, row);
-      }
-      for (const xs of byRow.values()) {
-        const sorted = xs.toSorted((left, right) => left - right);
-        for (let index = 1; index < sorted.length; index += 1) {
-          const gap = (sorted[index] ?? 0) - (sorted[index - 1] ?? 0);
-          // Footprints already include the theme's own clearance, so touching is the floor.
-          expect(gap).toBeGreaterThanOrEqual(theme.stationFootprint.width * 0.85);
+    // THE OVERLAP GATE (owner report, 2026-08-16). Not "the positions differ" - two boats a
+    // centimetre apart have different positions and are the same catamaran. The assertion is
+    // that no two station FOOTPRINTS intersect, at every count and on every canvas shape,
+    // which is the property a projector actually shows.
+    describe.each(penShapes)("%s", (_shape, pen) => {
+      it.each(teamCounts)("keeps %i stations clear of each other", (count) => {
+        const anchors = stationAnchors(stationsOf(count), theme, pen);
+        expect(anchors).toHaveLength(count);
+        for (let left = 0; left < anchors.length; left += 1) {
+          for (let right = left + 1; right < anchors.length; right += 1) {
+            const first = anchors[left];
+            const second = anchors[right];
+            if (first === undefined || second === undefined) continue;
+            expect(
+              footprintsOverlap(first, second, theme),
+              `${first.stationId} overlaps ${second.stationId} at ${String(count)} teams`,
+            ).toBe(false);
+          }
         }
+      });
+
+      it.each(teamCounts)("keeps all %i stations inside the pen and the station band", (count) => {
+        const band = stagingBands(pen).stations;
+        for (const anchor of stationAnchors(stationsOf(count), theme, pen)) {
+          const halfWidth = (theme.stationFootprint.width * anchor.scale) / 2;
+          const halfDepth = (theme.stationFootprint.depth * anchor.scale) / 2;
+          expect(Math.abs(anchor.x) + halfWidth).toBeLessThanOrEqual(pen.halfWidth + 1e-9);
+          // Never into the water in front, never through the back wall behind.
+          expect(anchor.z + halfDepth).toBeLessThanOrEqual(band.nearZ + 1e-9);
+          expect(anchor.z - halfDepth).toBeGreaterThanOrEqual(band.farZ - 1e-9);
+        }
+      });
+    });
+
+    it("shrinks the stations only as far as it has to, and never past the theme's size", () => {
+      // Few teams get the theme's authored size; many teams get a uniform, monotonic squeeze.
+      expect(stationGrid(2, theme, bounds).scale).toBe(1);
+      let previous = 1;
+      for (const count of teamCounts) {
+        const { scale } = stationGrid(count, theme, bounds);
+        expect(scale, `${String(count)} teams`).toBeGreaterThan(0);
+        expect(scale, `${String(count)} teams`).toBeLessThanOrEqual(1);
+        expect(scale, `${String(count)} teams`).toBeLessThanOrEqual(previous + 1e-9);
+        previous = scale;
       }
     });
 
-    it("wraps to a second row rather than shrinking the first", () => {
+    it("wraps to a second row rather than shrinking the first into a strip", () => {
       const many = stationAnchors(stationsOf(9), theme, bounds);
       const rows = new Set(many.map((anchor) => anchor.z));
       expect(rows.size).toBeGreaterThan(1);
@@ -94,8 +147,91 @@ describe.each(stagingThemes.map((theme) => [theme.id, theme] as const))(
       const distinct = new Set(seats.map((seat) => `${String(seat.x)}:${String(seat.z)}`));
       expect(distinct.size).toBe(seats.length);
     });
+
+    it("keeps even a badly overcrowded crew on its own station", () => {
+      // Twenty people on one station is not a designed case, it is a Friday. What must never
+      // happen is a member drifting onto the NEIGHBOURING station, which the seat-wrap nudge
+      // used to do without a bound.
+      for (let index = 0; index < 20; index += 1) {
+        const seat = seatForMember(theme, index);
+        expect(Math.abs(seat.x), `seat ${String(index)}`).toBeLessThanOrEqual(
+          theme.stationFootprint.width / 2,
+        );
+        expect(Math.abs(seat.z), `seat ${String(index)}`).toBeLessThanOrEqual(
+          theme.stationFootprint.depth / 2,
+        );
+      }
+    });
   },
 );
+
+describe("the crowd in the holding area", () => {
+  it("has a slot for every avatar the diorama will draw, so nobody stands inside anybody", () => {
+    // The grid used to be a hard 3 rows of 6 - eighteen slots for a crowd of up to
+    // `maxDioramaAvatars`, so the nineteenth waiting player was placed EXACTLY on the first.
+    const spots = Array.from({ length: maxDioramaAvatars }, (_slot, index) =>
+      holdingPosition(index, bounds),
+    );
+    for (let left = 0; left < spots.length; left += 1) {
+      for (let right = left + 1; right < spots.length; right += 1) {
+        const first = spots[left];
+        const second = spots[right];
+        if (first === undefined || second === undefined) continue;
+        expect(
+          Math.hypot(first.x - second.x, first.z - second.z),
+          `slots ${String(left)} and ${String(right)}`,
+        ).toBeGreaterThanOrEqual(occupantSpacing - 1e-9);
+      }
+    }
+  });
+
+  it("keeps that personal space under the worst jitter the scatter can produce", () => {
+    // The jitter exists so a filling room never looks mechanically spaced, and it is bounded
+    // by whatever is left over once everybody has their space - so the guarantee survives it.
+    // Driven with the extremes rather than a seed: 0 and 1 are the worst two neighbours.
+    const extremes = [() => 0, () => 1];
+    for (let slot = 0; slot + 1 < maxDioramaAvatars; slot += 1) {
+      for (const first of extremes) {
+        for (const second of extremes) {
+          const left = holdingPosition(slot, bounds, first);
+          const right = holdingPosition(slot + 1, bounds, second);
+          const below = holdingPosition(slot + 6, bounds, second);
+          expect(Math.hypot(left.x - right.x, left.z - right.z)).toBeGreaterThanOrEqual(
+            occupantSpacing - 1e-9,
+          );
+          expect(Math.hypot(left.x - below.x, left.z - below.z)).toBeGreaterThanOrEqual(
+            occupantSpacing - 1e-9,
+          );
+        }
+      }
+    }
+  });
+});
+
+describe("a crew stays aboard its own station", () => {
+  it.each(teamCounts)("at %i teams, nobody is standing in a neighbour's boat", (count) => {
+    const stations = stationsOf(count, 7);
+    const anchors = new Map(
+      stationAnchors(stations, boatsStagingTheme, bounds).map((anchor) => [
+        anchor.stationId,
+        anchor,
+      ]),
+    );
+    for (const target of placeStaging(stations, [], boatsStagingTheme, bounds)) {
+      if (target.stationId === null) continue;
+      const anchor = anchors.get(target.stationId);
+      expect(anchor).toBeDefined();
+      if (anchor === undefined) continue;
+      expect(target.scale).toBe(anchor.scale);
+      expect(Math.abs(target.x - anchor.x)).toBeLessThanOrEqual(
+        (boatsStagingTheme.stationFootprint.width * anchor.scale) / 2 + 1e-9,
+      );
+      expect(Math.abs(target.z - anchor.z)).toBeLessThanOrEqual(
+        (boatsStagingTheme.stationFootprint.depth * anchor.scale) / 2 + 1e-9,
+      );
+    }
+  });
+});
 
 function spotOf(targets: readonly StagedTarget[], id: string): StagedTarget | undefined {
   return targets.find((target) => target.entityId === id);
@@ -115,14 +251,54 @@ function agentAt(x: number, z: number): WanderAgent {
   };
 }
 
-describe("a station keeps its spot as the room fills", () => {
-  it("does not move existing stations when a new team is created", () => {
+describe("what happens to the stage when a team is created", () => {
+  // REVERSAL, 2026-08-16 (staging-layout.ts records why). The old rule was "a station keeps
+  // its exact spot when a new team is created", and it cannot coexist with guaranteed
+  // clearance: the grid that fits N stations is not the grid that fits N+1. What replaces it
+  // is a weaker promise that is actually keepable, and a motion rule that makes it read.
+  it("keeps every station's identity and order - only the geometry re-packs", () => {
     const before = stationAnchors(stationsOf(3), boatsStagingTheme, bounds);
     const after = stationAnchors(stationsOf(4), boatsStagingTheme, bounds);
-    // Three boats fit on one row and four still do, so nobody should have shifted at all...
-    expect(after.slice(0, 3).map((a) => a.z)).toEqual(before.map((a) => a.z));
-    // ...and every station keeps its own identity in place, in input order.
-    expect(after.map((a) => a.stationId).slice(0, 3)).toEqual(before.map((a) => a.stationId));
+    expect(after.map((anchor) => anchor.stationId).slice(0, 3)).toEqual(
+      before.map((anchor) => anchor.stationId),
+    );
+  });
+
+  it("re-packs at all only when the grid actually changes shape", () => {
+    // Six and seven boats want different grids; six twice wants the same one, and an
+    // unchanged grid must produce byte-identical anchors or the stage would jitter on every
+    // roster message.
+    expect(stationAnchors(stationsOf(6), boatsStagingTheme, bounds)).toEqual(
+      stationAnchors(stationsOf(6), boatsStagingTheme, bounds),
+    );
+    const six = stationGrid(6, boatsStagingTheme, bounds);
+    const seven = stationGrid(7, boatsStagingTheme, bounds);
+    expect({ columns: seven.columns, rows: seven.rows }).not.toEqual({
+      columns: six.columns,
+      rows: six.rows,
+    });
+  });
+
+  it("moves a station to its new spot rather than teleporting it there", () => {
+    // The whole reason the reversal is acceptable: diorama-scene.ts eases stations through
+    // this, so the harbour visibly makes room instead of rearranging between two frames.
+    const start = { x: -2, z: -1 };
+    const target = { x: 1.5, z: -1 };
+    const oneFrame = easeStationPosition(start, target, 1 / 60);
+    expect(oneFrame.x).toBeCloseTo(start.x + stationSlideSpeed / 60, 6);
+    expect(oneFrame.x).toBeLessThan(target.x);
+
+    let position = start;
+    let frames = 0;
+    while (Math.hypot(target.x - position.x, target.z - position.z) > 1e-6 && frames < 600) {
+      position = easeStationPosition(position, target, 1 / 60);
+      frames += 1;
+    }
+    // Visible - a couple of seconds for 3.5 units - and it always arrives exactly.
+    expect(frames).toBeGreaterThan(60);
+    expect(position).toEqual(target);
+    // ...except under reduced motion, where the layout survives and the journey does not.
+    expect(easeStationPosition(start, target, 1 / 60, true)).toEqual(target);
   });
 
   it("does not move anyone already waiting when someone else boards", () => {
@@ -204,7 +380,14 @@ describe("partitionForStaging", () => {
 
 describe("the move onto a station is a journey, not a teleport", () => {
   const options = { frozen: false, celebratingEntityIds: new Set<string>() };
-  const target = { entityId: "swimmer", stationId: "t", x: 2, z: -1.5, heading: 0 };
+  const target: StagedTarget = {
+    entityId: "swimmer",
+    stationId: "t",
+    x: 2,
+    z: -1.5,
+    heading: 0,
+    scale: 1,
+  };
 
   it("walks toward the seat and arrives, taking real time to do it", () => {
     let agent = agentAt(-2, 2.5);
