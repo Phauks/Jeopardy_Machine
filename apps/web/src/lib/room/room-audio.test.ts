@@ -1,7 +1,7 @@
 // The exclusive-slot rule under test (owner directive "Only the winning buzz is heard"):
 // a would-overlap room sound is dropped, never queued; sound-check is the one sanctioned
 // queue. Runs against a fake AudioContext so node vitest needs no DOM.
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RoomAudio } from "#lib/room/room-audio.ts";
 import type { RoomAudioContextLike } from "#lib/room/room-audio.ts";
 
@@ -37,9 +37,13 @@ function fakeContext(): {
           buffer = next;
         },
         connect: () => undefined,
+        // `loop` and `stop` exist for the music channel, which is the one caller that keeps a
+        // source around long enough to need either.
+        loop: false,
         start: (at?: number) => {
           started.push({ at: at ?? clock.now, duration: buffer?.duration ?? 0 });
         },
+        stop: () => undefined,
       };
       return source as unknown as AudioBufferSourceNode;
     },
@@ -98,6 +102,72 @@ describe("room-audio exclusive slot", () => {
     expect(started).toHaveLength(2);
     // And it did not extend the room slot: the slot still frees at the first buzz's end.
     expect(audio.playBuzz("gong")).toBe(false);
+  });
+
+  it("shares the one room channel with system cues - a cue cannot talk over a buzz", () => {
+    const { context, started, clock } = fakeContext();
+    const audio = new RoomAudio({ enabled: true, context });
+    audio.prime();
+    expect(audio.playBuzz("klaxon")).toBe(true);
+    expect(audio.playCue("time-up")).toBe(false);
+    clock.now = (started[0]?.duration ?? 0) + 0.01;
+    expect(audio.playCue("time-up")).toBe(true);
+    expect(started).toHaveLength(2);
+  });
+
+  it("synthesizes time-up at prime time - the one cue with no file to load", () => {
+    const { context, started } = fakeContext();
+    const audio = new RoomAudio({ enabled: true, context });
+    audio.prime();
+    // Two 150 ms beeps 120 ms apart plus the 10 ms onset = 430 ms, built from the manifest's
+    // recorded parameters rather than from a magic number here.
+    expect(audio.playCue("time-up")).toBe(true);
+    expect(started[0]?.duration).toBeCloseTo(0.01 + 2 * 0.15 + 0.12, 3);
+  });
+
+  it("keeps music out of the room slot and out of prime() (no context, nothing to decode)", async () => {
+    const { context, started } = fakeContext();
+    const audio = new RoomAudio({ enabled: true, context });
+    audio.prime();
+    // The fake context has no decodeAudioData, so no file ever loads - which is exactly the
+    // "music is fetched on demand, never at prime" contract seen from the test's side.
+    expect(await audio.playLobbyMusic()).toBe(false);
+    expect(started).toHaveLength(0);
+    // And the room slot is untouched by the attempt.
+    expect(audio.playBuzz("gong")).toBe(true);
+  });
+
+  it("treats a repeat request for the playing track as a no-op, never a restart", async () => {
+    // The display drives this off a room phase that re-evaluates on every roster change, so
+    // "play the lobby track" arrives many times; restarting from the top on each join would
+    // be worse than no lobby music at all.
+    const { context, started } = fakeContext();
+    const decoded = context.createBuffer(2, 8000, 8000);
+    const fetched: string[] = [];
+    vi.stubGlobal("fetch", async (url: string) => {
+      fetched.push(url);
+      return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) };
+    });
+    const audio = new RoomAudio({
+      enabled: true,
+      context: { ...context, decodeAudioData: async () => decoded },
+    });
+    audio.prime();
+
+    expect(await audio.playLobbyMusic()).toBe(true);
+    expect(await audio.playLobbyMusic()).toBe(true);
+    expect(await audio.playLobbyMusic()).toBe(true);
+    const musicStarts = started.filter((entry) => entry.duration === decoded.duration);
+    expect(musicStarts).toHaveLength(1);
+    // And the file was fetched once, not once per call.
+    expect(fetched.filter((url) => url === "/sounds/lobby-theme.mp3")).toHaveLength(1);
+
+    // Stopping and asking again is a real restart - idempotence is per playing track, not a
+    // permanent latch.
+    audio.stopMusic();
+    expect(await audio.playLobbyMusic()).toBe(true);
+    expect(started.filter((entry) => entry.duration === decoded.duration)).toHaveLength(2);
+    vi.unstubAllGlobals();
   });
 
   it("unknown sound ids fall back to the default placeholder, never error mid-game", () => {

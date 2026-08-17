@@ -141,6 +141,7 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 - [x] **The theme document's two presentation slots**: `environment` and `staging` land together on `themeBodySchema` as optional fields (no migration), the exact lines `diorama-environment.ts` and `staging-theme-registry.ts` had written out. The display and the phone read the document; `?environment=` / `?staging=` survive as dev overrides that win over it; unbuilt scenery and unknown ids resolve to something drawable rather than blanking a projector. Terra Verde is the first preset to use both
 - [x] **Streamer mode reaches the display**: with `hideJoinCode` on, the code, the QR and the join URL are not in the markup at all (a template branch, not a CSS rule - the only version that survives a screenshot or a paused stream), replaced by a "Join code hidden - ask the host for the code" affordance. Mirror mode inherits it
 - [x] **The room's settings reach the join path**: `RoomView` carries the protocol's `RoomSettings` and the room's last refusal, and `room-refusal.ts` turns every wire reason into human copy in one exhaustive switch - a full room or a spectators-off room says so, in words, before anyone picks a character
+<<<<<<< HEAD
       Progress 2026-08-16 - the staged-lobby fixes and the host settings cog (owner, from the deployed site):
 
 - [x] **Station placement guarantees clearance at every team count**: the packing spread rows over whatever depth was left, so boats overlapped from five teams up and twelve teams were a pile. It is now a searched grid with a uniform scale - no station leaves the cell it was given - proved by a separating-axis assertion over fourteen team counts, two canvas shapes and both themes. The holding area had the same class of bug (18 slots for a crowd of 24, so the nineteenth waiter stood on the first). Cost: a station no longer keeps its exact spot when a team is created; it SLIDES to the new one, which is the reversal recorded in docs/decisions/2026-08-15-staged-lobby.md
@@ -157,10 +158,20 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 - [x] The console's reveal-a-hidden-code and caps panel now reach a real room: they write through `RoomStore.updateRoomSettings`, which is the host-only `update-room-settings` message
 - [ ] Not done here, deliberately: a phone reaching a PASSWORD room by URL alone has no field to type it into (the front door hands it over, so the normal path works), and an unjoined connection is still told nothing about the room it is standing outside - which is what makes a password room a password room
 - [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups, bundled sound files, PWA precache growth (tracked in docs/design/surfaces.md "Known gaps")
+=======
+- [ ] Next: the host console's room-settings panel, including revealing a hidden code on the host's own device (both room-layer doors exist; `/dev/rooms` drives them today)
+- [ ] Reconcile with M3: flip `createRoomStore` to the ws store and wire the gap list in docs/design/surfaces.md (content channel, timers, pause, room-closed screens) - exit criteria (real phones in one room) blocks on this
+- [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups (tracked in docs/design/surfaces.md "Known gaps"). Bundled sound files and the PWA precache growth landed in the M5 asset pass below
+>>>>>>> worktree-agent-a4164c8b63f297c64
 
 ### M5 - Event readiness (the club night)
 
 Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal - whose checklist includes the PWA drills: airplane-mode editor test and a service-worker-update-during-game drill (docs/decisions/2026-08-13-pwa.md). **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
+
+- [x] Sound pack bundled: `tools/audio-bake` (fetch + per-page license re-verification + trim/normalize/uniform-onset/encode, deterministic), 21 CC0 files under `apps/web/static/sounds/` with a manifest and credits table, `RoomAudio.prime()` decoding the real pack, the time-up double-beep synthesized in-app. Record of what shipped: docs/content/media-and-sounds.md section 10
+- [x] Picture-round images acquired: `tools/event-media-bake` (Commons license + sha1 re-verification, downscale to 2560 px, WebP), 8 files committed beside the event documents, the pack's media refs now `bundled` with real sha256/bytes instead of zero placeholders, and the 37.2 MB over-cap original closed
+- [ ] **Owner still owes the lobby track pick** - the slot is built and a CC0 placeholder ships in it (media-and-sounds.md section 10, "Lobby track: PLACEHOLDER")
+- [ ] **Owner still owes three look-at-the-picture checks** on img-02/04/05 (event README, "Still open on the images")
 
 ### M6 - Fairness + resilience polish
 
