@@ -226,6 +226,8 @@ importers:
         specifier: 'catalog:'
         version: 0.185.1
 
+  tools/event-media-bake: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':

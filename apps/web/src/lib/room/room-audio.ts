@@ -49,15 +49,13 @@ export type RoomAudioOptions = {
 
 const placeholderDurationSeconds = 0.6;
 
-<<<<<<< HEAD
 function clampVolume(volume: number): number {
   if (!Number.isFinite(volume)) return 1;
   return Math.min(1, Math.max(0, volume));
 }
-=======
+
 /** ids the pack loads eagerly at prime(): everything room-audible and latency-critical. */
 const eagerKinds = new Set(["buzz", "cue"]);
->>>>>>> worktree-agent-a4164c8b63f297c64
 
 function stableHash(text: string): number {
   let hash = 0;
@@ -93,7 +91,6 @@ export class RoomAudio {
   }
 
   /**
-<<<<<<< HEAD
    * Master volume for this device (the host's cog, src/lib/host-settings/). A separate control
    * from `enabled` on purpose: "quieter" and "not here" are different answers, and a host
    * turning a laptop down mid-clue must not have to think about which one they mean.
@@ -108,12 +105,8 @@ export class RoomAudio {
   }
 
   /**
-   * Create the context and pre-decode every catalog sound. Must be called from a user
-   * gesture on iOS (autoplay policy) - the routes call it on the first tap/keypress.
-=======
    * Create the context and make every sound playable. Must be called from a user gesture on
    * iOS (autoplay policy) - the routes call it on the first tap/keypress.
->>>>>>> worktree-agent-a4164c8b63f297c64
    */
   prime(): void {
     if (this.context !== null) return;
