@@ -218,6 +218,7 @@ describe("room server messages", () => {
         roster: { players: [], teams: [] },
         paused: false,
         clueContent: null,
+        timers: [{ kind: "answer-window", remainingMs: 3200 }],
       },
       { version: v, type: "event", stateVersion: 13, events: [{ type: "buzzers-armed" }] },
       {

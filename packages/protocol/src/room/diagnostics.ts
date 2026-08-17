@@ -44,7 +44,17 @@ export const alarmEntrySchema = z.strictObject({
   // `empty-room` is the grace timer a room starts when its last participant disconnects -
   // separate from `idle-expiry`, which measures dormancy in an OCCUPIED room. Seeing both in
   // one book is how "why did my room disappear" answers itself.
-  source: z.enum(["engine-timer", "team-succession", "idle-expiry", "empty-room"]),
+  // `buzz-adjudication` is the sub-second M6 entry: the room holding one arming's buzzes
+  // while latency compensation ranks them (apps/realtime/src/room/arm-window.ts). It is the
+  // only entry measured in milliseconds, and seeing it is how "the buzz felt late" answers
+  // itself.
+  source: z.enum([
+    "engine-timer",
+    "team-succession",
+    "idle-expiry",
+    "empty-room",
+    "buzz-adjudication",
+  ]),
   // Timer kind, team id, or "room" - a label, never an identity.
   label: z.string().max(60),
   dueAt: z.int().positive(),

@@ -34,6 +34,8 @@ export class Bot {
   stateVersion = 0;
   /** Every parsed server message, in arrival order - the test-assertion surface. */
   readonly received: RoomServerMessage[] = [];
+  /** The open arming as THIS client saw it: its id and the local moment it arrived (t0). */
+  arm: { armId: number; receivedAt: number } | null = null;
 
   private readonly socket: BotSocket;
   private readonly behavior: BotBehavior;
@@ -83,8 +85,27 @@ export class Bot {
   }
 
   /** Relay an engine action (identity/time stamped server-side per the authority matrix). */
-  sendAction(action: Record<string, unknown>): void {
-    this.sendMessage({ type: "action", action });
+  sendAction(action: Record<string, unknown>, timing?: { armId: number; elapsedMs: number }): void {
+    this.sendMessage({ type: "action", action, ...(timing !== undefined && { timing }) });
+  }
+
+  /**
+   * Buzz the way a phone does: with the arming id and the milliseconds since THIS client
+   * rendered the arm (M6). Falls back to a bare buzz when no arming is open or the behavior
+   * says to send no claim - the server treats a missing claim as "rank me by arrival minus my
+   * measured round trip", never as an error.
+   */
+  buzz(): void {
+    const arm = this.arm;
+    if (arm === null || this.behavior.elapsedClaim === "none") {
+      this.sendAction({ type: "buzz" });
+      return;
+    }
+    const elapsedMs =
+      this.behavior.elapsedClaim === "zero"
+        ? 0
+        : Math.max(Math.round(Date.now() - arm.receivedAt), 0);
+    this.sendAction({ type: "buzz" }, { armId: arm.armId, elapsedMs });
   }
 
   /** Resolves with the first (already-received or future) message matching the predicate. */
@@ -127,6 +148,15 @@ export class Bot {
       const mine = message.roster.players.find((entry) => entry.playerId === this.playerId);
       if (mine !== undefined) this.entityId = mine.teamId ?? mine.playerId;
     }
+    // The arming: note t0 locally and ack IMMEDIATELY, before doing anything else with the
+    // frame. The ack's return trip is how the server measures this connection, so any work
+    // done first would be measured as network latency that is not there.
+    if (message.type === "arm-window") {
+      this.arm = { armId: message.arm.armId, receivedAt: Date.now() };
+      if (this.behavior.acknowledgeArming && !this.closed) {
+        this.sendMessage({ type: "arm-ack", armId: message.arm.armId });
+      }
+    }
     if (message.type === "event") {
       this.stateVersion = message.stateVersion;
       for (const event of message.events) this.reactTo(event as GameEvent);
@@ -159,7 +189,7 @@ export class Bot {
           this.behavior.buzzLatencyMaxMs,
         );
         setTimeout(() => {
-          if (!this.closed) this.sendAction({ type: "buzz" });
+          if (!this.closed) this.buzz();
         }, latency);
         return;
       }

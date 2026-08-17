@@ -86,6 +86,13 @@ function alarmEntries(
   if (schedule.emptyRoomAt !== null) {
     entries.push({ source: "empty-room", label: "room (empty)", dueAt: schedule.emptyRoomAt });
   }
+  if (schedule.buzzAdjudicateAt !== null) {
+    entries.push({
+      source: "buzz-adjudication",
+      label: "buzz window",
+      dueAt: schedule.buzzAdjudicateAt,
+    });
+  }
   for (const [kind, entry] of Object.entries(schedule.engineTimers)) {
     entries.push({ source: "engine-timer", label: kind.slice(0, 60), dueAt: entry.dueAt });
   }

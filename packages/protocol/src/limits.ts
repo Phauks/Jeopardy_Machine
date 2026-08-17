@@ -94,6 +94,27 @@ export const limits = {
     // absence, so a phone-sleep blip never reshuffles the crown.
     leaderDisconnectGraceMs: 30 * 1000,
   },
+  buzz: {
+    // THE TRUST CEILING of latency compensation (docs/decisions/2026-08-17-buzz-latency-
+    // compensation.md). A buzz carries a number the CLIENT produced (ms since it saw the arm),
+    // and no server can verify it - so the room never credits more than this much network
+    // handicap, whatever the client says and whatever its measured round trip is. The security
+    // property this buys, stated exactly: a lying client can gain at most as much as an HONEST
+    // client on the same connection would be given, and never more than this ceiling.
+    //
+    // 250ms is the ceiling because it is roughly the p95 round trip of a phone on congested
+    // venue Wi-Fi: high enough that the handicap it exists to cancel is actually cancelled, low
+    // enough that the worst cheat is comparable to one human reaction time rather than a free win.
+    maxCompensationMs: 250,
+    // Hard ceiling on the host-tunable adjudication window (settings.buzzing.compensationWindowMs):
+    // how long the room may hold buzzes before crowning a winner. A window longer than this
+    // would be felt in the room as a lag between the press and the sound, which is a worse
+    // failure than the unfairness it corrects.
+    compensationWindowMaxMs: 500,
+    // A round-trip sample above this is not a slow phone, it is a broken one (or a client
+    // stalling its ack to farm compensation); it is discarded rather than trusted.
+    roundTripSampleMaxMs: 2000,
+  },
   wire: {
     // A client message is an envelope + small payload (a buzz, a wager, a typed Final answer).
     // 4 KiB is an order of magnitude of headroom; anything larger is a bug or abuse.

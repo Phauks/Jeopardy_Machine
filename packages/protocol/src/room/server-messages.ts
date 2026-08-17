@@ -7,6 +7,8 @@
 // |              | team-level reasons keep the socket for a retry with another team            |
 // | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note)       |
 // | event        | broadcast after every accepted engine transition; role-redacted             |
+// | arm-window   | broadcast the instant buzzers arm (and to a connection that joins while     |
+// |              | an arming is open); carries the id a client acks and stamps its buzz with   |
 // | buzz-won     | broadcast, EXACTLY ONCE per arming - the room-audio driver (owner           |
 // |              | directive "Only the winning buzz is heard"; sound resolution note below)    |
 // | buzz-rejected| to the losing/early phone only - silent local feedback, never room audio    |
@@ -153,6 +155,38 @@ export const clueContentSchema = z.strictObject({
 });
 export type ClueContent = z.infer<typeof clueContentSchema>;
 
+// What a client owes the room when buzzers arm (docs/decisions/2026-08-17-buzz-latency-
+// compensation.md), in one shape so no surface has to infer it:
+//
+// 1. Note the local time this message was RENDERED - that is the phone's own t0, no clock
+//    synchronization involved.
+// 2. Send `arm-ack` with this armId immediately, before painting anything. The reply time is
+//    how the server measures this connection's round trip, and a client that skips it is
+//    ranked by raw arrival (never penalized below that, never compensated either).
+// 3. Attach `timing: { armId, elapsedMs }` to the buzz action, elapsed measured from step 1.
+//
+// `compensationMs` is how long the room may hold buzzes before crowning a winner (0 = the
+// setting is off and arrival order decides), so a phone can size its own optimistic feedback
+// against the real wait instead of guessing.
+export const armWindowSchema = z.strictObject({
+  armId: z.int().nonnegative(),
+  at: z.number().int().nonnegative(),
+  compensationMs: z.int().nonnegative(),
+  /** True for a re-arm after a wrong answer (the rebound), so a client can word it. */
+  rebound: z.boolean(),
+});
+export type ArmWindow = z.infer<typeof armWindowSchema>;
+
+// A timer the room is currently running, as remaining milliseconds. Present on every snapshot
+// so a console or display that reconnects mid-clue can paint the countdown it missed
+// (user-flows C6: "reopen console URL on any device -> full resume"). Remaining time rather
+// than a deadline: the two clocks are not synchronized, and the client needs a duration anyway.
+export const runningTimerSchema = z.strictObject({
+  kind: z.string().min(1).max(40),
+  remainingMs: z.number().int().nonnegative(),
+});
+export type RunningTimer = z.infer<typeof runningTimerSchema>;
+
 export const roomServerMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelopeFields,
@@ -185,7 +219,12 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // Present while a clue is open, so a phone that reconnects mid-clue renders the same
     // screen it left; null otherwise. Redacted exactly like the standalone message.
     clueContent: clueContentSchema.nullable(),
+    // Every timer the room is still running, with the time it has LEFT (empty while paused or
+    // idle). Without this a reconnecting console shows a clue with no countdown and a host
+    // has to guess how long the room has been waiting - user-flows C6, hardened in M6.
+    timers: z.array(runningTimerSchema),
   }),
+  z.strictObject({ ...envelopeFields, type: z.literal("arm-window"), arm: armWindowSchema }),
   z.strictObject({
     ...envelopeFields,
     type: z.literal("event"),

@@ -76,6 +76,22 @@ describe("matrix #12: early-buzz lockout", () => {
     expect(game.state.clue?.buzzWinner?.playerId).toBe("p2");
   });
 
+  // M6: a re-trigger has to be VISIBLE, or mashing feels like a broken buzzer rather than a
+  // penalty. The event carrying the new deadline is what a phone draws its penalty ring from,
+  // and what the room DO forwards privately (apps/realtime/src/game-room-do.ts).
+  it("re-triggering after arming narrates the new deadline, not just a rejection", () => {
+    let game = withOpenClue(startedGame(testSetup()));
+    game = runOn(game, [
+      { type: "buzz", at: 2500, playerId: "p1" }, // early: locked until 2750
+      { type: "arm-buzzers", at: 2600 },
+      { type: "buzz", at: 2700, playerId: "p1" }, // mash: locked until 2950
+    ]);
+    const early = eventsOfType(game.events, "early-buzz");
+    expect(early.map((event) => event.lockedUntil)).toEqual([2750, 2950]);
+    expect(early.at(-1)?.entityId).toBe("p1");
+    expect(eventsOfType(game.events, "buzz-rejected").at(-1)?.reason).toBe("early-lockout");
+  });
+
   it("the lockout expires: an early buzzer may win once their penalty passes", () => {
     let game = withOpenClue(startedGame(testSetup()));
     game = runOn(game, [

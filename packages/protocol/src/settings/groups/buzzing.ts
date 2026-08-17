@@ -6,6 +6,7 @@
 // "off / unlimited / host-paced" is null on a nullable number, never a magic 0 - EXCEPT
 // earlyBuzzLockoutMs, where 0-is-off is the natural physical reading of "no lockout".
 import { z } from "zod";
+import { limits } from "../../limits.ts";
 import { defineSetting, defineSettingsGroup } from "../definition.ts";
 
 export const buzzingGroup = defineSettingsGroup({
@@ -60,6 +61,26 @@ export const buzzingGroup = defineSettingsGroup({
       description:
         "A player who answered wrong stays locked out for the rest of the clue (TV rule).",
       schema: z.boolean().default(true),
+    }),
+    // M6 (docs/decisions/2026-08-17-buzz-latency-compensation.md). Not a matrix row: the
+    // matrix inventories the SHOW's rules, and the show has no network. This is the setting
+    // boundary 2.1 always named ("fairness compensation on/off in M6") - a knob on the one
+    // adjudication state machine, applied upstream of it, never a second algorithm.
+    latencyCompensation: defineSetting({
+      matrixRow: null,
+      label: "Buzz latency compensation",
+      description:
+        "Rank buzzes by reaction time (measured against each phone's own arm signal, clamped by its measured round trip) instead of raw server arrival, so a slow connection stops being a handicap. Off ranks by arrival, which quietly rewards the best Wi-Fi in the room.",
+      schema: z.boolean().default(true),
+    }),
+    compensationWindowMs: defineSetting({
+      matrixRow: null,
+      label: "Compensation window",
+      description:
+        "How long the room may hold buzzes before crowning the winner. Reordering needs waiting: a slower phone's earlier press physically arrives later. The room usually waits far less - adjudication closes as soon as no later arrival could still win.",
+      constraints:
+        "Only read when latency compensation is on; 0 makes it inert (arrival order wins).",
+      schema: z.int().min(0).max(limits.buzz.compensationWindowMaxMs).default(250),
     }),
   },
   refinements: [],

@@ -49,6 +49,8 @@ Arming, lockouts, and the windows around a buzz.
 | #14 | `answerWindowMs` (Answer window) | integer 3000 to 15000 | `5000` | Time the buzz winner has to answer before it counts as wrong. |
 | #15 | `rebound` (Rebound after wrong answer) | on / off | `true` | Re-arm the remaining buzzers after a wrong answer (TV rule); off means one attempt per clue. |
 | #16 | `wrongAnswererLockedOut` (Wrong answerer locked out) | on / off | `true` | A player who answered wrong stays locked out for the rest of the clue (TV rule). |
+| - | `latencyCompensation` (Buzz latency compensation) | on / off | `true` | Rank buzzes by reaction time (measured against each phone's own arm signal, clamped by its measured round trip) instead of raw server arrival, so a slow connection stops being a handicap. Off ranks by arrival, which quietly rewards the best Wi-Fi in the room. |
+| - | `compensationWindowMs` (Compensation window) | integer 0 to 500 | `250` | How long the room may hold buzzes before crowning the winner. Reordering needs waiting: a slower phone's earlier press physically arrives later. The room usually waits far less - adjudication closes as soon as no later arrival could still win. _Only read when latency compensation is on; 0 makes it inert (arrival order wins)._ |
 
 ## Scoring (`scoring`)
 

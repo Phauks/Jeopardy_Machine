@@ -9,6 +9,8 @@
   "exports": {
     "./bot": "./src/bot.ts",
     "./behavior": "./src/behavior.ts",
+    "./latency": "./src/latency.ts",
+    "./race": "./src/race.ts",
     "./socket": "./src/socket.ts"
   },
   "scripts": {

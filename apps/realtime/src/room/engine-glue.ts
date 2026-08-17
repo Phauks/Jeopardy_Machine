@@ -22,6 +22,34 @@ export const timerExpiryAction: Record<TimerKind, GameActionType> = {
   "round-time-limit": "round-timeout",
 };
 
+// Which timer kinds can still be RUNNING in a given engine phase. The alarm book keeps stale
+// entries on purpose (they fire as harmless rejections), which was invisible until M6 put the
+// room's live timers on every snapshot: without this table a console reconnecting mid-answer
+// would be handed a phantom buzz-window countdown left over from the press that opened the
+// clue. Same table prunes the book after each transition, so a stale entry also stops waking
+// the DO for nothing. A phase absent from the map runs no timers at all.
+const timersByPhase: Partial<Record<GameState["phase"], readonly TimerKind[]>> = {
+  "awaiting-selection": ["selection-shot-clock", "round-time-limit"],
+  reading: ["auto-arm", "round-time-limit"],
+  armed: ["buzz-window", "round-time-limit"],
+  answering: ["answer-window", "round-time-limit"],
+  wagering: ["wager-entry", "round-time-limit"],
+  "wager-answering": ["answer-window", "round-time-limit"],
+  "all-answering": ["everyone-answers-window", "round-time-limit"],
+  "all-judging": ["round-time-limit"],
+  "round-break": ["round-time-limit"],
+  "final-wagers": ["final-wager"],
+  "final-writing": ["final-writing"],
+  "tiebreaker-reading": ["auto-arm"],
+  "tiebreaker-armed": ["buzz-window"],
+  "tiebreaker-answering": ["answer-window"],
+};
+
+/** True when a timer of this kind is still meaningful in this phase (see timersByPhase). */
+export function timerLiveInPhase(phase: GameState["phase"], kind: string): boolean {
+  return (timersByPhase[phase] ?? []).some((live) => live === kind);
+}
+
 export type StampContext = {
   role: "host" | "player";
   // The sender's seat and scoring entity (player role only; null for host).

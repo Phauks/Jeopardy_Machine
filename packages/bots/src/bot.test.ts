@@ -47,11 +47,13 @@ function welcomeAndSeat(serve: (payload: Record<string, unknown>) => void, playe
       ],
       teams: [],
     },
-    // Room-level fields added with the M4 surfaces (2026-08-14): the host freeze and the
-    // redacted clue text. A bot ignores both - it plays by events - but a snapshot without
-    // them is not a valid frame, and this fixture is a real frame on purpose.
+    // Room-level fields added with the M4 surfaces (2026-08-14) and M6: the host freeze, the
+    // redacted clue text, and the room's running timers. A bot ignores all three - it plays by
+    // events - but a snapshot without them is not a valid frame, and this fixture is a real
+    // frame on purpose.
     paused: false,
     clueContent: null,
+    timers: [],
   });
 }
 
@@ -162,6 +164,59 @@ describe("bot driver", () => {
       .map((frame) => (frame as { action: { type: string } }).action);
     expect(actions).toContainEqual({ type: "commit-final-wager", amount: 800 });
     expect(actions).toContainEqual({ type: "submit-final-answer", text: "what is greenery" });
+  });
+
+  // M6: the client half of latency compensation. A bot has to behave like a phone here or the
+  // race harness would be measuring a client nobody ships.
+  it("acks an arming at once and stamps its buzz with the elapsed time since it", async () => {
+    const { socket, sent, serve } = fakeSocket();
+    const bot = new Bot(socket, {
+      nickname: "Bot 1",
+      seed: "s1",
+      behavior: { buzzProbability: 1, buzzLatencyMinMs: 20, buzzLatencyMaxMs: 20 },
+    });
+    bot.start();
+    welcomeAndSeat(serve, "p-1");
+    serve({ type: "arm-window", arm: { armId: 7, at: 1000, compensationMs: 250, rebound: false } });
+    expect(sent.at(-1)).toMatchObject({ type: "arm-ack", armId: 7 });
+    serve({
+      type: "event",
+      stateVersion: 1,
+      events: [{ type: "buzzers-armed", rebound: false, armedAt: 1000 }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    const buzz = sent.at(-1) as { type: string; timing?: { armId: number; elapsedMs: number } };
+    expect(buzz.type).toBe("action");
+    expect(buzz.timing?.armId).toBe(7);
+    // The claim is measured from the arm this client actually saw, not from any server clock.
+    expect(buzz.timing?.elapsedMs).toBeGreaterThanOrEqual(15);
+    expect(buzz.timing?.elapsedMs).toBeLessThan(400);
+  });
+
+  it("can play the adversary: no ack, and a buzz claiming an instant thumb", async () => {
+    const { socket, sent, serve } = fakeSocket();
+    const bot = new Bot(socket, {
+      nickname: "Cheater",
+      seed: "s1",
+      behavior: {
+        buzzProbability: 1,
+        buzzLatencyMinMs: 30,
+        buzzLatencyMaxMs: 30,
+        acknowledgeArming: false,
+        elapsedClaim: "zero",
+      },
+    });
+    bot.start();
+    welcomeAndSeat(serve, "p-1");
+    serve({ type: "arm-window", arm: { armId: 2, at: 1, compensationMs: 250, rebound: false } });
+    expect(sent.some((frame) => (frame as { type: string }).type === "arm-ack")).toBe(false);
+    serve({
+      type: "event",
+      stateVersion: 1,
+      events: [{ type: "buzzers-armed", rebound: false, armedAt: 1 }],
+    });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(sent.at(-1)).toMatchObject({ type: "action", timing: { armId: 2, elapsedMs: 0 } });
   });
 
   it("makes identical seeded decisions across runs (reproducible simulations)", async () => {
