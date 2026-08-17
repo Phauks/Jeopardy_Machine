@@ -222,6 +222,38 @@ describe("ws room store: messages become a view", () => {
     expect(view.content?.cellValues[0]?.[1]).toEqual([100, 200]);
   });
 
+  it("admits it has not heard this room's settings, and never counts an audience it was not given", () => {
+    // The two "say nothing rather than something plausible" fields, together because they are
+    // the same rule: a console that draws protocol defaults as this room's settings, or "0
+    // watching" for a room nobody has counted, has told the host something untrue about their
+    // own room (owner, 2026-08-17).
+    const room = harness();
+    room.open();
+    expect(room.store.view.settingsKnown).toBe(false);
+    expect(room.store.view.roster.spectatorCount).toBeNull();
+
+    // A roster without the optional count leaves it unknown; the shell settings stay flagged.
+    room.serve(snapshotFrame());
+    expect(room.store.view.roster.spectatorCount).toBeNull();
+    expect(room.store.view.settingsKnown).toBe(false);
+
+    room.serve({
+      type: "roster",
+      roster: { players: [rosterEntry("p-1", "Ada")], teams: [], spectatorCount: 4 },
+    });
+    expect(room.store.view.roster.spectatorCount).toBe(4);
+    // Zero is a REPORTED fact and must survive as one, distinct from "not reported".
+    room.serve({
+      type: "roster",
+      roster: { players: [rosterEntry("p-1", "Ada")], teams: [], spectatorCount: 0 },
+    });
+    expect(room.store.view.roster.spectatorCount).toBe(0);
+
+    room.serve({ type: "room-settings", settings: { ...settings, maxPlayers: 24 }, at: 3 });
+    expect(room.store.view.settingsKnown).toBe(true);
+    expect(room.store.view.settings.maxPlayers).toBe(24);
+  });
+
   it("folds an event batch and takes the state it carries", () => {
     const room = harness();
     room.open();
@@ -621,6 +653,14 @@ describe("ws room store: what the surfaces send", () => {
     expect(room.sent.at(-1)).toMatchObject({ type: "rename-player", playerId: "p-7" });
     room.store.kickFromRoom("p-7");
     expect(room.sent.at(-1)).toMatchObject({ type: "kick-player", playerId: "p-7" });
+    // Seating SOMEBODY ELSE rides the same message with the host-only `playerId` - the one
+    // roster power the console review had to add to the protocol (client-messages.ts).
+    room.store.assignPlayerToTeam("p-7", "t-2");
+    expect(room.sent.at(-1)).toMatchObject({
+      type: "team-join",
+      teamId: "t-2",
+      playerId: "p-7",
+    });
   });
 
   it("picks the right answer action for the phase it is in", () => {

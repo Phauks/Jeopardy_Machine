@@ -150,7 +150,15 @@ export class LocalSimRoomStore implements RoomStore {
       role: this.role,
       connection: "connected",
       phase: this.roomPhase,
-      roster: { players: this.rosterPlayers, teams: this.rosterTeams },
+      roster: {
+        players: this.rosterPlayers,
+        teams: this.rosterTeams,
+        // NULL, not 0. A mock room is one tab (docs/design/surfaces.md "Known gaps"): a
+        // spectator would be a separate simulation in another tab, so this store genuinely
+        // cannot know whether anyone is watching, and saying "0 watching" would be the console
+        // inventing a number about a room it cannot see. Only the DO counts spectators.
+        spectatorCount: null,
+      },
       teamsMode: this.setup.settings.teams.playerMode === "teams",
       myPlayerId: this.myPlayerId,
       game: this.engineState,
@@ -162,6 +170,10 @@ export class LocalSimRoomStore implements RoomStore {
       finalWagerRanges: this.finalWagerRanges,
       paused: this.pausedState,
       settings: this.roomSettings,
+      // This store IS the room it describes: its settings are the ones in force, whether they
+      // came from the constructor or from a host edit. Nothing is pending arrival, so nothing
+      // needs to be reported as unknown (contrast ws-room-store.ts, which starts blind).
+      settingsKnown: true,
       refusal: this.refusalState,
     };
   }
@@ -511,6 +523,27 @@ export class LocalSimRoomStore implements RoomStore {
     this.rosterTeams = this.rosterTeams.map((team) =>
       team.teamId === teamId ? { ...team, leaderPlayerId: playerId } : team,
     );
+  }
+
+  /**
+   * The host seating somebody else (console roster panel). Deliberately ignores the team's
+   * lock - the lock refuses JOINERS, and the host out-ranks every team decision - but keeps
+   * the lobby-only rule, because after start-game the engine's seats are truth.
+   */
+  assignPlayerToTeam(playerId: string, teamId: string): void {
+    if (this.roomPhase !== "lobby") return;
+    const team = this.rosterTeams.find((entry) => entry.teamId === teamId);
+    if (team === undefined) return this.refuse("unknown-team");
+    if (this.rosterPlayers.every((entry) => entry.playerId !== playerId)) return;
+    this.refusalState = null;
+    this.assignTeam(playerId, teamId);
+    // An empty team the host has just filled gets its first member as leader, exactly as a
+    // self-join would (the DO does the same in handleTeamJoin).
+    if (team.leaderPlayerId === null) {
+      this.rosterTeams = this.rosterTeams.map((entry) =>
+        entry.teamId === teamId ? { ...entry, leaderPlayerId: playerId } : entry,
+      );
+    }
   }
 
   renamePlayer(playerId: string, nickname: string): void {

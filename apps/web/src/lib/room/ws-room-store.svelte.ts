@@ -159,6 +159,12 @@ export class WsRoomStore implements RoomStore {
   private engineState = $state.raw<GameState | null>(null);
   private rosterPlayers = $state.raw<RoomPlayerView[]>([]);
   private rosterTeams = $state.raw<RoomTeamView[]>([]);
+  /**
+   * The audience, or null when the room has not reported one. Null is NOT zero: the DO always
+   * sends `spectatorCount`, so null here means no roster has landed yet, and a console that
+   * printed that as "0 watching" would be inventing a number (room-view.ts).
+   */
+  private spectatorCountState = $state<number | null>(null);
   private roomPhase = $state<"lobby" | "active" | "ended">("lobby");
   private teamsModeState = $state(false);
   private myPlayerIdState = $state<string | null>(null);
@@ -167,12 +173,21 @@ export class WsRoomStore implements RoomStore {
   private boardRounds = $state.raw<BoardMaterial["rounds"] | null>(null);
   private clueTexts = $state.raw<Record<string, ClueContentView>>({});
   private finalText = $state.raw<ClueContentView | null>(null);
+  /**
+   * A SHELL, and `settingsKnownState` below is what says so. `hideJoinCode: false` is the right
+   * shell value (the connecting screen shows no code anyway, and streamer mode lands the moment
+   * `room-settings` arrives), but the numbers beside it are the PROTOCOL's defaults and not this
+   * room's - so a surface that reports settings must say "not loaded yet" rather than draw a
+   * plausible fiction (owner, 2026-08-17: "I don't think the room I created shows the correct
+   * settings").
+   */
   private roomSettings = $state.raw<RoomSettings>({
     ...defaultRoomSettings,
     entry: "open",
     title: "",
     hostLabel: "",
   });
+  private settingsKnownState = $state(false);
   private refusalState = $state.raw<RoomRefusalView | null>(null);
   /** The room's last complaint about something this client sent (console-side notice). */
   private lastErrorState = $state.raw<{ reason: string; detail: string | null } | null>(null);
@@ -197,7 +212,11 @@ export class WsRoomStore implements RoomStore {
       role: this.role,
       connection: this.connectionState,
       phase: this.roomPhase,
-      roster: { players: this.rosterPlayers, teams: this.rosterTeams },
+      roster: {
+        players: this.rosterPlayers,
+        teams: this.rosterTeams,
+        spectatorCount: this.spectatorCountState,
+      },
       teamsMode: this.teamsModeState,
       myPlayerId: this.myPlayerIdState,
       game: this.engineState,
@@ -209,6 +228,7 @@ export class WsRoomStore implements RoomStore {
       finalWagerRanges: this.fold.finalWagerRanges,
       paused: this.pausedState,
       settings: this.roomSettings,
+      settingsKnown: this.settingsKnownState,
       refusal: this.refusalState,
     };
   }
@@ -416,6 +436,7 @@ export class WsRoomStore implements RoomStore {
         return;
       case "room-settings":
         this.roomSettings = message.settings;
+        this.settingsKnownState = true;
         return;
       case "room-closed":
         // Every reason ends this connection; the surfaces read the refusal-free "closed" state
@@ -494,6 +515,10 @@ export class WsRoomStore implements RoomStore {
   }
 
   private applyRoster(roster: RosterPayload): void {
+    // Absent stays null rather than becoming 0: the field is optional so that a producer which
+    // cannot count an audience is distinguishable from a room nobody is watching (roster.ts).
+    // The DO always counts, so in practice this is null only before the first roster lands.
+    this.spectatorCountState = roster.spectatorCount ?? null;
     this.rosterPlayers = roster.players.map(toPlayerView);
     this.rosterTeams = roster.teams.map((team) => ({
       teamId: team.teamId,
@@ -547,6 +572,15 @@ export class WsRoomStore implements RoomStore {
     // teamId either way, so nobody is ever briefly teamless.
     this.refusalState = null;
     this.sendMessage({ type: "team-join", teamId });
+  }
+
+  assignPlayerToTeam(playerId: string, teamId: string): void {
+    // The host seating SOMEBODY ELSE, on the same message a phone moves itself with: `playerId`
+    // is the host-only field the DO added for exactly this (client-messages.ts team-join, and
+    // handleTeamJoin refuses it from anybody but the host). A lock does not apply - it refuses
+    // joiners, and the host out-ranks it.
+    this.refusalState = null;
+    this.sendMessage({ type: "team-join", teamId, playerId });
   }
 
   leaveTeam(): void {

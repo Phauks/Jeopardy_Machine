@@ -17,6 +17,7 @@
 // screen - a demo room must never be mistaken for a room your friends can join.
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
 import { WsRoomStore } from "#lib/room/ws-room-store.svelte.ts";
+import { fixtureRoomCode } from "#lib/room/fixture-room.ts";
 import type { RoomSocketFactory } from "#lib/room/room-socket.ts";
 import type { GameEvent } from "@jeopardy/engine/events";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -99,4 +100,32 @@ export function createRoomStore(options: CreateRoomStoreOptions): RoomStore {
     ...(options.onEvent != null && { onEvent: options.onEvent }),
     ...(options.onBuzzWon != null && { onBuzzWon: options.onBuzzWon }),
   });
+}
+
+/**
+ * Which roster a SIMULATED room starts with - and the one rule that matters: A ROOM THE OWNER
+ * MADE NEVER STARTS WITH IMAGINARY PEOPLE IN IT.
+ *
+ * Before the 2026-08-17 reconcile every play route built a local simulation, and the sim seeded
+ * the 30-player fixture roster into whatever code was in the URL. The result was a host console
+ * reporting "26/30 connected" for a room nobody had joined (owner, 2026-08-17), a pre-flight
+ * checklist counting six teams that did not exist, and a display listing strangers on the
+ * projector. Fixture data is dev material; presenting it as the room's own is the surface lying
+ * about the room.
+ *
+ * `roomStoreModeFor` now keeps a created code away from the simulation entirely, so this is the
+ * second lock rather than the only one, and it still earns its place: `?sim` on a real code, and
+ * anything that builds a local-sim store directly, must not conjure a crowd either. The dummy
+ * roster therefore appears in exactly two places - the fixture room's own code (DUMYX, what the
+ * demo links and the surface reviews use) and an explicit `?demo` on any code. Everything else
+ * starts EMPTY and says so, which is exactly the shape the ws store arrives in.
+ */
+export function seedRosterFor(
+  roomCode: string,
+  // Structural, and only the one method: SvelteKit's `page.url` hands over a READONLY
+  // URLSearchParams, so asking for the mutable class here would make the routes cast.
+  url: { searchParams: { has: (name: string) => boolean } },
+): "fixture" | "empty" {
+  if (url.searchParams.has("demo")) return "fixture";
+  return roomCode.toUpperCase() === fixtureRoomCode.toUpperCase() ? "fixture" : "empty";
 }

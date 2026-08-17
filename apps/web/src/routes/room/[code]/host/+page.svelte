@@ -14,7 +14,7 @@
   import { page } from "$app/state";
   import HomeButton from "#lib/chrome/home-button.svelte";
   import HostConsole from "#lib/room/host-console.svelte";
-  import { createRoomStore, roomStoreModeFor } from "#lib/room/create-room-store.ts";
+  import { createRoomStore, roomStoreModeFor, seedRosterFor } from "#lib/room/create-room-store.ts";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
   import { recallHostToken } from "#lib/lobby/join-hand-off.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
@@ -46,6 +46,9 @@
 
   const store = createRoomStore({
     roomCode,
+    // The dummy roster belongs to the fixture room and to ?demo, never to a code somebody just
+    // created (create-room-store.ts): a real room starts empty and says so.
+    seedRoster: seedRosterFor(roomCode, page.url),
     role: "host",
     ...(simOverride && { mode: "local-sim" as const }),
     timerAutopilot: browser,

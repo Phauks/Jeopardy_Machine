@@ -80,6 +80,28 @@ describe("room client messages", () => {
     );
   });
 
+  it("lets team-join name WHO is being seated - the host's move, nobody else's", () => {
+    // A phone moving itself sends no playerId; the host's roster panel names the player it is
+    // rebalancing (apps/realtime enforces that only a host may). One message, two actors,
+    // because it is the same edit.
+    expect(
+      parseRoomClientMessage(JSON.stringify({ version: v, type: "team-join", teamId: "t1" })).ok,
+    ).toBe(true);
+    const seated = parseRoomClientMessage(
+      JSON.stringify({ version: v, type: "team-join", teamId: "t1", playerId: "p-abc" }),
+    );
+    expect(seated.ok).toBe(true);
+    // Still strict: a stray field is a bug, not an extension point (ext exists for those).
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "team-join",
+        teamId: "t1",
+        who: "p-abc",
+      }).success,
+    ).toBe(false);
+  });
+
   it("bounds nickname and team-name lengths by the limits module", () => {
     const tooLong = "x".repeat(limits.player.nicknameMaxLength + 1);
     expect(
@@ -242,6 +264,44 @@ describe("room server messages", () => {
       const result = parseRoomServerMessage(JSON.stringify(raw));
       expect(result.ok, JSON.stringify(raw)).toBe(true);
     }
+  });
+
+  it("carries the audience as a count on the roster, and keeps ABSENT distinct from zero", () => {
+    // Spectators hold no seat and give no identity, so a number is the only honest thing a
+    // roster can say about them. The field is optional because "this producer cannot count its
+    // audience" is a real state - and it is NOT zero, exactly as the lobby row's spectator
+    // fields work (registry.test.ts). A console that renders the two the same invents a fact.
+    const rosterMessage = (roster: Record<string, unknown>) => ({
+      version: v,
+      type: "roster",
+      roster,
+    });
+    const counted = parseRoomServerMessage(
+      JSON.stringify(rosterMessage({ players: [], teams: [], spectatorCount: 4 })),
+    );
+    expect(
+      counted.ok && counted.message.type === "roster" && counted.message.roster.spectatorCount,
+    ).toBe(4);
+    const unreported = parseRoomServerMessage(
+      JSON.stringify(rosterMessage({ players: [], teams: [] })),
+    );
+    expect(
+      unreported.ok &&
+        unreported.message.type === "roster" &&
+        unreported.message.roster.spectatorCount,
+    ).toBeUndefined();
+    // Bounded by the same hard cap the room admits people under - hosts tune down, never up.
+    expect(
+      parseRoomServerMessage(
+        JSON.stringify(
+          rosterMessage({
+            players: [],
+            teams: [],
+            spectatorCount: limits.room.spectatorHardCap + 1,
+          }),
+        ),
+      ).ok,
+    ).toBe(false);
   });
 
   it("keeps refusal reasons and close codes in agreement about the no-such-room path", () => {

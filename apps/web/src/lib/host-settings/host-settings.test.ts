@@ -22,10 +22,13 @@ import {
   typeScaleStyle,
 } from "#lib/host-settings/device-preferences.ts";
 import {
+  pendingCapsSummary,
+  pendingNameSummary,
   roomSettingsRefusal,
   roomSettingsSummary,
   settingsRejectionCopy,
 } from "#lib/host-settings/room-settings-edit.ts";
+import type { RoomStore } from "#lib/room/room-store.ts";
 
 function hostStore(): LocalSimRoomStore {
   return new LocalSimRoomStore({ roomCode: "TESTA", role: "host", seed: "settings" });
@@ -300,6 +303,80 @@ describe("the panel itself", () => {
     // A reveal button on the streamed display would defeat the setting; it belongs on the
     // host's own screen (docs/decisions/2026-08-14-room-controls-and-staging.md).
     expect(panel(streaming)).toContain("Show me the code");
+  });
+});
+
+describe("what SAVE CAPS became", () => {
+  // Owner, 2026-08-17: "I don't understand SAVE CAPS". The button now names its effect, and the
+  // panel states the pending edit in the room's own units before it is sent.
+  it("states the pending edit rather than naming the button", () => {
+    const store = hostStore();
+    const current = store.view.settings;
+    expect(
+      pendingCapsSummary(store.view, {
+        maxPlayers: current.maxPlayers,
+        maxSpectators: current.maxSpectators,
+      }),
+      "nothing typed = nothing pending, and the button is dead",
+    ).toBeNull();
+    expect(
+      pendingCapsSummary(store.view, { maxPlayers: 24, maxSpectators: current.maxSpectators }),
+    ).toBe(`player cap ${String(current.maxPlayers)} -> 24`);
+    expect(pendingCapsSummary(store.view, { maxPlayers: 24, maxSpectators: 5 })).toContain(
+      "spectator cap",
+    );
+  });
+
+  it("does the same for the room's name, which has the same wait-for-Apply reason", () => {
+    const store = hostStore();
+    expect(
+      pendingNameSummary(store.view, { title: "", hostLabel: "" }),
+      "the fixture room is unnamed, so an unedited draft is not a change",
+    ).toBeNull();
+    expect(pendingNameSummary(store.view, { title: "Compost Quiz", hostLabel: "" })).toBe(
+      "title (none) -> Compost Quiz",
+    );
+  });
+
+  it("renders as an action with a scope, beside the room's current numbers", () => {
+    const store = hostStore();
+    const preferences = new DevicePreferencesStore();
+    const body = render(SettingsPanel, {
+      props: { store, preferences, onClose: () => undefined },
+    }).body;
+    expect(body).not.toContain("Save caps");
+    expect(body).toContain("Apply caps to the room");
+    expect(body).toContain("How many people fit");
+    expect(body).toContain("Right now:");
+    // And the panel says out loud which controls wait for an Apply and which do not.
+    expect(body).toContain("Switches take effect the moment you flip them");
+    // Nothing is pending on first render, so the Apply is disabled rather than inviting.
+    expect(body).toContain("disabled");
+    expect(body).not.toContain("Not applied yet");
+  });
+});
+
+describe("a room the console has not heard from", () => {
+  it("says so instead of drawing the protocol's defaults as this room's settings", () => {
+    // The ws store starts blind (settingsKnown: false) and the panel must not present its shell
+    // values as the room's (owner, 2026-08-17: "I don't think the room I created shows the
+    // correct settings").
+    const store = hostStore();
+    const blind = {
+      mode: "ws",
+      view: { ...store.view, settingsKnown: false },
+    } as unknown as RoomStore;
+    const preferences = new DevicePreferencesStore();
+    const body = render(SettingsPanel, {
+      props: { store: blind, preferences, onClose: () => undefined },
+    }).body;
+    expect(body).toContain("has not heard the room's settings yet");
+    expect(roomSettingsSummary(blind.view)).toBe("Waiting for the room to report its settings");
+    // No editable room controls at all while the room is unknown - and the DEVICE half, which
+    // owes nothing to the room, keeps working.
+    expect(body).not.toContain("Apply caps to the room");
+    expect(body).not.toContain("Streamer mode");
+    expect(body).toContain("Display text size");
   });
 });
 

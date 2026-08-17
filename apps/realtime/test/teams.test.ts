@@ -11,7 +11,9 @@ import {
   initializeRoom,
   instantBot,
   roomStub,
+  TestClient,
   uniqueCode,
+  upgradeToRoom,
 } from "./helpers.ts";
 import type { AlarmSchedule } from "../src/room/storage.ts";
 import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
@@ -230,5 +232,59 @@ describe("team-scoped buzzing", () => {
       message.roster.teams.some((team) => team.name === "Host Says This"),
     );
     expect(renamed.roster.teams[0]?.name).toBe("Host Says This");
+  });
+
+  it("lets the HOST seat a player on any team, lock or no lock, and refuses a phone doing it", async () => {
+    // The console's roster panel rebalancing teams (user-flows C2 "drag to rebalance"): the
+    // host names the player on `team-join`, which nobody but a host may do.
+    const { code, host } = await teamsRoom("teams-host-seating");
+    const founder = await connectBot(code, {
+      ...instantBot("Founder"),
+      team: { kind: "create", name: "Reds" },
+    });
+    await host.waitFor("roster", (message) => message.roster.teams.length === 1);
+    const redsId = (await host.waitFor("roster")).roster.teams[0]?.teamId ?? "";
+    const stray = await connectBot(code, instantBot("Stray"));
+    await host.waitFor("roster", (message) => message.roster.players.length === 2);
+
+    // A locked team still admits the host's seating - a lock refuses JOINERS, not the host.
+    founder.sendMessage({ type: "team-update", locked: true });
+    await host.waitFor("roster", (message) => message.roster.teams[0]?.locked === true);
+
+    host.send({ type: "team-join", teamId: redsId, playerId: stray.playerId ?? "" });
+    const seated = await host.waitFor("roster", (message) =>
+      message.roster.players.some(
+        (entry) => entry.playerId === stray.playerId && entry.teamId === redsId,
+      ),
+    );
+    expect(seated.roster.players.length).toBe(2);
+
+    // ...and a phone naming somebody else is refused outright.
+    founder.sendMessage({ type: "team-join", teamId: redsId, playerId: stray.playerId ?? "" });
+    const refused = await founder.waitFor((message) => message.type === "error");
+    expect(refused).toMatchObject({ reason: "unauthorized" });
+  });
+});
+
+describe("the audience on the roster", () => {
+  it("travels as a counted number, because spectators hold no seat and no identity", async () => {
+    const { code, host } = await teamsRoom("teams-audience");
+    await connectBot(code, instantBot("First"));
+    // Zero here is a COUNTED zero, from live connections - the honest kind. A client's "we do
+    // not know" is the field being ABSENT (apps/web/src/lib/room/room-view.ts).
+    const alone = await host.waitFor("roster", (message) => message.roster.players.length === 1);
+    expect(alone.roster.spectatorCount).toBe(0);
+
+    const spectator = new TestClient(await upgradeToRoom(code));
+    spectator.send({ type: "join", role: "spectator" });
+    await spectator.waitFor("welcome");
+    // A spectator takes no seat, so the roster's PLAYER count is unmoved by their arrival.
+    await connectBot(code, instantBot("Second"));
+
+    const withAudience = await host.waitFor(
+      "roster",
+      (message) => message.roster.players.length === 2,
+    );
+    expect(withAudience.roster.spectatorCount).toBe(1);
   });
 });

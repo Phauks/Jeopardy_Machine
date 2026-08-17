@@ -168,7 +168,9 @@ export function fixtureRosterView(): RoomRosterView {
     // Fixture order is join order; late joiners land after everyone else.
     joinedAt: (player.lateJoiner ? 100_000 : 0) + index,
   }));
-  return { players, teams };
+  // No audience: the fixture describes a roster, and spectators are live connections nobody
+  // can invent (room-view.ts - null is "not reported", which is the truth about dummy data).
+  return { players, teams, spectatorCount: null };
 }
 
 export const fixtureRoomCode = fixtureRoster.roomCode;
