@@ -130,6 +130,17 @@ Not every venue gives the host an extended desktop - sometimes the laptop screen
 - Keyboard shortcuts still work in mirror mode (the dock is for visibility, not the only input).
 - Mirror mode is a per-device toggle (like audio routing), not a room setting - a co-host on a second laptop can run the full private console simultaneously.
 
+### C1c. The cog (owner-specified 2026-08-16, shipped)
+
+One settings panel on the console, opened **in place** - a rail beside the console, never a screen, so the board, the clue and the judge row stay live and keyboard shortcuts keep working while it is open (the persistent-layout law).
+
+It has two halves and says which is which, because the difference is not cosmetic:
+
+- **This device** - local, instant, stored on this laptop, invisible to everyone else: **display text size** and **console text size** as independent controls (a projector is read across a room, a console at arm's length - the same slider for both is the wrong control), room audio here plus master volume, mirror mode, manual mode, timer visibility, roster density, and stage motion (moving / still / no 3D).
+- **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, password, the two caps, spectators allowed.
+
+The display type scale reaches the projector window of the same browser live, because both windows read one device-preferences document (C1's laptop-plus-projector setup is two tabs of one origin). A projector driven by a different machine has its own, which the panel says.
+
 ### C2. Doors open
 
 Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments (drag to rebalance), rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
