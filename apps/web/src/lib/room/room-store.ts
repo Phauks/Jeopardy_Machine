@@ -46,6 +46,19 @@ export type TeamPatch = {
 export type RoomStoreMode = "local-sim" | "ws";
 
 /**
+ * The room-audible buzz, resolved: the TEAM's sound in teams mode, the winner's own otherwise
+ * (the owner's double-confirmation directive - the room hears the team while the display shows
+ * its name and colour). A real room resolves this server-side and ships it on the buzz-won
+ * message; the mock applies the same rule to its own roster. Surfaces that make noise take it
+ * from here rather than resolving it a third time.
+ */
+export type RoomBuzz = {
+  playerId: string;
+  entityId: string;
+  buzzSoundId: string | null;
+};
+
+/**
  * All surfaces' actions in one interface. Grouping mirrors who may call what (the M3
  * authority matrix): player actions are also always available to the host on a player's
  * behalf (guiding principle 4), host actions are refused for phones by the server - the mock

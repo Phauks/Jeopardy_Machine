@@ -33,7 +33,12 @@ import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
 import { updateRoomSettingsRequestSchema } from "@jeopardy/protocol/room/room-settings";
 import { roomCloseCodes } from "@jeopardy/protocol/room/server-messages";
 import { Server, type Connection, type ConnectionContext, type WSMessage } from "partyserver";
-import { clueContentFor, resolveCellContent, resolveFinalContent } from "./room/content.ts";
+import {
+  boardMaterial,
+  clueContentFor,
+  resolveCellContent,
+  resolveFinalContent,
+} from "./room/content.ts";
 import { buildRoomDiagnostics } from "./room/diagnostics.ts";
 import { identityEditsLocked, stampRelayedAction, timerExpiryAction } from "./room/engine-glue.ts";
 import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
@@ -254,6 +259,10 @@ export class GameRoomDO extends Server {
       phase: lifecycle,
       game: redactStateFor(attachment.role, room.state),
       roster: this.wireRoster(),
+      // The room's static facts travel with every snapshot, so `sync` restores a client
+      // completely rather than leaving it with live state and no board to draw it on.
+      teamsMode: room.setup.settings.teams.playerMode === "teams",
+      board: boardMaterial(room.spec, room.setup),
       paused: room.meta.pausedAt !== null,
       // A phone that reconnects mid-clue must land on the screen it left, so an open clue
       // ships its (redacted) content with the snapshot rather than waiting for the next one.
@@ -399,15 +408,26 @@ export class GameRoomDO extends Server {
       this.broadcastClueContent();
     }
 
-    // Everything else flows as the ordered event stream, role-redacted per connection.
-    // early-buzz additionally produces private buzz-rejected feedback for the offender.
+    // Everything else flows as the ordered event stream, role-redacted per connection, WITH
+    // the state it produced (server-messages.ts explains why the events alone are not enough
+    // for a client to hold state). The state redaction is memoized per ROLE: it is identical
+    // for every phone in the room, and a 100-player buzz would otherwise redact it 100 times.
     const stream = events.filter((event) => event.type !== "buzz-won");
+    const stateByRole = new Map<RoomRole, unknown>();
     for (const connection of this.getConnections<Attachment>()) {
       const attachment = connection.state;
       if (attachment === null) continue;
       const redacted = redactEventsFor(attachment.role, attachment.playerId, stream);
       if (redacted.length > 0) {
-        this.send(connection, { type: "event", stateVersion: version, events: redacted });
+        if (!stateByRole.has(attachment.role)) {
+          stateByRole.set(attachment.role, redactStateFor(attachment.role, room.state));
+        }
+        this.send(connection, {
+          type: "event",
+          stateVersion: version,
+          events: redacted,
+          game: stateByRole.get(attachment.role) ?? null,
+        });
       }
       for (const event of stream) {
         if (event.type === "early-buzz" && event.playerId === attachment.playerId) {
@@ -900,6 +920,10 @@ export class GameRoomDO extends Server {
         avatarId: message.avatarId ?? null,
         accentId: message.accentId ?? null,
         buzzSoundId: message.buzzSoundId ?? null,
+        // Absent stays ABSENT rather than becoming null: "this client never sent a tone" and
+        // "this player chose the pack's own colors" are different facts, and nothing here may
+        // turn the first into the second (packages/protocol/src/room/identity.ts).
+        ...(message.skinToneId !== undefined && { skinToneId: message.skinToneId }),
       },
       teamId,
       connected: true,
@@ -1259,6 +1283,9 @@ export class GameRoomDO extends Server {
     if (message.avatarId !== undefined) entry.identity.avatarId = message.avatarId;
     if (message.accentId !== undefined) entry.identity.accentId = message.accentId;
     if (message.buzzSoundId !== undefined) entry.identity.buzzSoundId = message.buzzSoundId;
+    // The tone was accepted by the schema and dropped on the floor here until the 2026-08-17
+    // reconcile - a phone could pick one, see it locally, and have the room forget it.
+    if (message.skinToneId !== undefined) entry.identity.skinToneId = message.skinToneId;
     await this.persist("roster", "renames");
     this.broadcastRoster();
   }
@@ -1342,7 +1369,10 @@ export class GameRoomDO extends Server {
       return;
     }
     if (Object.keys(room.teams).length >= limits.team.teamMaxCount) {
-      this.sendError(connection, "rejected", "team limit reached");
+      // A TEAM-tier refusal, not an error: the catalog gives it its own reason (`teams-full`)
+      // precisely so the phone can say "join one of the teams that already exist" instead of
+      // showing a player a generic rejection. The socket survives, as every team refusal does.
+      this.refuse(connection, "teams-full");
       return;
     }
     this.detachFromTeam(entry);
@@ -1379,12 +1409,16 @@ export class GameRoomDO extends Server {
       return;
     }
     const team = room.teams[message.teamId];
+    // The same two team-tier refusals a JOIN-time team intent earns (handleJoin above), for
+    // the same reason and in the same words: the phone keeps its socket and picks another
+    // card. They were plain errors here until the 2026-08-17 reconcile, which meant tapping a
+    // locked team on the pre-game screen produced a console notice and no sentence on screen.
     if (team === undefined) {
-      this.sendError(connection, "unknown-team");
+      this.refuse(connection, "unknown-team");
       return;
     }
     if (team.locked) {
-      this.sendError(connection, "rejected", "team is locked");
+      this.refuse(connection, "team-locked");
       return;
     }
     this.detachFromTeam(entry);

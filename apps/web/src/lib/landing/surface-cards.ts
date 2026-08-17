@@ -33,7 +33,7 @@ export const devSurfaces: readonly SurfaceCard[] = [
   {
     href: "/room/DUMYX",
     title: "Player room",
-    note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (M4 mock room; ?theme=modern-flat previews presets).",
+    note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (the DUMYX demo room simulates a full 30-player lobby in this tab alone; ?theme=modern-flat previews presets).",
   },
   {
     href: "/room/DUMYX/display",

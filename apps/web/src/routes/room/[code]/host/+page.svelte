@@ -1,20 +1,34 @@
 <script lang="ts">
   // The host console route (/room/CODE/host): the C4 instrument panel with mirror mode
-  // (?mirror starts in it) and the dev-only sim panel. MOCK MODE until the M3 reconcile: an
-  // isolated local simulation with the full fixture roster - the sim panel drives fake
-  // players so a whole game is playable from this one tab (docs/design/surfaces.md).
+  // (?mirror starts in it) and the dev-only sim panel.
+  //
+  // A REAL room since the 2026-08-17 reconcile: the console joins the code's GameRoomDO as
+  // role=host, holding the creation token the front door stashed at create
+  // (#lib/lobby/join-hand-off.ts). That token is the room's strongest secret and it lives in
+  // THIS TAB's sessionStorage - so a console opened in a tab that did not create the room has
+  // no way to prove itself, and this route says so plainly instead of rendering a panel whose
+  // every button would be refused. The demo code still gets the local simulation, sim panel
+  // and all, which is what makes the screens reviewable without a server.
   import { onDestroy } from "svelte";
   import { browser, dev } from "$app/env";
   import { page } from "$app/state";
+  import HomeButton from "#lib/chrome/home-button.svelte";
   import HostConsole from "#lib/room/host-console.svelte";
-  import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { createRoomStore, roomStoreModeFor } from "#lib/room/create-room-store.ts";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
+  import { recallHostToken } from "#lib/lobby/join-hand-off.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
-  import type { GameEvent } from "@jeopardy/engine/events";
 
   const roomCode = (page.params.code ?? "DUMYX").toUpperCase();
+  const simOverride = page.url.searchParams.has("sim");
+  const mode = roomStoreModeFor(roomCode, simOverride);
+  // Read once, at construction, because that is when the socket needs it. Empty during SSR
+  // (there is no sessionStorage there), which is why the missing-token screen below is gated
+  // on `browser` too - a server-rendered frame must not accuse anyone of anything.
+  const hostToken = browser && mode === "ws" ? recallHostToken(roomCode) : "";
+  const tokenMissing = $derived(browser && mode === "ws" && hostToken === "");
 
   // This device's preferences: type scales, audio, mirror, manual mode (src/lib/host-settings/).
   // Attached on the route rather than in the console so the display window of the same browser
@@ -29,23 +43,19 @@
   // local toggle, the display defaults on and everything else off). The host turns it on in the
   // cog when the console sits nearer the speakers than the projector laptop does.
   const consoleAudio = new RoomAudio({ enabled: false });
-  function onRoomEvent(event: GameEvent): void {
-    if (event.type === "buzz-won") {
-      const view = store.view;
-      const team = view.roster.teams.find((entry) => entry.teamId === event.entityId);
-      const sound =
-        team?.buzzSoundId ??
-        view.roster.players.find((entry) => entry.playerId === event.playerId)?.buzzSoundId ??
-        null;
-      consoleAudio.playBuzz(sound);
-    }
-  }
 
   const store = createRoomStore({
     roomCode,
     role: "host",
+    ...(simOverride && { mode: "local-sim" as const }),
     timerAutopilot: browser,
-    onEvent: onRoomEvent,
+    // A console with no token still opens its socket in a demo room; in a real one it would
+    // only be refused, so the dial waits until there is something to prove.
+    autoConnect: browser && (mode === "local-sim" || hostToken !== ""),
+    hostToken,
+    onBuzzWon: (buzz) => {
+      consoleAudio.playBuzz(buzz.buzzSoundId);
+    },
   });
   onDestroy(() => {
     store.destroy();
@@ -72,17 +82,76 @@
 </svelte:head>
 
 <div class="host-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <HostConsole
-    {store}
-    showSimPanel={dev}
-    mirror={startInMirror}
-    settingsOpen={startWithSettings}
-  />
+  {#if tokenMissing}
+    <!-- Not an error screen: nothing went wrong, this tab simply is not the one that made the
+         room. It says what the token is, where it lives, and the two real ways forward. -->
+    <section class="no-token" aria-label="Host console unavailable">
+      <h1>This tab cannot host room {roomCode}</h1>
+      <p>
+        A room is hosted by the tab that created it. The key is kept in that tab and nowhere
+        else - not in a link, not in your account, because there is no account - so a console
+        opened anywhere else has nothing to prove it is the host with.
+      </p>
+      <ul>
+        <li>Still have the tab you made the room in? The console is already there.</li>
+        <li>Closed it? Make a new room - and put its display on the screen before you share
+          the code.</li>
+        <li>You can watch this room without hosting it: open <code>/room/{roomCode}</code>
+          and join as a player.</li>
+      </ul>
+      <HomeButton variant="inline" />
+    </section>
+  {:else}
+    <HostConsole
+      {store}
+      showSimPanel={dev}
+      mirror={startInMirror}
+      settingsOpen={startWithSettings}
+    />
+  {/if}
 </div>
 
 <style>
   .host-shell {
     min-height: 100dvh;
     background: var(--surface-page);
+  }
+
+  .no-token {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: clamp(2rem, 8vh, 5rem) 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    color: var(--surface-text);
+  }
+
+  .no-token h1 {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 5vw, 2.4rem);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin: 0;
+  }
+
+  .no-token p,
+  .no-token li {
+    margin: 0;
+    line-height: 1.6;
+    color: var(--surface-text-muted);
+  }
+
+  .no-token ul {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin: 0;
+    padding-left: 1.2rem;
+  }
+
+  .no-token code {
+    font-family: var(--font-chrome);
+    color: var(--surface-text);
   }
 </style>

@@ -216,10 +216,18 @@ describe("room server messages", () => {
         phase: "active",
         game: { phase: "armed" },
         roster: { players: [], teams: [] },
+        teamsMode: false,
+        board: { rounds: [{ categoryTitles: ["Firsts"], cellValues: [[100, 200]] }] },
         paused: false,
         clueContent: null,
       },
-      { version: v, type: "event", stateVersion: 13, events: [{ type: "buzzers-armed" }] },
+      {
+        version: v,
+        type: "event",
+        stateVersion: 13,
+        events: [{ type: "buzzers-armed" }],
+        game: { phase: "armed" },
+      },
       {
         version: v,
         type: "buzz-won",
@@ -306,6 +314,33 @@ describe("room server messages", () => {
         game: null,
         roster: { players: [], teams: [] },
       }).success,
+    ).toBe(false);
+  });
+
+  it("makes a stateful client's three needs mandatory, not optional", () => {
+    // The M4 reconcile's findings, held as schema: a snapshot without the board or the seating
+    // rule leaves a display with nothing to paint and a teams room with no teams, and an event
+    // batch without its state leaves every client guessing (see the notes on those fields).
+    const snapshot = {
+      version: v,
+      type: "snapshot",
+      stateVersion: 1,
+      phase: "lobby",
+      game: null,
+      roster: { players: [], teams: [] },
+      teamsMode: true,
+      board: { rounds: [] },
+      paused: false,
+      clueContent: null,
+    };
+    expect(roomServerMessageSchema.safeParse(snapshot).success).toBe(true);
+    for (const missing of ["teamsMode", "board"]) {
+      const { [missing]: _dropped, ...rest } = snapshot as Record<string, unknown>;
+      expect(roomServerMessageSchema.safeParse(rest).success, missing).toBe(false);
+    }
+    expect(
+      roomServerMessageSchema.safeParse({ version: v, type: "event", stateVersion: 2, events: [] })
+        .success,
     ).toBe(false);
   });
 

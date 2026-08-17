@@ -2,22 +2,23 @@
   // The board display (/room/CODE/display): the projector window (C1). An independent client
   // of the room - crashing or reopening it never touches the game. This device is the
   // default room-audio owner (resolved UX question 3: per-device toggle, display on by
-  // default); the buzz sound is resolved TEAM-first (owner directive: double confirmation).
-  // MOCK MODE until the M3 reconcile: an isolated local simulation (docs/design/surfaces.md);
-  // use the host route's sim panel in another tab for a driven demo, or this page's own sim
-  // hotkeys below.
+  // default); the buzz sound is resolved TEAM-first (owner directive: double confirmation) by
+  // whoever owns the room, and arrives here already decided.
+  // A REAL room since the 2026-08-17 reconcile: this window joins the code's GameRoomDO as
+  // role=display, so it shows the same room the phones are in. The demo code still gets the
+  // local simulation, and the host route's sim panel drives it from another tab.
   import { onDestroy } from "svelte";
   import { browser } from "$app/env";
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { recallRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
   import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
   import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
-  import type { GameEvent } from "@jeopardy/engine/events";
 
   const roomCode = (page.params.code ?? "DUMYX").toUpperCase();
 
@@ -40,29 +41,21 @@
     roomAudio.setVolume(device.audioVolume);
   });
 
-  function resolveRoomBuzzSound(playerId: string, entityId: string): string | null {
-    // Team-scoped in teams mode (the leader-picked team sound), personal otherwise. The M3
-    // server resolves this itself and ships it on the buzz-won message; the mock resolves
-    // client-side with the same rule.
-    const view = store.view;
-    const team = view.roster.teams.find((entry) => entry.teamId === entityId);
-    if (team !== undefined) return team.buzzSoundId;
-    return view.roster.players.find((entry) => entry.playerId === playerId)?.buzzSoundId ?? null;
-  }
-
-  function onRoomEvent(event: GameEvent): void {
-    // Room audio keys off buzz-won ALONE (exactly once per arming - the engine contract), so
-    // overlap is structurally impossible; the exclusive slot in RoomAudio is the second belt.
-    if (event.type === "buzz-won") {
-      roomAudio.playBuzz(resolveRoomBuzzSound(event.playerId, event.entityId));
-    }
-  }
-
   const store = createRoomStore({
     roomCode,
     role: "display",
+    ...(page.url.searchParams.has("sim") && { mode: "local-sim" as const }),
     timerAutopilot: browser,
-    onEvent: onRoomEvent,
+    autoConnect: browser,
+    // A display is not a spectator, but a password room still gates it (only the host's
+    // creation token outranks the password), so the projector tab carries the same secret.
+    password: browser ? recallRoomPassword(roomCode) : null,
+    // Room audio keys off buzz-won ALONE (exactly once per arming - the engine contract), so
+    // overlap is structurally impossible; the exclusive slot in RoomAudio is the second belt.
+    // The sound arrives resolved: the room decides team-vs-personal, not this window.
+    onBuzzWon: (buzz) => {
+      roomAudio.playBuzz(buzz.buzzSoundId);
+    },
   });
   onDestroy(() => {
     store.destroy();

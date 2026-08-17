@@ -5,8 +5,10 @@
 // | welcome      | to the joining/resuming connection only, before anything else               |
 // | refused      | to the refused connection; room-level reasons then close (codes below),     |
 // |              | team-level reasons keep the socket for a retry with another team            |
-// | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note)       |
-// | event        | broadcast after every accepted engine transition; role-redacted             |
+// | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note);      |
+// |              | carries the room's static facts too (teamsMode, board material)             |
+// | event        | broadcast after every accepted engine transition; role-redacted, and it     |
+// |              | carries the state those events produced (see the `game` note on it)         |
 // | buzz-won     | broadcast, EXACTLY ONCE per arming - the room-audio driver (owner           |
 // |              | directive "Only the winning buzz is heard"; sound resolution note below)    |
 // | buzz-rejected| to the losing/early phone only - silent local feedback, never room audio    |
@@ -113,6 +115,31 @@ const gameViewSchema = z.unknown();
 export const roomPhaseSchema = z.enum(["lobby", "active", "ended"]);
 export type RoomPhase = z.infer<typeof roomPhaseSchema>;
 
+// THE BOARD'S PUBLIC MATERIAL: category titles and face values, per round.
+//
+// Added at the M4 reconcile (2026-08-17), when wiring the real surfaces found the gap: the
+// engine deals in coordinates and carries no titles or values in its state (GameSetup is not
+// part of GameState, by design - packages/engine/src/setup.ts), and `clue-content` answers
+// only for the clue that is OPEN. A display therefore had nothing to paint a board with. This
+// is the missing half of the content channel, and it is deliberately its own shape rather
+// than a second content message: it is STATIC for a room's whole life, it contains no answers
+// and no prompts, and it is exactly what a projector already shows the room. Redaction does
+// not apply - a face value is public the moment the board is on a wall.
+//
+// It rides the snapshot rather than a message of its own so that `sync` recovers everything a
+// client needs in one round trip; a client that missed a standalone message would have had no
+// way back to a board short of reconnecting.
+export const boardMaterialSchema = z.strictObject({
+  rounds: z.array(
+    z.strictObject({
+      categoryTitles: z.array(z.string().max(80)),
+      /** cellValues[categoryIndex][rowIndex] - resolved face values, multipliers applied. */
+      cellValues: z.array(z.array(z.int())),
+    }),
+  ),
+});
+export type BoardMaterial = z.infer<typeof boardMaterialSchema>;
+
 // CLUE CONTENT - the one channel carrying authored prompt/answer text to clients. The engine
 // deals in board coordinates and never sees a word of content (guiding principle 6), so this
 // rides beside the event stream rather than inside it, resolved by the DO from the room's
@@ -184,6 +211,12 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // Engine state (see gameViewSchema note); null until start-game creates it.
     game: gameViewSchema.nullable(),
     roster: rosterPayloadSchema,
+    // How this room seats people (rules row 34, frozen at creation). A room fact rather than a
+    // room SETTING - it belongs to the game's rule set, not to the host's live controls - and
+    // a client cannot derive it: in the lobby the engine has met nobody, so an empty `teams`
+    // record says nothing. Without it a teams room's join screen offers no teams at all.
+    teamsMode: z.boolean(),
+    board: boardMaterialSchema,
     // Host-held freeze (the console's pause button). Room-level, not engine-level: the
     // engine has no pause concept, so the room parks its timers and says so.
     paused: z.boolean(),
@@ -199,6 +232,17 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // `game`), role-redacted: everyone-answers submission text is stripped for everyone but
     // the host and the submitting phone.
     events: z.array(z.unknown()),
+    // The state those events produced, redacted exactly like `snapshot.game`.
+    //
+    // Added at the M4 reconcile (2026-08-17). Events are NARRATION, not a diff: replaying the
+    // action log regenerates them, but no client holds the log, the setup, or the engine's
+    // seeded rng, so nothing on the wire let a display or a console rebuild GameState from an
+    // event batch. The alternatives were both worse: asking every client to send `sync` after
+    // every action turns one broadcast into N round trips that each wake the DO, and shipping
+    // the action log would hand phones the wager positions redaction exists to hide. The state
+    // is a few KB with the log and rng stripped, and it is computed once per ROLE per batch,
+    // not once per connection.
+    game: gameViewSchema.nullable(),
   }),
   z.strictObject({
     ...envelopeFields,

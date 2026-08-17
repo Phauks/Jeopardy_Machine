@@ -49,7 +49,11 @@ function welcomeAndSeat(serve: (payload: Record<string, unknown>) => void, playe
     },
     // Room-level fields added with the M4 surfaces (2026-08-14): the host freeze and the
     // redacted clue text. A bot ignores both - it plays by events - but a snapshot without
-    // them is not a valid frame, and this fixture is a real frame on purpose.
+    // them is not a valid frame, and this fixture is a real frame on purpose. The same goes
+    // for the seating rule and the board material added at the 2026-08-17 reconcile, which
+    // the stateful surfaces need and a bot does not.
+    teamsMode: false,
+    board: { rounds: [{ categoryTitles: ["Bots"], cellValues: [[100, 200, 300]] }] },
     paused: false,
     clueContent: null,
   });
@@ -97,6 +101,8 @@ describe("bot driver", () => {
     serve({
       type: "event",
       stateVersion: 1,
+      // A bot plays by events alone, so the state every real batch now carries is null here.
+      game: null,
       events: [{ type: "buzzers-armed", rebound: false, armedAt: 1000 }],
     });
     await nextTick();
@@ -115,6 +121,8 @@ describe("bot driver", () => {
     serve({
       type: "event",
       stateVersion: 2,
+      // A bot plays by events alone, so the state every real batch now carries is null here.
+      game: null,
       events: [
         { type: "wager-cell-hit", label: "Double Down", entityId: "p-9", minimum: 5, maximum: 100 },
       ],
@@ -124,6 +132,8 @@ describe("bot driver", () => {
     serve({
       type: "event",
       stateVersion: 3,
+      // A bot plays by events alone, so the state every real batch now carries is null here.
+      game: null,
       events: [
         { type: "wager-cell-hit", label: "Double Down", entityId: "p-1", minimum: 5, maximum: 105 },
       ],
@@ -147,6 +157,8 @@ describe("bot driver", () => {
     serve({
       type: "event",
       stateVersion: 4,
+      // A bot plays by events alone, so the state every real batch now carries is null here.
+      game: null,
       events: [
         { type: "final-wagers-open", ranges: [{ entityId: "p-1", minimum: 0, maximum: 800 }] },
       ],
@@ -154,6 +166,8 @@ describe("bot driver", () => {
     serve({
       type: "event",
       stateVersion: 5,
+      // A bot plays by events alone, so the state every real batch now carries is null here.
+      game: null,
       events: [{ type: "final-writing-open", eligible: ["p-1"] }],
     });
     await nextTick();
@@ -180,6 +194,8 @@ describe("bot driver", () => {
         serve({
           type: "event",
           stateVersion: arming + 1,
+          // A bot plays by events alone, so the state every real batch now carries is null here.
+          game: null,
           events: [{ type: "buzzers-armed", rebound: false, armedAt: arming }],
         });
         // Sequential on purpose: each arming's buzz decision must land before the next

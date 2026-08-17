@@ -15,6 +15,7 @@ import { normalizeRoomCode } from "#lib/realtime/room-url.ts";
 
 const passwordStorageKey = "jeopardy.room-password";
 const hostTokenStorageKey = "jeopardy.host-token";
+const sessionTokenStorageKey = "jeopardy.session-token";
 
 /** The destination for "join this room": the player join screen. */
 export function joinUrlForRoom(rawCode: string): string {
@@ -83,6 +84,41 @@ export function recallHostToken(rawCode: string): string {
   if (storage === undefined) return "";
   try {
     return storage.getItem(`${hostTokenStorageKey}.${normalizeRoomCode(rawCode)}`) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * The player's resume credential, minted by the room on join and handed back on reconnect
+ * (user-flows A5: "the phone reconnects and lands on the same screen it left").
+ *
+ * sessionStorage for the same reasons as the two secrets above, plus one of its own: a seat is
+ * a per-TAB thing. Two tabs on one phone are two players as far as the room is concerned, and
+ * localStorage would quietly make them fight over one seat. Empty string clears it - which is
+ * what a room does when it tells this device the token is no longer a seat.
+ */
+export function rememberSessionToken(rawCode: string, sessionToken: string): void {
+  const code = normalizeRoomCode(rawCode);
+  const storage = globalThis.sessionStorage as Storage | undefined;
+  if (storage === undefined) return;
+  try {
+    if (sessionToken === "") {
+      storage.removeItem(`${sessionTokenStorageKey}.${code}`);
+      return;
+    }
+    storage.setItem(`${sessionTokenStorageKey}.${code}`, sessionToken);
+  } catch {
+    // No storage = no resume; the phone joins again as a new seat, which still works.
+  }
+}
+
+/** What the play surface offers the room on connect. Empty string = this tab has no seat. */
+export function recallSessionToken(rawCode: string): string {
+  const storage = globalThis.sessionStorage as Storage | undefined;
+  if (storage === undefined) return "";
+  try {
+    return storage.getItem(`${sessionTokenStorageKey}.${normalizeRoomCode(rawCode)}`) ?? "";
   } catch {
     return "";
   }

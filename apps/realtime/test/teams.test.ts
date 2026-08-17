@@ -82,8 +82,10 @@ describe("team lifecycle in the lobby", () => {
     await host.waitFor("roster", (message) => message.roster.teams[0]?.locked === true);
     const latecomer = await connectBot(code, { ...instantBot("Late"), seed: "late-seed" });
     latecomer.sendMessage({ type: "team-join", teamId });
-    const lockedOut = await latecomer.waitFor((message) => message.type === "error");
-    expect(lockedOut).toMatchObject({ reason: "rejected" });
+    // A team-tier REFUSAL with its own reason, not a generic error: the phone stays connected
+    // and gets a sentence it can show ("that team is locked - pick another one").
+    const lockedOut = await latecomer.waitFor((message) => message.type === "refused");
+    expect(lockedOut).toMatchObject({ reason: "team-locked" });
   });
 
   it("kick returns the member to team selection; handoff moves the crown; kicked can rejoin unless locked", async () => {
