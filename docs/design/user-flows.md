@@ -27,26 +27,31 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **A room in progress** shows "Playing" and is dimmed - whether it actually accepts an arrival is the late-join setting's business, answered by the room itself, not by the list.
 - The list is a **browse surface, not a live room**: it polls, it is briefly cached, and it is capped (pagination deliberately deferred). A stale row can never open a dead room - the room refuses.
 
-### A2. Join (two screens, still <15 seconds)
+### A2/A3. The pre-game screen (ONE surface, still <15 seconds to play)
 
-**Amended 2026-08-15.** This was specified as one screen and built as one, and the identity half ended up as three squeezed lines above a grid of team cards - the only moment in the product that is about the PLAYER, given the least room on the page. It is two screens now, and the second one exists because the team choice needs the staged lobby beside it (docs/decisions/2026-08-15-staged-lobby.md). Both are short; the count of taps to play is unchanged.
+**Amended 2026-08-16, and this reverses the 2026-08-15 amendment above it.** The journey was specified as one screen, split into two (character, then team) because the identity half was being squeezed, and then had the A3 lobby behind it as a third. That chain is what the standing UI law now forbids outright (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md): _"state changes in place; it does not swap screens ... No wizard chains ... Nothing that has been shown gets hidden by a later step."_ Splitting the screen was the right diagnosis of a real problem and the wrong cure - the identity half needed ROOM, not its own page, and on anything wider than a phone there was room for all of it side by side the whole time.
 
-**A2a - character.** The animated walk-cycle preview at the top (it moves - the identity moment), then name, the avatar grid with accent swatches, and pick-your-buzzer-sound (tap to preview locally). Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix. Continuing takes your seat in the room **without a team**.
+So A2 and A3 are one surface with three regions, all present from the first paint, none of which can hide another. The old stage function is gone; `playerSurfaceFor` (apps/web/src/lib/room/pre-game.ts) now answers only pre-game or buzzer.
 
-**A2b - team** (teams mode only, and skipped for a mid-game arrival, whose engine seat already exists). You are now standing in the staged lobby's holding area - in the water, with the boats theme - and the projector shows you there. Then:
+**The character region.** The animated walk-cycle preview (it moves - the identity moment), name with a live `17/24` counter, the avatar grid with accent swatches, the skin-tone row for the human models, and pick-your-buzzer-sound (tap to preview locally). Validation inline: length, profanity filter (host-toggleable), duplicate names get an auto-suffix. The accent tints the CHARACTER, not the backdrop behind it.
 
-- Host-premade or already-created teams: tap your team's station in the staged view, or its card. You walk across and board it, visibly.
-- Self-organize: "start a new team" (creating a team makes you its **leader** - see "Teams & leadership" below).
-- "Play on my own instead" is always available; an unteamed player is seated as a solo team of one at start-game.
+The region does not change when you take a seat; only what its controls mean changes. Before joining they edit a local draft that travels with the join. After joining the identical controls write straight through to the room, which is what replaced the old post-join "identity sheet" modal - a modal being, precisely, a surface that appears and then takes itself away.
+
+**The teams region** (teams mode; individuals-mode rooms get the region saying so, never a hole). Live before you have a seat, so you can see who is on which team while you are still picking a name - only the actions wait for the seat. It holds the staged lobby with the holding area, the team cards, and real team management for players:
+
+- **Join** a host-premade or already-created team: tap its station in the staged view, or its card. You walk across and board it, visibly.
+- **Move** to a different team after joining: every other card keeps its button, reading "Move here". One message, so the room never sees you briefly teamless.
+- **Create**: "start a new team", offered whether or not you already have one (creating a team makes you its **leader** - see "Teams & leadership" below).
+- **Rename** (leader) and **leave**, both in place, both behind the team's "..." with lock, per the overflow rule.
+- An unteamed player is still seated as a solo team of one at start-game. There is no longer a "play on my own instead" button, because there is no team screen left to escape from - staying in the holding area IS the choice, and the region says so.
+
+**The room region.** Who is here, the live roster with still chips, the explicit waiting state ("Waiting for the host to start"), and buzzer practice - a disarmed demo button whose press plays _local_ feedback only, never room sound. Host may run an official sound check (see C3).
 
 On join: session token minted and kept in `sessionStorage`; wake-lock requested; phone registered in lobby.
 
-### A3. Lobby
+**On a laptop** the three regions are three columns and the whole thing is visible at once; on a phone they are one scrolling column in that order. Every region reserves its space, so a roster arriving or a refusal appearing moves nothing else (held by apps/web/src/lib/room/pre-game-layout.gate.test.ts).
 
-"You're in as **Lorax** on **Team Sequoia**" + the staged lobby (you on your team's station, anyone still choosing in the holding area) + live roster + game title card in the event's theme. The stations stay tappable here: changing your mind before the host starts is allowed, and it is the same visible move it was on A2b.
-
-- Buzzer practice: a disarmed demo button; pressing plays _local_ feedback only (no room sound spam). Host may run an official sound check (see C3).
-- Waiting state is explicit: "Waiting for the host to start."
+A mid-game arrival sees the same surface - they pick a character exactly like everyone else did - and lands on the buzzer once seated, since their engine seat is created on join.
 
 ### A4. In game - the phone mirrors room state
 
@@ -173,20 +178,22 @@ Winner screen (podium + per-team totals). Console: export results (JSON/CSV: fin
 
 Two customization tiers that never collide:
 
-| Tier         | Who controls | What it covers                                                                                                                                                                                                                                       |
-| ------------ | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Team**     | Team leader  | Team name, team color (picked from the player-accent palette - docs/design/theming.md "Player accents and avatars"), **the team's room-audible buzz sound**, team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation) |
-| **Personal** | Each player  | Own nickname, personal avatar/accent, personal buzzer sound - always visible _within_ the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal avatar chip)            |
+| Tier         | Who controls | What it covers                                                                                                                                                                                                                                                                |
+| ------------ | ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Team**     | Team leader  | Team name, team color (picked from the player-accent palette - docs/design/theming.md "Player accents and avatars"), **the team's room-audible buzz sound**, team lock (no new joiners), future team-level options (e.g. designated-buzzer rotation)                          |
+| **Personal** | Each player  | Own nickname, personal avatar/accent, **skin tone** for the human models, personal buzzer sound - always visible _within_ the team display, so every player keeps an identity marker showing where they are (e.g. team-color card bearing each member's personal avatar chip) |
+
+**Skin tone (owner-specified 2026-08-16).** The Mini Characters carry a curated tone axis alongside the accent, recoloured through the same palette mechanism. Three rules, all load-bearing: it is an **explicit choice**, never inferred from a name, an avatar, or anything else; the default is **neutral**, meaning the pack's own colors and not a tone the product picked; and it is offered **only for the human avatars**, because the pets have no skin cells and a control that silently does nothing would be a lie. The set and the reasoning behind its numeric labels live in tools/avatar-bake/src/skin-tone-palette.mjs.
 
 **Buzz sounds are team-scoped in team mode (owner-specified 2026-08-13).** The room-audible buzz-in sound belongs to the team tier: the leader picks it, and when any member wins the buzz the room hears the _team's_ sound while the display shows the team name/color - a **double confirmation** (audio + visual) of who has been selected. One sound per team is learnable by the host and crowd; per-player sounds at 20 teams x 5 members would be noise. Personal buzzer sounds still exist: in individuals mode they ARE the room sound; in team mode they play **locally on the buzzing player's own phone only** as private feedback. The display may additionally show _which member_ buzzed, small, under the team name - identification without audio clutter.
 
-**Post-join customization (owner-specified 2026-08-13).** Joining is not a one-shot identity commitment: players can reopen their appearance (avatar/accent, personal buzzer sound, nickname) at any time from the player screen (tap your own avatar chip), and leaders can reopen team customization the same way. Changes apply immediately and sync everywhere. Guardrails: name changes are rate-limited (anti-confusion, not anti-fun), and identity edits are locked during the brief armed/answering window so the display never relabels mid-adjudication.
+**Post-join customization (owner-specified 2026-08-13; how it is reached amended 2026-08-16).** Joining is not a one-shot identity commitment. There is nothing to reopen any more: the character region is simply still there after you join, with the same controls, now writing straight through to the room. The "tap your own chip to open a sheet" affordance and the sheet itself are gone - a modal that appears and takes itself away is the thing the persistent-layout law exists to stop. Leaders edit team name and lock in place on their own team card, behind its "...". Changes apply immediately and sync everywhere. Guardrails unchanged: name changes are rate-limited (anti-confusion, not anti-fun), and identity edits are locked during the brief armed/answering window so the display never relabels mid-adjudication.
 
 **Leadership mechanics:**
 
 - Creating a team makes you its leader (crown affordance on your card). Host-premade teams: leader = first joiner, until changed.
-- Leader powers, all from the phone lobby screen: rename team, pick team color + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly), and **lock** the team. **Kick and hand-off live behind a per-member "..." overflow menu, and the lock behind the team's own "..."** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name or as a switch on the card.
-- Kicked players return to team selection (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list).
+- Leader powers, all from the pre-game screen's teams region: rename team, pick team color + team buzz sound, **kick** members who don't belong, **hand off leadership** to any teammate (explicit tap -> confirm; role moves instantly), and **lock** the team. **Kick and hand-off live behind a per-member "..." overflow menu, and rename, lock and leave behind the team's own "..."** (owner-specified) - destructive/administrative actions are one deliberate tap away, never exposed as always-visible buttons next to a teammate's name or as a switch on the card. Rename opens an inline field on the card itself, keeping the card where it was.
+- Kicked players return to the holding area (they may join another team; rejoin of the same team is possible unless the leader locks the team - lock is the anti-nuisance tool, not a ban list). This needs no code path of its own and no longer moves them to a different screen: their `teamId` goes null in a region that never went away.
 - **Leader disconnect**: after a grace period (missed heartbeats), leadership auto-passes to the longest-tenured connected member; if the original leader returns they rejoin as a regular member.
 - **Host supremacy is unchanged** (guiding principle 4): the host console can rename/kick/merge/reassign leaders over any team decision, and sees a feed entry for kicks (abuse visibility). Team self-governance reduces host workload; it never gates the host.
 - Personal customization is never leader-editable; team customization is never member-editable. The tiers are separate protocol fields (team doc vs player doc in room state, modeled in M3, surfaced in M5 team mode).
