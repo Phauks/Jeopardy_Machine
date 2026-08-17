@@ -1,14 +1,14 @@
 // The room-store seam: ONE typed interface between the play surfaces (join/lobby/buzzer,
 // display, host console) and wherever room state actually lives. Two implementations:
 //
-// - local-sim-store.svelte.ts - complete; wraps @jeopardy/engine's transition() plus the
-//   fixtures/ dummy dataset, timers driven client-side. The default while M3 lands.
-// - ws-room-store.ts - the same interface with every method documented as its M3 room
-//   protocol message; bodies are stubs wired at reconcile (docs/design/surfaces.md holds
-//   the message-to-store mapping table).
+// - local-sim-store.svelte.ts - wraps @jeopardy/engine's transition() plus the fixtures/ dummy
+//   dataset, timers driven client-side. What the demo room and the dev surfaces get.
+// - ws-room-store.svelte.ts - the same interface over a real socket to the room's GameRoomDO.
+//   What every real room code gets (docs/design/surfaces.md holds the message-to-store table).
 //
-// Surfaces consume ONLY this interface, so swapping mock for WebSocket is a factory change
-// (create-room-store.ts), never a component change.
+// Surfaces consume ONLY this interface, so which room you are in is a factory decision
+// (create-room-store.ts), never a component one - and the event fold both implementations use
+// is one module (room-fold.ts), so they cannot drift into two answers about the same event.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";

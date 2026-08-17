@@ -21,9 +21,9 @@ All three shells apply a theme preset via `themeToStyleAttribute` + `data-effect
 
 | Code                | Store       | Why                                                                                                                                                     |
 | ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DUMYX` (the demo)  | `local-sim` | The code the surface cards link to. A full 30-player fixture lobby with no server, so every screen is reviewable and the sim panel drives a whole game.  |
-| anything else       | `ws`        | A code from `POST /api/rooms` names a `GameRoomDO`, and the socket is the only way to be in that room.                                                    |
-| `?sim` on any route | `local-sim` | Dev override for reviewing a real room's URL against fixture material. Never in a printed link.                                                          |
+| `DUMYX` (the demo)  | `local-sim` | The code the surface cards link to. A full 30-player fixture lobby with no server, so every screen is reviewable and the sim panel drives a whole game. |
+| anything else       | `ws`        | A code from `POST /api/rooms` names a `GameRoomDO`, and the socket is the only way to be in that room.                                                  |
+| `?sim` on any route | `local-sim` | Dev override for reviewing a real room's URL against fixture material. Never in a printed link.                                                         |
 
 Any surface can ask which it got (`store.mode`), and the pre-game screen SAYS so ("Demo room - this tab only", or "Reconnecting..."/"Disconnected" on a real one) - a simulated room looks exactly like a real one, which is the point of the seam and the reason somebody about to share a code deserves to be told.
 
@@ -43,21 +43,37 @@ Any surface can ask which it got (`store.mode`), and the pre-game screen SAYS so
 
 Wraps `@jeopardy/engine`'s `transition()` over the fixtures/ dummy dataset (`fixture-room.ts` is the only fixture import site): the dummy game (teams mode, manual wager cells, final) + the 30-player/6-team roster. Engine timer hints run on client `setTimeout` (the DO-alarm stand-in; `timerAutopilot` off in tests/SSR). Role redaction is reproduced honestly: player/display stores never hold answers in memory. Doubles as the sim-panel backend (`simBuzz`, `simBuzzRace`, `simSetConnected`, `simCompleteFinal`) and the future rehearse-mode core. Unteamed players in a teams-mode game are seated as solo teams of one at start-game.
 
-### Implementation 2: ws (`ws-room-store.ts`) - stub until reconcile
+### Implementation 2: ws (`ws-room-store.svelte.ts`) - wired 2026-08-17
 
-Same interface; every method body names the exact room protocol message it will send, and the file header carries the full **server-message -> store-effect mapping table**. Renders a permanent "connecting" shell if constructed today.
+The same interface over a real socket to `wss://<page origin>/room/<CODE>/ws` (the single origin - docs/decisions/2026-08-13-single-origin-binding.md). Its file header carries the **server-message -> store-effect table**; the shape of it:
 
-### What the reconcile must wire (the honest gap list)
+- **The door.** `join` (role, nickname, avatar, accent, skin tone, buzz sound, team intent, password, host token) or `resume` with this tab's seat token. Curated ids are OMITTED rather than nulled - absence is the protocol's "not chosen", and a skin tone is never guessed. A player's socket opens immediately but says nothing until the pre-game screen's button is pressed; host and display connections announce themselves on open.
+- **State.** `snapshot` replaces game + roster + phase + paused wholesale and carries the room's static facts (`teamsMode`, board material). Each `event` batch folds its narration and takes the state it carries; a `stateVersion` jump of more than one sends `sync`.
+- **Per-phone.** `buzz-won` (folded, plus the room-audio callback with the SERVER-resolved sound), `buzz-rejected` (silent, local, with the penalty deadline), `refused` -> `view.refusal` as a REASON, `room-closed` -> the polite screen, `error` -> the console-side notice.
+- **Reconnect.** A drop that is not a 44xx walks a fixed backoff ladder (0.5s to 15s, last rung repeating) and resumes the SAME seat with the session token, so the phone lands on the screen it left (user-flows A5). A 44xx never reconnects - the room already said no.
+- **Timers.** The DO owns expiries through its alarm book; this store only RENDERS the hints. `expireTimer` is the host's "skip the wait" relay, and it names no kind: a client claiming to know the room's clock would be a client that can forge one.
 
-1. **Socket lifecycle**: open `wss://<origin>/room/<CODE>/ws`, `join`/`resume` with the sessionStorage token, snapshot/event folding with `stateVersion` gap detection -> `sync`.
-2. **Content channel**: the M3 snapshot does NOT carry clue text (the engine never sees it). `RoomView.content` needs a defined source - snapshot extension or a fetched, host-redacted game definition. Until decided, only mock rooms can render prompts.
-3. **Timers**: the ws store only RENDERS `timer-set` hints; expiries come back as server events (DO alarms). `expireTimer` becomes a host-only force-expire relay.
-4. **Pause**: `setPaused` needs a room-level message that is not in the M3 catalog yet.
-5. **Room audio**: `buzz-won` arrives with the server-resolved `buzzSoundId` (team-first). The mock display resolves it client-side with the same rule; delete that resolution when wiring.
-6. **Roster events**: kicked/renamed phones need the polite screens (A5) driven by `room-closed` / roster diffs; the mock never disconnects anyone.
-7. **Identity guardrails**: rename rate limits and the armed-window `identity-locked` error surface as toasts; the mock silently refuses during the armed window.
-8. **Room settings + refusals** (shape landed 2026-08-16, socket still to come): the ws store fills `view.settings` from the `room-settings` message (sent on join and on every host edit) and `view.refusal` from `refused`. The local-sim store already applies the same door rules in the same order - player cap, then the spectator switch, then the team-level reasons that keep the connection - so the surfaces are already written against real behavior.
-9. **Revealing a hidden join code**: streamer mode hides the code on the display, and reveal deliberately does not live there (a button on the streamed screen defeats the setting). The room layer already has both doors - `PATCH /api/rooms/<CODE>` and the host-only `update-room-settings` message - so what remains is the console's room-settings panel, which is the next surface pass; `/dev/rooms` drives the same controls against real rooms today.
+**The fold is shared.** `room-fold.ts` is the one implementation of "what does this event mean for this phone" (buzz verdicts, the judged flash, wager ranges, pending timer hints), used by BOTH stores - so the mock and the wire cannot drift into two answers, and both are tested at the same shape (`room-store.contract.test.ts`, `ws-room-store.test.ts`).
+
+**Tokens** (`src/lib/lobby/join-hand-off.ts`, all sessionStorage, none ever in a URL): the room password rides the `join` message; the player's seat token is minted by the room and resumed per TAB (two tabs are two players, which is why this is not localStorage); the host console reads the creation token the front door stashed. A console opened in a tab that never created the room renders an honest panel saying where the key lives, not a console whose every button would be refused.
+
+### What the reconcile found missing, and what it added
+
+The seam was a field-for-field mapping as designed. The gaps were all on the wire, and all three are now protocol (`packages/protocol/src/room/server-messages.ts`):
+
+1. **`event.game`** - events are NARRATION, not a diff. Replaying the action log regenerates them, but no client holds the log, the setup, or the seeded rng, so nothing let a display or console rebuild `GameState` from a batch. Every batch now carries the state it produced, redacted per role (computed once per role, not once per connection). The alternatives were worse: a `sync` per client per action turns one broadcast into N round trips that each wake the DO, and shipping the action log would hand phones the wager positions redaction exists to hide.
+2. **`snapshot.board`** - the engine carries no category titles and no face values (`GameSetup` is deliberately not part of `GameState`), and `clue-content` answers only for the OPEN clue, so a display had nothing to paint a board with. Public by nature, so unredacted.
+3. **`snapshot.teamsMode`** - a rule-set fact (row 34) a client cannot derive: in a lobby the engine has met nobody, so an empty `teams` record says nothing. Without it a teams room offered no teams at all.
+
+Both snapshot fields ride the snapshot rather than a message of their own, so `sync` restores a client completely.
+
+Three DO fixes went with them (`apps/realtime/src/game-room-do.ts`): `skinToneId` was accepted by the schema and dropped on the floor at join and on `identity-update`; `team-join` and `team-create` answered locked / unknown / at-cap teams with generic errors instead of the team-tier REFUSALS the catalog defines for exactly those cases (`team-locked`, `unknown-team`, `teams-full`), which meant tapping a locked team produced a console notice and no sentence on screen.
+
+### What the reconcile deliberately did NOT change
+
+- **An unjoined connection is told nothing.** The room sends no roster, no settings and no `teamsMode` until you are in it - which is what makes a password room a password room. The consequence is visible: a phone that has not joined yet sees an empty roster and, in a teams room, the individuals-mode note, until the seat lands and the regions fill in. That is the privacy rule working, not a bug, but it is why the pre-game screen's `joinBlock` courtesy check can only speak once you are inside.
+- **No password prompt on the phone.** The front door collects it and hands it over; a phone that arrives at a password room by URL alone gets `password-required` as a refusal with no field to type into. The next surface pass owns that.
+- **Clue text on phones** follows the room's `clueTextOnPhones` setting server-side, so a player-role `content.clueAt()` can legitimately hold an empty prompt where the mock always had one.
 
 ## The avatar diorama (`src/lib/diorama/`)
 
@@ -72,6 +88,8 @@ The display's live 3D layer: one Kenney model per scoring entity, wandering a th
 | `game-over`                                                      | yes     | The winners face the camera and celebrate; everyone else strolls               |
 | Category reveal, board, clue card, wagering, any answering phase | **no**  | -                                                                              |
 | Host console mirror mode (`?mirror`)                             | **no**  | The console passes `environment="none"`; one renderer per room, on the display |
+
+**`environment: "none"` removes the SCENERY, never the seating chart** (corrected 2026-08-17): the staged lobby is information - which boat am I on - so the lobby row above renders its clean-2D layout whatever the environment says, and only the ambient diorama phases obey the setting. It used to be gated one level too early, so a host turning stage motion off in the cog, or a mirrored console declining a second renderer, lost the lobby's whole point. Nothing spins up a renderer that was declined: `staged-lobby.svelte` mounts no canvas for `"none"`.
 
 The clue-bearing phases are excluded by name and a gate test (`motion-guardrails.gate.test.ts`) asserts they never creep into the list. The layer sits at `z-index: 0` in the lower 46% of the screen with the content block padded clear of it, so a wandering avatar never crosses the join QR or the winner's name.
 
