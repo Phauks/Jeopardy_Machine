@@ -34,6 +34,8 @@
     /** Boarding, when the surface offers it (the team screen does; the display does not). */
     onSelectStation?: ((stationId: string) => void) | null;
     selectedStationId?: string | null;
+    /** The host's per-device "hold the stage still" preference (src/lib/host-settings/). */
+    stageStill?: boolean;
   };
   let {
     theme,
@@ -47,6 +49,7 @@
     seed = 1,
     onSelectStation = null,
     selectedStationId = null,
+    stageStill = false,
   }: Props = $props();
 
   // Starts false so SSR and the pre-hydration paint both render the 2D staged view - which is
@@ -77,6 +80,7 @@
         {beat}
         {themeKey}
         {seed}
+        holdStill={stageStill}
         onAvailability={(available) => {
           sceneReady = available;
         }}

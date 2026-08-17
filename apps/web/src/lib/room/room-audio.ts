@@ -25,17 +25,26 @@ export type RoomAudioContextLike = {
   destination: AudioNode | object;
   createBuffer(channels: number, length: number, sampleRate: number): AudioBuffer;
   createBufferSource(): AudioBufferSourceNode;
+  /** Optional so a test context stays two methods; a real AudioContext always has it. */
+  createGain?: () => GainNode;
   resume?: () => Promise<void>;
 };
 
 export type RoomAudioOptions = {
   /** Per-device room-audio toggle default; the display route passes true. */
   enabled?: boolean;
+  /** Master level for this device, 0..1 - the host's cog owns it (src/lib/host-settings/). */
+  volume?: number;
   /** Injected for tests; defaults to a real AudioContext in the browser. */
   context?: RoomAudioContextLike;
 };
 
 const placeholderDurationSeconds = 0.6;
+
+function clampVolume(volume: number): number {
+  if (!Number.isFinite(volume)) return 1;
+  return Math.min(1, Math.max(0, volume));
+}
 
 function stableHash(text: string): number {
   let hash = 0;
@@ -54,10 +63,28 @@ export class RoomAudio {
   private slotBusyUntil = 0;
   /** Sound-check serialization point (the one sanctioned queue). */
   private checkQueueUntil = 0;
+  /** Master level, 0..1. Applied through one gain node every sound is routed via. */
+  private level: number;
+  private gain: GainNode | null = null;
 
   constructor(options: RoomAudioOptions = {}) {
     this.enabled = options.enabled ?? false;
+    this.level = clampVolume(options.volume ?? 1);
     this.injectedContext = options.context;
+  }
+
+  /**
+   * Master volume for this device (the host's cog, src/lib/host-settings/). A separate control
+   * from `enabled` on purpose: "quieter" and "not here" are different answers, and a host
+   * turning a laptop down mid-clue must not have to think about which one they mean.
+   */
+  setVolume(volume: number): void {
+    this.level = clampVolume(volume);
+    if (this.gain !== null) this.gain.gain.value = this.level;
+  }
+
+  get volume(): number {
+    return this.level;
   }
 
   /**
@@ -70,6 +97,15 @@ export class RoomAudio {
       this.injectedContext ?? (typeof AudioContext === "undefined" ? null : new AudioContext());
     if (context === null) return;
     this.context = context;
+    // One gain node between every source and the speakers, made at prime time so the level is
+    // already right for the first buzz. A context without createGain (the injected test one)
+    // simply plays at full level - the exclusive-slot semantics are what those tests assert.
+    const gain = context.createGain?.() ?? null;
+    if (gain !== null) {
+      gain.gain.value = this.level;
+      gain.connect(context.destination as AudioNode);
+      this.gain = gain;
+    }
     void context.resume?.();
     this.primeBuffers(context);
   }
@@ -116,7 +152,7 @@ export class RoomAudio {
     if (buffer === undefined) return 0;
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(context.destination as AudioNode);
+    source.connect(this.gain ?? (context.destination as AudioNode));
     source.start();
     return buffer.duration;
   }
@@ -147,7 +183,7 @@ export class RoomAudio {
     const startAt = Math.max(context.currentTime, this.checkQueueUntil);
     const source = context.createBufferSource();
     source.buffer = buffer;
-    source.connect(context.destination as AudioNode);
+    source.connect(this.gain ?? (context.destination as AudioNode));
     source.start(startAt);
     this.checkQueueUntil = startAt + buffer.duration;
   }

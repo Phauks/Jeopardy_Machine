@@ -16,7 +16,7 @@ import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
-import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
+import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
 import type {
   LastJudgedView,
@@ -282,6 +282,28 @@ export class LocalSimRoomStore implements RoomStore {
   expireTimer(kind?: TimerKind): void {
     const target = kind ?? this.pendingTimers.at(-1)?.kind;
     if (target !== undefined) this.fireTimer(target);
+  }
+
+  /**
+   * The host's room-settings edit, mock-side. Applied with the DO's own two refusals
+   * (packages/protocol/src/room/room-settings.ts): a public room needs a title, and a cap never
+   * drops below the people already in the room - because nobody is ever ejected by a settings
+   * change. `entry` is DERIVED from the password rather than stored twice, exactly as the room
+   * derives it, so a mock room in streamer mode behaves like a real one on every surface.
+   */
+  updateRoomSettings(patch: RoomSettingsPatch): void {
+    const next: RoomSettings = { ...this.roomSettings };
+    if (patch.listing !== undefined) next.listing = patch.listing;
+    if (patch.title !== undefined) next.title = patch.title;
+    if (patch.hostLabel !== undefined) next.hostLabel = patch.hostLabel;
+    if (patch.maxPlayers !== undefined) next.maxPlayers = patch.maxPlayers;
+    if (patch.maxSpectators !== undefined) next.maxSpectators = patch.maxSpectators;
+    if (patch.spectatorsAllowed !== undefined) next.spectatorsAllowed = patch.spectatorsAllowed;
+    if (patch.hideJoinCode !== undefined) next.hideJoinCode = patch.hideJoinCode;
+    if (patch.password !== undefined) next.entry = patch.password === null ? "open" : "password";
+    if (next.listing === "public" && next.title.trim().length === 0) return;
+    if (next.maxPlayers < this.rosterPlayers.length) return;
+    this.roomSettings = next;
   }
 
   setPaused(paused: boolean): void {

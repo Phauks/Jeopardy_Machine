@@ -43,8 +43,31 @@ describe("the display survives a phone", () => {
   it("gives the type scale a width term - the projector scale is height-only", () => {
     const compactScreen = screen.slice(screen.indexOf(compactQuery));
     for (const token of ["--board-category-size", "--board-value-size", "--clue-text-size"]) {
-      const line = new RegExp(`${token}: clamp\\([^)]*vw`);
+      const line = new RegExp(`${token}: calc\\(clamp\\([^)]*vw`);
       expect(compactScreen, token).toMatch(line);
+      // ...and the phone's re-clamped tokens keep the host's per-surface multiplier, or the
+      // display type scale would silently stop working at exactly the breakpoint.
+      expect(compactScreen, token).toContain(`${token}: calc(clamp`);
+    }
+    expect(compactScreen.match(/var\(--type-scale\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3);
+  });
+
+  it("scales every one of its own headline sizes with the surface type scale", () => {
+    // The board tokens live in theme/tokens.css, but this screen sets a dozen font sizes of its
+    // own - the room code, the title, the winner names. A host who turns the display type up
+    // for a big hall must not find that only the board grew.
+    const styles = screen.slice(screen.indexOf("<style>"));
+    const fontSizes = [...styles.matchAll(/font-size: ([^;]+);/g)].map((match) => match[1] ?? "");
+    expect(fontSizes.length).toBeGreaterThan(8);
+    for (const size of fontSizes) {
+      // Either it is a scaled clamp, or it is one of the tokens that is already scaled, or it
+      // is relative to a parent that is (em).
+      const scaled =
+        size.includes("var(--type-scale)") ||
+        size.includes("var(--clue-text-size)") ||
+        size.includes("var(--board-") ||
+        size.endsWith("em");
+      expect(scaled, size).toBe(true);
     }
   });
 

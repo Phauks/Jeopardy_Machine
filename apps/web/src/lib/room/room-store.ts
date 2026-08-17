@@ -11,6 +11,7 @@
 // (create-room-store.ts), never a component change.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomView } from "#lib/room/room-view.ts";
 
 /** What a phone submits from the A2 join screen (mirrors the protocol join message fields). */
@@ -97,6 +98,13 @@ export type RoomStore = {
   tiebreakerNextClue(): void;
   /** Freeze/unfreeze all pending timers; the display shows "one moment" (C4 pause). */
   setPaused(paused: boolean): void;
+  /**
+   * Change the ROOM's own settings - listing, entry/password, caps, spectators, streamer mode
+   * (packages/protocol/src/room/room-settings.ts). Host-only and sparse: send the fields you
+   * mean to change. Server state, broadcast to every connection, and therefore the opposite of
+   * a device preference in every way that matters (src/lib/host-settings/).
+   */
+  updateRoomSettings(patch: RoomSettingsPatch): void;
   /**
    * Fire a pending timer's expiry action now (host force-expire; also how tests and the sim
    * panel advance time). Omitting `kind` fires whichever timer the current phase waits on.
