@@ -2,38 +2,17 @@
 // against the BUILT app under multi-config wrangler dev - deterministic buzz ordering and
 // roster sync through the single origin, plus the owner's /dev/rooms panel flow. Run via
 // `pnpm -F @jeopardy/web test:e2e` (not part of `pnpm test`/CI: needs a local chromium -
-// see chromiumExecutable below - and a free port).
+// see ./chromium.ts - and a free port). The PRODUCT surfaces have their own suite next door
+// (surfaces.e2e.ts); this one drives the wire directly.
 //
 // Sequential awaits in loops are the point here (ordered protocol scripts, per-context
 // assertions against one shared server), so the parallelize-your-awaits rule is off.
 /* oxlint-disable no-await-in-loop */
-import { existsSync } from "node:fs";
-import process from "node:process";
 import { chromium } from "playwright";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { chromiumExecutable, chromiumLaunchArgs } from "./chromium.ts";
 import { e2eOrigin } from "./global-setup.ts";
 import type { Browser, BrowserContext, Page } from "playwright";
-
-// Explicit executable resolution instead of playwright's revision-matched download (the
-// postinstall is deliberately blocked): E2E_CHROMIUM wins, then playwright's own install
-// location if one exists, then the machine-provided /opt/pw-browsers/chromium.
-function chromiumExecutable(): string {
-  const candidates = [
-    process.env["E2E_CHROMIUM"],
-    (() => {
-      try {
-        return chromium.executablePath();
-      } catch {
-        return undefined;
-      }
-    })(),
-    "/opt/pw-browsers/chromium",
-  ];
-  for (const candidate of candidates) {
-    if (candidate !== undefined && candidate !== "" && existsSync(candidate)) return candidate;
-  }
-  throw new Error("no chromium found - set E2E_CHROMIUM to a chromium executable");
-}
 
 type WireMessage = { type: string } & Record<string, unknown>;
 // What joinRoom installs on the page's globalThis for later evaluate/waitForFunction calls.
@@ -46,9 +25,7 @@ const contexts: BrowserContext[] = [];
 beforeAll(async () => {
   browser = await chromium.launch({
     executablePath: chromiumExecutable(),
-    // Sandboxing needs privileges dev containers often lack; this suite renders no
-    // untrusted content, only our own app.
-    args: ["--no-sandbox", "--disable-dev-shm-usage"],
+    args: chromiumLaunchArgs,
   });
 });
 

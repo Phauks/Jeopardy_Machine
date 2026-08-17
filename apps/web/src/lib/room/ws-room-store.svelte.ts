@@ -184,7 +184,10 @@ export class WsRoomStore implements RoomStore {
     this.connectSocket = options.connect ?? browserRoomSocket;
     this.now = options.now ?? Date.now;
     this.reconnectDelaysMs = options.reconnectDelaysMs ?? defaultReconnectDelaysMs;
-    this.sessionToken = options.sessionToken ?? null;
+    // "" is what sessionStorage answers for a tab that has no seat, and it is NOT a token: the
+    // browser-walk found this store politely resuming with an empty string and being told the
+    // frame was malformed, after which the phone's join never went out at all.
+    this.sessionToken = options.sessionToken === "" ? null : (options.sessionToken ?? null);
     if (options.autoConnect !== false) this.connect();
   }
 
@@ -347,6 +350,9 @@ export class WsRoomStore implements RoomStore {
     switch (message.type) {
       case "welcome":
         this.myPlayerIdState = message.playerId;
+        // Host/display/spectator connections are welcomed with a null token - they hold no
+        // seat and re-join by URL - so this must not overwrite a player's token with null on
+        // some other role's welcome, which only ever arrives on its own connection anyway.
         this.sessionToken = message.sessionToken;
         this.options.onSessionToken?.(message.sessionToken);
         this.connectionState = "connected";

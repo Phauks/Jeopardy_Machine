@@ -169,10 +169,6 @@
   // text is a frame-budget bill nobody agreed to pay (guardrail 4). Because the mount is a
   // template branch rather than a hidden element, "not shown" also means "not rendering".
   const dioramaPhases = ["round-break", "final-wagers", "final-writing", "final-reveal", "game-over"];
-  const showDiorama = $derived(
-    environment !== "none" &&
-      (game === null || view.phase === "lobby" || dioramaPhases.includes(game.phase)),
-  );
 
   // THE STAGED LOBBY. Before the game the diorama is not scenery, it is the seating chart:
   // people waiting in the holding area, people aboard their team's station, and a team change
@@ -183,6 +179,17 @@
   // Unlike the diorama, the staged view survives a display with no WebGL: it degrades to the
   // same layout in CSS rather than to nothing, because "which boat am I on" is information.
   const staged = $derived(view.phase === "lobby");
+
+  // ...which is why `environment: "none"` does not remove it. "No 3D stage" - a host turning
+  // stage motion off in the cog, or mirror mode declining a second renderer - means no SCENERY,
+  // and it used to mean no seating chart either: the layer was gated on the environment before
+  // the branch inside it got a say, so the projector lost the one thing the lobby is for. Only
+  // the ambient diorama phases obey it now; staged-lobby.svelte renders its clean-2D layout
+  // and mounts no canvas, so nothing spins up a renderer that was declined.
+  const showDiorama = $derived(
+    (game === null || view.phase === "lobby" || dioramaPhases.includes(game.phase)) &&
+      (environment !== "none" || staged),
+  );
   const stagingTheme = $derived(stagingThemeById(stagingThemeId));
   const roomStaging = $derived(stagingFromRoom(view));
 

@@ -148,6 +148,23 @@ describe("ws room store: the door", () => {
     expect(room.sent[0]).toMatchObject({ type: "resume", sessionToken: "b".repeat(32) });
   });
 
+  it("treats an empty stored token as no seat at all", () => {
+    // "" is what sessionStorage answers for a tab that never joined. Resuming with it earns a
+    // malformed-frame error and - because the store thought it had resumed - the pending join
+    // never went out. Found by the browser walk, held here.
+    const room = harness({ sessionToken: "" });
+    room.store.join({
+      nickname: "Ada",
+      avatarId: null,
+      accentId: null,
+      buzzSoundId: null,
+      skinToneId: null,
+    });
+    room.open();
+    expect(room.sent).toHaveLength(1);
+    expect(room.sent[0]).toMatchObject({ type: "join", nickname: "Ada" });
+  });
+
   it("hands the minted session token out for sessionStorage and takes the seat", () => {
     const tokens: (string | null)[] = [];
     const room = harness({ onSessionToken: (token) => tokens.push(token) });

@@ -1,6 +1,6 @@
-# Play surfaces: routes, the room-store seam, and the M3 reconcile
+# Play surfaces: routes, the room-store seam, and the reconcile
 
-> 2026-08-14 · M4 phase 2. The three play UIs (phone, display, console) as real routes over ONE typed client store, built mock-first: the complete implementation is a local simulation of the room (engine + fixtures), and the WebSocket implementation is a documented stub wired when M3's `GameRoomDO` lands. Spec: docs/design/user-flows.md (A2-A4, C1-C7). Tokens: docs/design/theming.md.
+> 2026-08-14 · M4 phase 2, **reconciled 2026-08-17**. The three play UIs (phone, display, console) as real routes over ONE typed client store, built mock-first and now wired: a real room code opens a WebSocket to its `GameRoomDO`, and the local simulation stays for the demo room and the dev surfaces. Spec: docs/design/user-flows.md (A2-A4, C1-C7). Tokens: docs/design/theming.md.
 
 ## Route map
 
@@ -17,7 +17,15 @@ All three shells apply a theme preset via `themeToStyleAttribute` + `data-effect
 
 **The front door's own building blocks**, for anyone extending it: the screen is `src/lib/landing/front-door.svelte` (presentational - the route owns polling, storage, fetching and navigation), with `rejoin-panel.svelte`, `create-room-panel.svelte` and `src/lib/lobby/room-browser.svelte` as its three regions; `create-room-request.ts` holds the form rules; `src/lib/lobby/room-memory.ts` is this tab's list of rooms it entered and `room-liveness.ts` is how it asks whether one still exists. Entering a room from anywhere should call `rememberRoom()` and, for a room this tab created, `rememberHostToken()` (`src/lib/lobby/join-hand-off.ts`) - that pair is what makes the rejoin offer and the host console's credential work.
 
-**Mock mode (current)**: `createRoomStore` (apps/web/src/lib/room/create-room-store.ts) always returns the local-sim store, so each tab is an ISOLATED simulated room - a phone tab and a display tab do not see each other yet. That is the documented cost of mock-first; the host tab's sim panel makes a full single-tab game playable today. The reconcile flips the factory to the ws store and the tabs converge on the DO.
+**Which store a room gets** (`createRoomStore`, apps/web/src/lib/room/create-room-store.ts) follows the CODE, and the choice is explicit rather than a constant:
+
+| Code                | Store       | Why                                                                                                                                                     |
+| ------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DUMYX` (the demo)  | `local-sim` | The code the surface cards link to. A full 30-player fixture lobby with no server, so every screen is reviewable and the sim panel drives a whole game.  |
+| anything else       | `ws`        | A code from `POST /api/rooms` names a `GameRoomDO`, and the socket is the only way to be in that room.                                                    |
+| `?sim` on any route | `local-sim` | Dev override for reviewing a real room's URL against fixture material. Never in a printed link.                                                          |
+
+Any surface can ask which it got (`store.mode`), and the pre-game screen SAYS so ("Demo room - this tab only", or "Reconnecting..."/"Disconnected" on a real one) - a simulated room looks exactly like a real one, which is the point of the seam and the reason somebody about to share a code deserves to be told.
 
 ## The room-store seam
 
