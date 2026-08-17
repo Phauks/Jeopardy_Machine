@@ -25,7 +25,7 @@
   // play devices"). The breakpoints are on the CONTAINER, so a narrow window on a big screen
   // gets the phone layout rather than a stretched one.
   import CharacterPanel from "#lib/room/character-panel.svelte";
-  import RoomHomeLink from "#lib/room/room-home-link.svelte";
+  import HomeButton from "#lib/chrome/home-button.svelte";
   import RosterPanel from "#lib/room/roster-panel.svelte";
   import TeamsPanel from "#lib/room/teams-panel.svelte";
   import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
@@ -139,7 +139,7 @@
 <div class="pre-game" data-seated={regions.seated} data-teams-mode={regions.teams.shown}>
   <header class="room-bar">
     <p class="room-line">Room <strong>{roomCode}</strong></p>
-    <RoomHomeLink tone="quiet" />
+    <HomeButton variant="inline" />
   </header>
 
   <div class="regions">

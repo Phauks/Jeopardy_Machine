@@ -123,7 +123,7 @@ describe("the regions are ALL present in every pre-game state", () => {
   });
 
   it("offers a way home from the surface", () => {
-    expect(bodyOf(newStore())).toContain("room-home-link");
+    expect(bodyOf(newStore())).toContain("home-button");
   });
 });
 
