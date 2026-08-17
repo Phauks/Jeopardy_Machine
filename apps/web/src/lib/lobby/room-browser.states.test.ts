@@ -3,11 +3,13 @@
 //
 // The states are the point. "Rooms listed", "genuinely nobody hosting", and "the registry
 // cannot answer" were once the same pixel on screen (owner report, 2026-08-14), and that is
-// the failure this screen was rebuilt around - so each one is asserted to say something
-// different, and the code box is asserted to survive all of them.
+// the failure this region was rebuilt around - so each one is asserted to say something
+// different. The browser is now a REGION of the front door rather than the /lobby page
+// (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md); the code box that used
+// to be repeated above it is the front door's own, tested in front-door.states.test.ts.
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
-import LobbyScreen from "#lib/lobby/lobby-screen.svelte";
+import RoomBrowser from "#lib/lobby/room-browser.svelte";
 import RoomCard from "#lib/lobby/room-card.svelte";
 import { formatRoomAge, formatRoomPhase } from "#lib/lobby/room-age.ts";
 import { playerSeats, roomUnavailableReason, spectatorSeats } from "#lib/lobby/room-capacity.ts";
@@ -47,11 +49,10 @@ function listingOf(rooms: RoomSummary[]): LobbyListing {
 
 const noopHandlers = {
   onJoinRoom: () => undefined,
-  onJoinCode: () => undefined,
 };
 
-describe("lobby screen: rooms listed", () => {
-  const { body } = render(LobbyScreen, {
+describe("room browser: rooms listed", () => {
+  const { body } = render(RoomBrowser, {
     props: { listing: listingOf([lobbyRoom, playingRoom]), now: fetchedAt, ...noopHandlers },
   });
 
@@ -82,15 +83,11 @@ describe("lobby screen: rooms listed", () => {
     expect(body).not.toContain("PQZ21");
     expect(body).not.toContain("MJ4TW");
   });
-
-  it("keeps the code box, which is the path that always works", () => {
-    expect(body).toContain("Have a code?");
-  });
 });
 
-describe("lobby screen: the empty and unavailable states differ", () => {
+describe("room browser: the empty and unavailable states differ", () => {
   it("an empty lobby explains that unlisted is the default", () => {
-    const { body } = render(LobbyScreen, {
+    const { body } = render(RoomBrowser, {
       props: { listing: listingOf([]), now: fetchedAt, ...noopHandlers },
     });
     expect(body).toContain("Nobody is hosting publicly right now");
@@ -99,7 +96,7 @@ describe("lobby screen: the empty and unavailable states differ", () => {
   });
 
   it("a broken registry names the reason and the fix, and never says 'no rooms'", () => {
-    const { body } = render(LobbyScreen, {
+    const { body } = render(RoomBrowser, {
       props: {
         listing: {
           rooms: [],
@@ -117,7 +114,7 @@ describe("lobby screen: the empty and unavailable states differ", () => {
   });
 
   it("distinguishes 'not fetched yet' from 'no rooms'", () => {
-    const { body } = render(LobbyScreen, {
+    const { body } = render(RoomBrowser, {
       props: { listing: listingOf([]), loaded: false, now: fetchedAt, ...noopHandlers },
     });
     expect(body).toContain("Looking for rooms");
@@ -125,7 +122,7 @@ describe("lobby screen: the empty and unavailable states differ", () => {
   });
 
   it("a failed fetch is reported without hiding the code box", () => {
-    const { body } = render(LobbyScreen, {
+    const { body } = render(RoomBrowser, {
       props: {
         listing: {
           rooms: [],
@@ -138,7 +135,7 @@ describe("lobby screen: the empty and unavailable states differ", () => {
       },
     });
     expect(body).toContain("lobby responded 500");
-    expect(body).toContain("Have a code?");
+    expect(body).toContain("joined by code");
   });
 });
 

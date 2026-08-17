@@ -9,8 +9,13 @@ function hostStore(seed = "console-states"): LocalSimRoomStore {
   return new LocalSimRoomStore({ roomCode: "TESTA", role: "host", seed });
 }
 
-function markup(store: LocalSimRoomStore, mirror = false, showSimPanel = false): string {
-  return render(HostConsole, { props: { store, mirror, showSimPanel } }).body;
+function markup(
+  store: LocalSimRoomStore,
+  mirror = false,
+  showSimPanel = false,
+  settingsOpen = false,
+): string {
+  return render(HostConsole, { props: { store, mirror, showSimPanel, settingsOpen } }).body;
 }
 
 const fixtureAnswer = "Topsy-Turvy National Park"; // (0,0) of the fixture pack, round 1
@@ -56,14 +61,16 @@ describe("host console states (C4)", () => {
     expect(body).toContain("No penalty");
   });
 
-  it("manual mode: award-to rows for every entity, no buzzers required", () => {
+  it("manual mode: the toggle lives in the cog, and the console says when it is on", () => {
     const store = hostStore();
     store.startGame();
     store.selectCell(0, 0);
-    // Manual mode is a component toggle; SSR cannot click it, so assert the toggle exists
-    // and the award path works store-side (covered by the contract suite).
-    const body = markup(store);
-    expect(body).toContain("Manual mode");
+    // Manual mode became a DEVICE PREFERENCE at the 2026-08-16 host-settings pass - it belongs
+    // to this laptop, not to the room, and it survives a mid-game reload. SSR cannot click it,
+    // so assert it is reachable in the panel; the award path itself is in the contract suite.
+    expect(markup(store, false, false, true)).toContain("Manual mode");
+    // ...and the header carries no flag while it is off, which is the honest default state.
+    expect(markup(store)).not.toContain("mode-flag");
   });
 
   it("wager wizard: range shown, host can type the wager on the player's behalf", () => {
@@ -113,13 +120,14 @@ describe("host console states (C4)", () => {
     expect(markup(store)).toContain("Game over");
   });
 
-  it("score override drawer control and pause toggle are always in the header", () => {
+  it("score override drawer control, pause, undo and the cog are always in the header", () => {
     const store = hostStore();
     store.startGame();
     const body = markup(store);
     expect(body).toContain("Override");
     expect(body).toContain("Pause");
     expect(body).toContain("Undo");
+    expect(body).toContain('aria-label="Settings"');
   });
 });
 

@@ -7,6 +7,7 @@
   import AvatarChip from "#lib/avatars/avatar-chip.svelte";
   import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import { buzzSoundLabel } from "#lib/room/buzz-sound-catalog.ts";
+  import { limits } from "@jeopardy/protocol/limits";
   import type { RoomPlayerView, RoomTeamView } from "#lib/room/room-view.ts";
 
   type Props = {
@@ -16,8 +17,23 @@
     viewerPlayerId?: string | null;
     /** True when the viewer holds admin power over this team (its leader, or the host). */
     viewerIsAdmin?: boolean;
+    /**
+     * True when the viewer is already on SOME team. Changes the join button from "join" to
+     * "move here", which is the same store call either way (room-store.ts joinTeam) but a
+     * different promise to the player: they are leaving one station for another, and the room
+     * watches them cross.
+     */
+    viewerHasTeam?: boolean;
     /** Join-screen mode: the whole card is a tap target. */
     onJoin?: ((teamId: string) => void) | null;
+    /**
+     * Leader rename, in place on the card. Administrative, so it lives behind the team's "..."
+     * with lock - the owner's rule - and opens an inline field rather than a dialog, because a
+     * dialog would be exactly the disappearing surface the 2026-08-16 law forbids.
+     */
+    onRename?: ((name: string) => void) | null;
+    /** Step off this team back to the holding area. Offered only to its own members. */
+    onLeave?: (() => void) | null;
     onKick?: ((playerId: string) => void) | null;
     onHandOff?: ((playerId: string) => void) | null;
     /**
@@ -34,7 +50,10 @@
     members,
     viewerPlayerId = null,
     viewerIsAdmin = false,
+    viewerHasTeam = false,
     onJoin = null,
+    onRename = null,
+    onLeave = null,
     onKick = null,
     onHandOff = null,
     onToggleLock = null,
@@ -43,6 +62,25 @@
 
   let openMenuFor = $state<string | null>(null);
   let teamMenuOpen = $state(false);
+  let renaming = $state(false);
+  let nameDraft = $state("");
+
+  const viewerIsMember = $derived(
+    viewerPlayerId !== null && members.some((member) => member.playerId === viewerPlayerId),
+  );
+  /** Any team-level overflow item present at all - otherwise the "..." should not exist. */
+  const hasTeamMenu = $derived(
+    (viewerIsAdmin && (onToggleLock !== null || onRename !== null)) ||
+      (viewerIsMember && onLeave !== null),
+  );
+
+  function commitRename(): void {
+    const trimmed = nameDraft.trim();
+    renaming = false;
+    if (trimmed.length >= limits.team.teamNameMinLength && trimmed !== team.name) {
+      onRename?.(trimmed);
+    }
+  }
 
   const teamHex = $derived(
     avatarManifest.accents.find((entry) => entry.id === team.colorId)?.hex ??
@@ -63,12 +101,30 @@
 
 <article class="team-card" style="--team-color: {teamHex}" data-team-id={team.teamId}>
   <header class="team-header">
-    <h3 class="team-name">{team.name}</h3>
+    {#if renaming}
+      <!-- In place, on the card, keeping the card's position and everything else on the
+           screen. The heading is replaced by its own editor rather than the card being
+           replaced by a form. -->
+      <input
+        class="rename-field"
+        type="text"
+        aria-label="Team name"
+        maxlength={limits.team.teamNameMaxLength}
+        bind:value={nameDraft}
+        onblur={commitRename}
+        onkeydown={(event) => {
+          if (event.key === "Enter") commitRename();
+          if (event.key === "Escape") renaming = false;
+        }}
+      />
+    {:else}
+      <h3 class="team-name">{team.name}</h3>
+    {/if}
     <span class="team-sound" title="Team buzz sound">{buzzSoundLabel(team.buzzSoundId)}</span>
     {#if team.locked}
       <span class="locked-badge" title="Team locked - no new joiners">locked</span>
     {/if}
-    {#if viewerIsAdmin && onToggleLock !== null}
+    {#if hasTeamMenu}
       <div class="overflow">
         <button
           type="button"
@@ -84,16 +140,44 @@
         </button>
         {#if teamMenuOpen}
           <div class="overflow-menu" role="menu">
-            <button
-              type="button"
-              role="menuitem"
-              onclick={() => {
-                teamMenuOpen = false;
-                onToggleLock(!team.locked);
-              }}
-            >
-              {team.locked ? "Unlock team" : "Lock team"}
-            </button>
+            {#if viewerIsAdmin && onRename !== null}
+              <button
+                type="button"
+                role="menuitem"
+                onclick={() => {
+                  teamMenuOpen = false;
+                  nameDraft = team.name;
+                  renaming = true;
+                }}
+              >
+                Rename team
+              </button>
+            {/if}
+            {#if viewerIsAdmin && onToggleLock !== null}
+              <button
+                type="button"
+                role="menuitem"
+                onclick={() => {
+                  teamMenuOpen = false;
+                  onToggleLock(!team.locked);
+                }}
+              >
+                {team.locked ? "Unlock team" : "Lock team"}
+              </button>
+            {/if}
+            {#if viewerIsMember && onLeave !== null}
+              <button
+                type="button"
+                role="menuitem"
+                class="destructive"
+                onclick={() => {
+                  teamMenuOpen = false;
+                  onLeave();
+                }}
+              >
+                Leave this team
+              </button>
+            {/if}
           </div>
         {/if}
       </div>
@@ -177,7 +261,7 @@
     {/if}
   </ul>
 
-  {#if onJoin !== null}
+  {#if onJoin !== null && !viewerIsMember}
     <button
       type="button"
       class="join-button"
@@ -186,8 +270,13 @@
         onJoin(team.teamId);
       }}
     >
-      {team.locked ? "Locked" : "Join this team"}
+      {team.locked ? "Locked" : viewerHasTeam ? "Move here" : "Join this team"}
     </button>
+  {:else if viewerIsMember}
+    <!-- Your own team keeps the button's SPACE rather than collapsing the card a row shorter
+         when you board it: the cards sit in a grid and reflowing one of them nudges the rest
+         (the reserve-the-space corollary of the 2026-08-16 law). -->
+    <p class="your-team">You are on this team</p>
   {/if}
 </article>
 
@@ -373,8 +462,38 @@
     cursor: default;
   }
 
+  /* Matches the join button's box exactly (same padding, same border width in transparent) so
+     boarding a team does not change the card's height. */
+  .your-team {
+    margin: 0;
+    padding: 0.5rem;
+    border: 1px solid transparent;
+    text-align: center;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.78rem;
+    color: var(--team-color);
+  }
+
+  .rename-field {
+    flex: 1;
+    min-width: 0;
+    font: inherit;
+    font-family: var(--font-chrome);
+    font-size: 1.05rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0.1rem 0.35rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--board-radius);
+    background: var(--surface-page);
+    color: var(--surface-text);
+  }
+
   .join-button:focus-visible,
   .overflow-trigger:focus-visible,
+  .rename-field:focus-visible,
   .self-edit:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;

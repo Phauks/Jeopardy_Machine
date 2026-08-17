@@ -11,12 +11,13 @@
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
+import { limits } from "@jeopardy/protocol/limits";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
-import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
+import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
 import type {
   LastJudgedView,
@@ -72,6 +73,43 @@ function expiryActionFor(kind: TimerKind, at: number): GameAction {
       return { type: "final-writing-timeout", at };
     case "round-time-limit":
       return { type: "round-timeout", at };
+  }
+}
+
+/**
+ * Which timer a phase can legitimately be waiting on. Exhaustive by construction, so a new
+ * engine phase has to declare what it waits for rather than inheriting somebody else's clock.
+ * `round-time-limit` rides alongside the per-clue windows because it spans the whole round.
+ */
+function timerKindsFor(phase: GameState["phase"]): TimerKind[] {
+  const round: TimerKind[] = ["round-time-limit"];
+  switch (phase) {
+    case "awaiting-selection":
+      return [...round, "selection-shot-clock"];
+    case "reading":
+    case "tiebreaker-reading":
+      return [...round, "auto-arm"];
+    case "armed":
+    case "tiebreaker-armed":
+      return [...round, "buzz-window"];
+    case "answering":
+    case "tiebreaker-answering":
+    case "wager-answering":
+      return [...round, "answer-window"];
+    case "wagering":
+      return [...round, "wager-entry"];
+    case "all-answering":
+      return [...round, "everyone-answers-window"];
+    case "final-wagers":
+      return ["final-wager"];
+    case "final-writing":
+      return ["final-writing"];
+    case "all-judging":
+    case "final-reveal":
+    case "round-break":
+    case "game-over":
+    case "lobby":
+      return [];
   }
 }
 
@@ -155,8 +193,33 @@ export class LocalSimRoomStore implements RoomStore {
     const result = transition(state, action, this.setup);
     this.engineState = result.state;
     for (const event of result.events) this.applyEvent(event, action.at);
+    this.prunePendingTimers(result.state.phase);
     for (const event of result.events) this.onEvent?.(event);
     if (result.state.phase === "game-over") this.roomPhase = "ended";
+  }
+
+  /**
+   * Drop timer hints the new phase cannot be waiting on.
+   *
+   * The engine emits `timer-set` when a window OPENS and says nothing when one stops mattering
+   * - it does not have to, because the DO that owns the alarms cancels them on the phase change.
+   * This store was keeping them all, so `pendingTimers` accumulated: an answer window still
+   * "pending" through the rebound after a wrong answer, a wager-entry window still pending while
+   * the wagerer was already answering. Nothing rendered them, so nothing noticed - until the
+   * console grew a countdown at the 2026-08-16 host pass and started showing the host the wrong
+   * clock. One place, keyed on the phase, so a new phase has to say what it waits for.
+   */
+  private prunePendingTimers(phase: GameState["phase"]): void {
+    const allowed = timerKindsFor(phase);
+    const kept = this.pendingTimers.filter((timer) => allowed.includes(timer.kind));
+    if (kept.length === this.pendingTimers.length) return;
+    for (const timer of this.pendingTimers) {
+      if (allowed.includes(timer.kind)) continue;
+      const handle = this.timerHandles.get(timer.kind);
+      if (handle !== undefined) clearTimeout(handle);
+      this.timerHandles.delete(timer.kind);
+    }
+    this.pendingTimers = kept;
   }
 
   private applyEvent(event: GameEvent, at: number): void {
@@ -284,6 +347,28 @@ export class LocalSimRoomStore implements RoomStore {
     if (target !== undefined) this.fireTimer(target);
   }
 
+  /**
+   * The host's room-settings edit, mock-side. Applied with the DO's own two refusals
+   * (packages/protocol/src/room/room-settings.ts): a public room needs a title, and a cap never
+   * drops below the people already in the room - because nobody is ever ejected by a settings
+   * change. `entry` is DERIVED from the password rather than stored twice, exactly as the room
+   * derives it, so a mock room in streamer mode behaves like a real one on every surface.
+   */
+  updateRoomSettings(patch: RoomSettingsPatch): void {
+    const next: RoomSettings = { ...this.roomSettings };
+    if (patch.listing !== undefined) next.listing = patch.listing;
+    if (patch.title !== undefined) next.title = patch.title;
+    if (patch.hostLabel !== undefined) next.hostLabel = patch.hostLabel;
+    if (patch.maxPlayers !== undefined) next.maxPlayers = patch.maxPlayers;
+    if (patch.maxSpectators !== undefined) next.maxSpectators = patch.maxSpectators;
+    if (patch.spectatorsAllowed !== undefined) next.spectatorsAllowed = patch.spectatorsAllowed;
+    if (patch.hideJoinCode !== undefined) next.hideJoinCode = patch.hideJoinCode;
+    if (patch.password !== undefined) next.entry = patch.password === null ? "open" : "password";
+    if (next.listing === "public" && next.title.trim().length === 0) return;
+    if (next.maxPlayers < this.rosterPlayers.length) return;
+    this.roomSettings = next;
+  }
+
   setPaused(paused: boolean): void {
     if (paused === this.pausedState) return;
     this.pausedState = paused;
@@ -379,6 +464,7 @@ export class LocalSimRoomStore implements RoomStore {
         avatarId: request.avatarId,
         accentId: request.accentId,
         buzzSoundId: request.buzzSoundId,
+        skinToneId: request.skinToneId,
         teamId,
         connected: true,
         joinedAt: Date.now(),
@@ -424,6 +510,7 @@ export class LocalSimRoomStore implements RoomStore {
             avatarId: patch.avatarId !== undefined ? patch.avatarId : player.avatarId,
             accentId: patch.accentId !== undefined ? patch.accentId : player.accentId,
             buzzSoundId: patch.buzzSoundId !== undefined ? patch.buzzSoundId : player.buzzSoundId,
+            skinToneId: patch.skinToneId !== undefined ? patch.skinToneId : player.skinToneId,
           }
         : player,
     );
@@ -431,6 +518,11 @@ export class LocalSimRoomStore implements RoomStore {
 
   createTeam(name: string): void {
     if (this.myPlayerId === null) return;
+    // The cap is refused HERE, not only in the form that offers the button: the pre-game
+    // screen is live, so the last slot can be taken by someone else between the render that
+    // enabled the control and the tap. Refusing in the store is what makes that a notice on a
+    // working screen instead of a 21st team appearing locally and vanishing on reconcile.
+    if (this.rosterTeams.length >= limits.team.teamMaxCount) return this.refuse("teams-full");
     const myPlayerId = this.myPlayerId;
     const teamId = `team-local-${String(Date.now() % 1_000_000)}`;
     this.rosterTeams = [
@@ -446,7 +538,16 @@ export class LocalSimRoomStore implements RoomStore {
     if (team === undefined) return this.refuse("unknown-team");
     if (team.locked) return this.refuse("team-locked");
     this.refusalState = null;
+    // The same call whether you have a team or not - assignTeam REPLACES teamId, so joining
+    // from another team is a move, not an error. That is what makes "change your mind" work on
+    // the pre-game screen without a leave-then-join dance the room could be interrupted during.
     this.assignTeam(this.myPlayerId, teamId);
+  }
+
+  leaveTeam(): void {
+    if (this.myPlayerId === null) return;
+    this.refusalState = null;
+    this.assignTeam(this.myPlayerId, null);
   }
 
   private assignTeam(playerId: string, teamId: string | null): void {
@@ -583,7 +684,12 @@ export class LocalSimRoomStore implements RoomStore {
     // rearranges teams freely because the engine has not met anyone yet).
     for (const player of this.rosterPlayers) this.dispatchJoinFor(player.playerId);
     this.dispatch({ type: "start-game", at: Date.now() });
-    this.roomPhase = "active";
+    // Only when the ENGINE actually started. Found by the 2026-08-16 host-loop walk: pressing
+    // Start in an empty room left the engine in `lobby` (it has nobody to seat) while the ROOM
+    // went active anyway - which took the projector off the staged lobby and onto a board that
+    // could not be played, with nothing on either screen saying why. The room's phase now
+    // follows the engine's, and the console refuses the button instead.
+    if (this.engineState.phase !== "lobby") this.roomPhase = "active";
   }
 
   selectCell(category: number, row: number): void {

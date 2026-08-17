@@ -33,6 +33,8 @@
  *                             document fields, so chrome restyles itself from any valid theme
  *                             and the M7 customizer has nothing extra to expose.
  * --board-gutter, --board-radius, type-scale tokens: app layout constants, not themeable.
+ * --type-scale: NOT a document field either - a per-device, per-surface host preference
+ *               (src/lib/host-settings/), multiplying the type tokens below.
  * body.soundSet: audio, no CSS mapping. Divergences beyond these notes are bugs.
  * ============================================================================================ */
 
@@ -80,12 +82,20 @@
   --board-gutter: clamp(3px, 0.8vw, 10px);
   --board-radius: 2px;
 
+  /* --- PER-SURFACE TYPE SCALE. A host's own multiplier over the type below, scoped to one
+   * surface: the projector is read from across a room and the console at arm's length, so the
+   * two are set independently and neither knows about the other (owner, 2026-08-16 - the host
+   * settings cog). It is a DEVICE preference, stored in localStorage and applied as an inline
+   * custom property by the surface that opted in (src/lib/host-settings/device-preferences.ts,
+   * `typeScaleStyle`); it is never room state and never travels. 1 = as designed. */
+  --type-scale: 1;
+
   /* --- Board type scale: clamp() against viewport so one component serves a 720p projector
    * and a 4K TV (research section 3 distance-legibility rules: values >= ~8% of screen
    * height, clue text >= ~5vh). */
-  --board-category-size: clamp(0.8rem, 2.4vh, 2rem);
-  --board-value-size: clamp(1.7rem, 8vh, 6.5rem);
-  --clue-text-size: clamp(1.3rem, 5vh, 4rem);
+  --board-category-size: calc(clamp(0.8rem, 2.4vh, 2rem) * var(--type-scale));
+  --board-value-size: calc(clamp(1.7rem, 8vh, 6.5rem) * var(--type-scale));
+  --clue-text-size: calc(clamp(1.3rem, 5vh, 4rem) * var(--type-scale));
 
   /* --- Effects tokens: FLAT defaults. The effects level is a token-driven switch - the
    * [data-effects] blocks below re-derive these from the active theme's color tokens, so

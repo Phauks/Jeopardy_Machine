@@ -1,21 +1,39 @@
 <script lang="ts">
-  // The site root. The SCREEN lives in #lib/landing/landing-screen.svelte (so it can be
-  // server-rendered in a test like every other surface); this route owns the two things a
-  // component should not: polling the lobby endpoint, and navigating.
+  // The site root, and now the ONLY front door: joining, browsing and creating are one screen
+  // (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md, "Landing and lobby").
+  // /lobby was folded back in here and deleted outright - no redirect, per the no-legacy
+  // directive (docs/research/00-user-directives.md).
   //
-  // OWNER RULE, still in force: every new meaningful surface gets a card in the list below, in
-  // the same PR that ships it. The list moved into a closed drawer on 2026-08-15 when the real
-  // front door was built - demoted, not deleted. (The creator Library, user-flows B1, is what
-  // eventually replaces it.)
+  // The SCREEN lives in #lib/landing/front-door.svelte so it server-renders in a test like
+  // every other surface; this route owns the four things a component should not: polling the
+  // listing, reading this browser's room memory, creating rooms, and navigating.
   import BuildBadge from "#lib/dev/build-badge.svelte";
-  import LandingScreen from "#lib/landing/landing-screen.svelte";
-  import { joinUrlForRoom, rememberRoomPassword } from "#lib/lobby/join-hand-off.ts";
+  import FrontDoor from "#lib/landing/front-door.svelte";
+  import {
+    hostUrlForRoom,
+    joinUrlForRoom,
+    rememberHostToken,
+    rememberRoomPassword,
+  } from "#lib/lobby/join-hand-off.ts";
+  import {
+    blankCreateForm,
+    createRoomBody,
+    describeCreateFailure,
+    handOffAfterCreate,
+  } from "#lib/landing/create-room-request.ts";
+  import { devSurfaces } from "#lib/landing/surface-cards.ts";
   import { limits } from "@jeopardy/protocol/limits";
+  import { probeRoomLiveness } from "#lib/lobby/room-liveness.ts";
+  import { readRememberedRooms, forgetRoom, rememberRoom } from "#lib/lobby/room-memory.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
   import { themeToStyleAttribute } from "#lib/theme/theme-to-css.ts";
   import { page } from "$app/state";
-  import type { LobbyListing } from "@jeopardy/protocol/room/registry";
-  import type { SurfaceCard } from "#lib/landing/landing-screen.svelte";
+  import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
+  import type { CreateState } from "#lib/landing/create-room-panel.svelte";
+  import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
+  import type { RejoinCandidate } from "#lib/landing/rejoin-panel.svelte";
+
+  // ---- the public listing --------------------------------------------------------------
 
   // The registry starts "unavailable/error" rather than "ok": until the first fetch answers,
   // an empty list has no verdict behind it, and claiming one would be the old bug in reverse.
@@ -25,18 +43,22 @@
     registry: { status: "unavailable", reason: "error", detail: "not fetched yet" },
   });
   let listingError = $state<string | null>(null);
+  let listingLoaded = $state(false);
+  let now = $state(Date.now());
 
   async function refreshListing(): Promise<void> {
     try {
       const response = await fetch("/api/rooms");
-      if (!response.ok) throw new Error(`lobby responded ${String(response.status)}`);
+      if (!response.ok) throw new Error(`listing responded ${String(response.status)}`);
       listing = (await response.json()) as LobbyListing;
       listingError = null;
     } catch (error) {
-      // A lobby that cannot load is a non-event: the code box still works, which is the
-      // path that matters (guiding principle 3).
+      // A list that cannot load is a non-event: the code box still works, which is the path
+      // that matters (guiding principle 3).
       listingError = error instanceof Error ? error.message : String(error);
     }
+    listingLoaded = true;
+    now = Date.now();
   }
 
   $effect(() => {
@@ -45,7 +67,94 @@
     return () => clearInterval(timer);
   });
 
-  function enterRoom(code: string, password: string): void {
+  // ---- rejoin memory ---------------------------------------------------------------------
+
+  let rejoins = $state<RejoinCandidate[]>([]);
+
+  $effect(() => {
+    // Read synchronously on mount so the offer is drawn in the first client frame rather than
+    // appearing under someone's thumb a moment later; the liveness verdict then changes the
+    // card IN PLACE (the standing layout law). sessionStorage only - no account, no server.
+    const remembered = readRememberedRooms();
+    rejoins = remembered.map((room) => ({ ...room, verdict: "unknown" as const }));
+    void Promise.all(
+      remembered.map(async (room) => {
+        const verdict = await probeRoomLiveness(room.code);
+        if (verdict === "gone") {
+          // A room that has genuinely ended cleans itself up without a word - an offer to
+          // rejoin a finished game is worse than no offer at all.
+          forgetRoom(room.code);
+          rejoins = rejoins.filter((candidate) => candidate.code !== room.code);
+          return;
+        }
+        // Updated IN PLACE (the layout law, applied to the data too): the card keeps its
+        // identity and its position, and only its own state changes.
+        const candidate = rejoins.find((entry) => entry.code === room.code);
+        if (candidate !== undefined) candidate.verdict = verdict;
+      }),
+    );
+  });
+
+  // ---- creating a room -------------------------------------------------------------------
+
+  const createForm = $state(blankCreateForm());
+  let createState = $state<CreateState>({ status: "idle" });
+
+  async function createRoom(): Promise<void> {
+    createState = { status: "creating" };
+    try {
+      // Dynamic: the sample game drags the content schema and the engine's setup path behind
+      // it, and the front door must not carry that weight for the visitors who only came to
+      // type a code. It is fetched at the moment of the tap and never before.
+      const { sampleGameDefinition } = await import("#lib/hotseat/sample-game.ts");
+      const response = await fetch("/api/rooms", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          createRoomBody(createForm, { kind: "definition", body: sampleGameDefinition.body }),
+        ),
+      });
+      if (!response.ok) {
+        const refusal = (await response.json().catch(() => null)) as { error?: string } | null;
+        createState = {
+          status: "failed",
+          message: describeCreateFailure(response.status, refusal?.error ?? null),
+        };
+        return;
+      }
+      const created = (await response.json()) as CreateRoomResponse;
+      // The creation token rides sessionStorage to the console, never the URL (join-hand-off.ts
+      // documents why), and this tab remembers the room so the front door can offer it back.
+      rememberHostToken(created.code, created.hostToken);
+      rememberRoomPassword(created.code, createForm.password);
+      rememberRoom({
+        code: created.code,
+        title: created.settings.title,
+        role: "host",
+        at: Date.now(),
+      });
+      const decision = handOffAfterCreate(created);
+      if (decision.handOff) {
+        globalThis.location.assign(hostUrlForRoom(created.code));
+        return;
+      }
+      createState = {
+        status: "held",
+        code: created.code,
+        warning: decision.warning ?? "",
+        registry: created.registry,
+      };
+    } catch (error) {
+      createState = {
+        status: "failed",
+        message: `Creating the room failed: ${error instanceof Error ? error.message : String(error)}`,
+      };
+    }
+  }
+
+  // ---- going somewhere -------------------------------------------------------------------
+
+  function enterRoom(code: string, password: string, title: string): void {
     let destination: string;
     try {
       destination = joinUrlForRoom(code);
@@ -54,7 +163,13 @@
       return;
     }
     rememberRoomPassword(code, password);
+    rememberRoom({ code, title, role: "player", at: Date.now() });
     globalThis.location.assign(destination);
+  }
+
+  /** A typed code may name a room that is on screen: borrow its title for the memory entry. */
+  function titleForCode(code: string): string {
+    return listing.rooms.find((room) => room.code === code.toUpperCase())?.title ?? "";
   }
 
   // Same dev affordance the play surfaces carry: ?theme=<preset-id> previews any preset, so
@@ -63,59 +178,6 @@
     themePresets.find((preset) => preset.id === page.url.searchParams.get("theme")) ??
       retroTvPreset,
   );
-
-  const surfaces: SurfaceCard[] = [
-    {
-      href: "/lobby",
-      title: "Public rooms",
-      note: "The room browser: title and host label, players and spectators against caps, lock icon, phase badge, age - with the password prompt inline on a locked room.",
-    },
-    {
-      href: "/dev/hotseat",
-      title: "Hotseat game",
-      note: "Play a full two-round game + final, keyboard-driven, no server (M2 engine). S starts, A arms, 1-8 buzz, C/W/N judge, U undo.",
-    },
-    {
-      href: "/dev/theme",
-      title: "Theme gallery",
-      note: "Four presets on the live token contract - board, type, swatches, emblems, effects toggle (M4 phase 1).",
-    },
-    {
-      href: "/dev/rooms",
-      title: "Room instrument panel",
-      note: "Three-column room console: create/delete rooms and see every one this tab made, connect and join through the single origin with a live DO inspector, watch the auto-refreshing public lobby with the registry's health stated out loud, and run the refusal probes in the test area.",
-    },
-    {
-      href: "/dev/diorama",
-      title: "Avatar diorama",
-      note: "The live 3D scene with fake players: free-wander mode and the staged lobby (boats and campfires), switch themes, fire a buzz beat, flip to the winner scene - without hosting a game.",
-    },
-    {
-      href: "/api/rooms",
-      title: "/api/rooms",
-      note: "The public lobby listing as JSON: live public rooms, newest first, capped and briefly cached.",
-    },
-    {
-      href: "/room/DUMYX",
-      title: "Player room",
-      note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (M4 mock room; ?theme=modern-flat previews presets).",
-    },
-    {
-      href: "/room/DUMYX/display",
-      title: "Display screen",
-      note: "Projector board: title screen + QR, category reveal, clue card, winner screen - with the staged 3D lobby on lobby and winner phases. Works on a phone too.",
-    },
-    {
-      href: "/room/DUMYX/host",
-      title: "Host console",
-      note: "C4 console incl. mirror mode (?mirror) and the dev sim panel driving fake players.",
-    },
-    {
-      href: "/api/version",
-      title: "/api/version",
-      note: "Deployment identity as JSON: commit, build time, wire protocol version.",
-    },
-  ];
 </script>
 
 <svelte:head>
@@ -124,7 +186,33 @@
 </svelte:head>
 
 <div class="root-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <LandingScreen {listing} {listingError} {surfaces} onJoin={enterRoom} />
+  <FrontDoor
+    initialCode={page.url.searchParams.get("code") ?? ""}
+    {listing}
+    {listingError}
+    {listingLoaded}
+    {now}
+    {rejoins}
+    {createForm}
+    {createState}
+    surfaces={devSurfaces}
+    onJoin={(code, password) => {
+      enterRoom(code, password, titleForCode(code));
+    }}
+    onJoinRoom={(room: RoomSummary, password: string) => {
+      enterRoom(room.code, password, room.title);
+    }}
+    onRejoin={(room) => {
+      globalThis.location.assign(
+        room.role === "host" ? hostUrlForRoom(room.code) : joinUrlForRoom(room.code),
+      );
+    }}
+    onCreate={() => void createRoom()}
+    onContinueCreate={(code) => {
+      globalThis.location.assign(hostUrlForRoom(code));
+    }}
+    onRefreshListing={() => void refreshListing()}
+  />
 </div>
 
 <BuildBadge />

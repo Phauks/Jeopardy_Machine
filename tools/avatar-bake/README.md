@@ -14,9 +14,14 @@ This package is tooling, not shipped code: plain Node scripts driving three.js i
 ## Re-baking
 
 ```sh
-pnpm -F @jeopardy/avatar-bake download   # fetch + sha256-verify + unzip both packs (gitignored)
-pnpm -F @jeopardy/avatar-bake bake       # sprites + sheets + models + both manifests
+pnpm -F @jeopardy/avatar-bake download       # fetch + sha256-verify + unzip both packs (gitignored)
+pnpm -F @jeopardy/avatar-bake bake           # sprites + sheets + models + both manifests
+pnpm -F @jeopardy/avatar-bake sync-manifest  # manifest-only, no packs and no browser needed
 ```
+
+`sync-manifest` exists for the narrow case where a change touches only the parts of the manifest that are pure roster data - the accent palette, the skin-tone palette, each avatar's `recolorTargets` and `tolerance`. Those depend on no rendered pixel, so copying them forward cannot invalidate a committed sprite, and doing it with a script keeps the manifest generated-from-source rather than typed by hand. It refuses to invent structure: the roster and the manifest must already agree on which avatars exist.
+
+**It cannot tell whether a recolor target actually CHANGED**, only that it differs from the committed manifest. If you edited a target rather than merely surfacing it, the sprites baked from the old one are stale and you need the full `bake`.
 
 `bake` needs a Chromium: it uses playwright's managed browser (`npx playwright install chromium` once), or set `AVATAR_BAKE_BROWSER=/path/to/chromium` to use a system one (sandboxes: `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`). Rendering is software-GL (swiftshader), no GPU needed. `download` needs `unzip` on PATH. A full run is about 30 seconds.
 
@@ -74,7 +79,15 @@ For each avatar, the walk clip is rendered as a **horizontal filmstrip**: `SHEET
   | Per-accent, 10 frames @ 128px, q0.82     | 216   | 4648 KB                                                        |
   | Per-accent, 8 frames @ 112px, q0.72      | 216   | ~2370 KB, and visibly soft at the 120px the join preview shows |
 
-  Per-accent only fits a sane budget by degrading the one surface whose entire job is looking good. The accent is carried by the backing chip instead - the same split the 24px chip has always used. The visible consequence, worth knowing before someone files it as a bug: on the join screen the natural-colored preview sits above an accent-tinted picker grid, so the same avatar appears in two colors at once. Flipping the choice is one constant in `bake.mjs` plus a re-bake.
+  Per-accent only fits a sane budget by degrading the one surface whose entire job is looking good. **Amended 2026-08-16.** The paragraph that used to close this section said the accent would be carried by the backing chip instead, and called the resulting two-colours-at-once preview a known consequence rather than a bug. The owner filed it as a bug, and was right: the preview is the largest thing on the character screen, so tapping a colour visibly repainted the backdrop and left the character alone (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md).
+
+  The resolution costs no bytes and does not disturb this table. There was a third option neither row considered - recolor the accent-neutral sheet **in the browser**, with this tool's own `palette-recolor` over this tool's own committed targets (`apps/web/src/lib/avatars/sheet-recolor.ts`). One canvas pass per distinct (avatar, accent, tone), cached for the page. The per-accent stills carry the first paint, so the accent is correct before any script runs, and the recoloured filmstrip replaces the still when it resolves. That is why manifest v3 carries `recolorTargets` and `tolerance` on the sprite manifest as well as the model one: the phone needs them and the model manifest is deliberately kept out of every phone's bundle.
+
+### Skin tones
+
+The Mini Characters carry a curated tone axis alongside the accent (`src/skin-tone-palette.mjs`, which documents the naming and neutrality rules the owner set). It is **runtime-only, and deliberately not baked**: the accent axis already multiplies 27 avatars by 8, and adding a 6-entry tone axis on top would mean 27 x 8 x 7 = 1512 stills against a 2 MB budget that 216 of them fill to 931 KB - roughly 6.5 MB, three times the whole sprite budget, for a feature the surfaces that matter can get for free from the recolor already running there. Tone therefore rides the same browser-side pass as the accent, on the character preview and the diorama models.
+
+The measured cost of the whole change is the manifest growing **14,406 -> 17,544 bytes** (+3,138 raw JSON, before compression) for the tone palette, the shared skin cells, and every avatar's recolor targets.
 
 ### Model shipping and the GLB repack
 

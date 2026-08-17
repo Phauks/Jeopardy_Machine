@@ -17,30 +17,38 @@ function source(relativePath: string): string {
 describe("guardrail 1: motion never reaches the buzzer's critical path", () => {
   // "Never on the buzzer's critical path. The phone's buzz screen stays 2D and instant;
   //  animation lives on the join/lobby screens only."
-  // join-screen.svelte was split in two on 2026-08-15 (character + team); the animated sheet
-  // followed the identity half, which is the half it was ever about.
-  const allowed = ["room/character-screen.svelte", "room/lobby-screen.svelte"];
+  // join-screen.svelte was split in two on 2026-08-15 (character + team), and on 2026-08-16 the
+  // whole chain collapsed into one surface (docs/decisions/2026-08-16-persistent-layout-and-
+  // pregame-rework.md). The rule survived both moves unchanged, because it was never about how
+  // many screens there are: the animated sheet belongs to the ONE place a player looks at their
+  // own avatar, which is now character-panel.svelte. Everything that lists more than one avatar
+  // stays on still chips.
+  const allowed = ["room/character-panel.svelte"];
   const surfaces = [
     "room/buzzer-screen.svelte",
     "room/scores-strip.svelte",
     "room/team-card.svelte",
-    "room/team-screen.svelte",
-    "room/identity-sheet.svelte",
+    "room/teams-panel.svelte",
+    "room/roster-panel.svelte",
     "room/host-console.svelte",
     "room/display-screen.svelte",
     "staging/staged-lobby-2d.svelte",
     "avatars/avatar-picker.svelte",
   ];
 
-  it("is used by the character and lobby screens", () => {
+  it("is used by the character panel - the one place you look at your own avatar", () => {
     for (const surface of allowed) {
       expect(source(surface), surface).toContain("avatars/avatar-animated.svelte");
     }
   });
 
   it("is used by NOTHING else - above all not the buzz screen", () => {
+    // Matched on the IMPORT, not on the name appearing anywhere in the file: a surface is
+    // allowed to explain in a comment why it deliberately uses still chips instead
+    // (avatar-picker.svelte does), and a gate that forbade saying so would push exactly the
+    // reasoning that keeps this rule alive out of the code.
     for (const surface of surfaces) {
-      expect(source(surface), surface).not.toContain("avatar-animated");
+      expect(source(surface), surface).not.toMatch(/^\s*import .*avatar-animated/m);
     }
   });
 
@@ -141,6 +149,40 @@ describe("the staged lobby degrades differently from the diorama, on purpose", (
     expect(motion).toContain("if (options.frozen)");
     expect(motion).toMatch(/frozen[\s\S]{0,400}mode: "idle"/);
     expect(source("staging/staging-motion.ts")).toMatch(/if \(frozen\) return 0;/);
+  });
+
+  // Owner report, 2026-08-16: "I don't understand still in the water", and "names beneath the
+  // boats". Both fixes have to exist on BOTH paths or the answer depends on whether the
+  // projector laptop happened to have WebGL - which is the one thing the staged lobby's whole
+  // two-path design exists to prevent. The 3D half cannot be rendered in a headless test, so
+  // it is gated at the source, next to the 2D half that IS rendered (staged-lobby.states.test).
+  it("says the holding-area words on the 3D stage as well as in the CSS one", () => {
+    const scene = source("diorama/diorama-scene.ts");
+    const fallback = source("staging/staged-lobby-2d.svelte");
+    for (const surface of [scene, fallback]) {
+      expect(surface).toContain("staging/staging-copy.ts");
+      expect(surface).toContain("holdingAreaCopy");
+    }
+    // The words are DRAWN, not merely computed: a sprite the scene positions over the water.
+    expect(scene).toContain("#writeHoldingLabel");
+    expect(scene).toContain("#positionHoldingLabel");
+  });
+
+  it("draws the crew's names beneath each station on both paths", () => {
+    expect(source("diorama/diorama-scene.ts")).toContain("#writeCrewPlate");
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("crew-plate");
+    // ...and the overflow rule is shared, so the two views list the same people.
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("crewPlateNameLimit");
+    expect(source("diorama/diorama-scene.ts")).toContain("crewPlate(");
+  });
+
+  it("gives the water a boundary rather than running it under the whole stage", () => {
+    // The 60x40 plane is what made "in the water" indistinguishable from "on the floor".
+    const boats = source("staging/staging-themes/boats.ts");
+    expect(boats).not.toContain("width: 60");
+    expect(boats).toContain("edge:");
+    expect(source("diorama/diorama-scene.ts")).toContain("holding-edge-");
+    expect(source("staging/staged-lobby-2d.svelte")).toContain("holding-noun");
   });
 });
 

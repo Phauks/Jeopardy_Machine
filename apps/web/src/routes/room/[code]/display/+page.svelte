@@ -11,6 +11,8 @@
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import { createRoomStore } from "#lib/room/create-room-store.ts";
+  import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
+  import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
   import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
@@ -21,6 +23,22 @@
 
   const roomAudio = new RoomAudio({ enabled: true });
   let audioReady = $state(false);
+
+  // THIS DEVICE'S PREFERENCES (src/lib/host-settings/). The display window reads the same
+  // localStorage document the host console writes, and a `storage` event lands here the moment
+  // the cog changes it - so "display text size" on the host's screen re-lays the projector
+  // window on the other output of the same laptop, live, with nothing going near the room.
+  // A projector driven by a different machine reads that machine's own preferences instead.
+  if (browser) devicePreferences.attach();
+  onDestroy(() => {
+    devicePreferences.detach();
+  });
+  const device = $derived(devicePreferences.current);
+
+  $effect(() => {
+    roomAudio.enabled = device.displayAudio;
+    roomAudio.setVolume(device.audioVolume);
+  });
 
   function resolveRoomBuzzSound(playerId: string, entityId: string): string | null {
     // Team-scoped in teams mode (the leader-picked team sound), personal otherwise. The M3
@@ -69,7 +87,11 @@
   // scenery whose kit has not shipped still renders on the studio stage.
   const stagingThemeId = $derived(page.url.searchParams.get("staging") ?? theme.staging ?? null);
   const environment = $derived(
-    resolveDioramaEnvironment(page.url.searchParams.get("environment") ?? theme.environment),
+    // "No 3D stage" is this device saying it cannot afford one - a laptop driving a projector
+    // and a board at once - and it outranks the document, which is a wish, not a capability.
+    device.stageMotion === "off"
+      ? "none"
+      : resolveDioramaEnvironment(page.url.searchParams.get("environment") ?? theme.environment),
   );
 </script>
 
@@ -83,8 +105,17 @@
 
 <svelte:window onpointerdown={primeAudio} />
 
-<div class="display-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
-  <DisplayScreen {store} {stagingThemeId} {environment} />
+<div
+  class="display-shell"
+  style="{themeToStyleAttribute(theme)}; {typeScaleStyle(device.displayTypeScale)}"
+  data-effects={theme.effectsLevel}
+>
+  <DisplayScreen
+    {store}
+    {stagingThemeId}
+    {environment}
+    stageStill={device.stageMotion === "still"}
+  />
   {#if !audioReady}
     <p class="audio-hint">Click anywhere to enable room audio on this device</p>
   {/if}

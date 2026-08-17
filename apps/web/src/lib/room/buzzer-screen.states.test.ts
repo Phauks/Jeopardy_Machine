@@ -11,7 +11,13 @@ import { viewEntityForPlayer } from "#lib/room/room-view.ts";
 
 function playerStore(seed = "buzzer-states"): LocalSimRoomStore {
   const store = new LocalSimRoomStore({ roomCode: "TESTA", role: "player", seed });
-  store.join({ nickname: "Stagehand", avatarId: null, accentId: null, buzzSoundId: null });
+  store.join({
+    nickname: "Stagehand",
+    avatarId: null,
+    accentId: null,
+    buzzSoundId: null,
+    skinToneId: null,
+  });
   return store;
 }
 

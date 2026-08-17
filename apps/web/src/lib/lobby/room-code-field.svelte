@@ -58,7 +58,13 @@
 </label>
 
 <style>
+  /* Board materials, like everything on the front door: the code box is a value cell with a
+     number in it, so it derives from --board-cell-bg + --board-value-color rather than the
+     chrome tokens. That pairing is the one the theme contract guarantees to be legible under
+     every preset - including the light paper one, where the chrome tokens converge. */
   .code-field {
+    --field-ink: var(--clue-text-color);
+    --field-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
     display: flex;
     flex-direction: column;
     gap: 0.35rem;
@@ -70,7 +76,7 @@
     text-transform: uppercase;
     letter-spacing: 0.14em;
     font-size: 0.75rem;
-    color: var(--surface-text-muted);
+    color: var(--field-muted);
   }
 
   /* The code reads the way it reads on the projector: the theme's value face, tracked out,
@@ -86,16 +92,16 @@
     text-align: center;
     text-transform: uppercase;
     color: var(--board-value-color);
-    background: var(--surface-page);
-    border: 2px solid var(--surface-border);
-    border-radius: var(--board-radius);
+    background: color-mix(in srgb, var(--board-cell-bg) 55%, #000000);
+    border: 2px solid color-mix(in srgb, var(--clue-text-color) 26%, transparent);
+    border-radius: 2px;
     padding: 0.35rem 0.5rem 0.25rem;
     width: 100%;
     min-width: 0;
   }
 
   .code-input::placeholder {
-    color: var(--surface-text-muted);
+    color: var(--field-muted);
     opacity: 0.4;
   }
 
@@ -113,6 +119,6 @@
     font-family: var(--font-chrome);
     font-size: 0.72rem;
     letter-spacing: 0.04em;
-    color: var(--surface-text-muted);
+    color: var(--field-muted);
   }
 </style>

@@ -109,6 +109,66 @@ describe("the 2D staged view (no WebGL)", () => {
     expect(body).not.toContain("the water");
   });
 
+  // Owner report, 2026-08-16: "I don't understand still in the water." These four assertions
+  // are the fix stated as behaviour - the holding area has to say what it is, what to do, and
+  // how many people are in it, and it has to look like a bounded place rather than a gap.
+  it("labels the holding area in WORDS, not just as a position", () => {
+    const { body } = render(StagedLobby2d, {
+      props: { theme: boatsStagingTheme, stations, occupants, waitingEntityIds },
+    });
+    expect(body).toContain("Waiting to board");
+    expect(body).toContain("Choose a team to board");
+    expect(body).toContain(`${String(waitingEntityIds.length)} waiting`);
+  });
+
+  it("re-speaks that label in the theme's own verb", () => {
+    const { body } = render(StagedLobby2d, {
+      props: { theme: campfiresStagingTheme, stations, occupants, waitingEntityIds },
+    });
+    expect(body).toContain("Waiting to join");
+    expect(body).not.toContain("Waiting to board");
+  });
+
+  it("draws the holding area as a bounded place, with its noun on the boundary", () => {
+    const { body } = render(StagedLobby2d, {
+      props: { theme: boatsStagingTheme, stations, occupants, waitingEntityIds },
+    });
+    expect(body).toContain("holding-noun");
+    expect(body).toContain("the water");
+    // A region with a name, so a screen reader is told the same thing the projector shows.
+    expect(body).toContain('aria-label="Waiting to board"');
+  });
+
+  it("puts the crew's names BENEATH each station, not only inside it", () => {
+    const { body } = render(StagedLobby2d, {
+      props: { theme: boatsStagingTheme, stations, occupants, waitingEntityIds },
+    });
+    expect(body).toContain("crew-plate");
+    const first = stations[0];
+    expect(first).toBeDefined();
+    for (const memberId of first?.memberIds ?? []) {
+      const member = occupants.find((occupant) => occupant.entityId === memberId);
+      expect(body).toContain(member?.label ?? "@@never@@");
+    }
+  });
+
+  it("counts the overflow when a station has more crew than the plate holds", () => {
+    const crowded = [
+      {
+        stationId: "big",
+        label: "Everybody",
+        colorHex: "#ff8800",
+        memberIds: occupants.map((occupant) => occupant.entityId),
+      },
+    ];
+    const { body } = render(StagedLobby2d, {
+      props: { theme: boatsStagingTheme, stations: crowded, occupants, waitingEntityIds: [] },
+    });
+    expect(body).toContain(`+${String(occupants.length - 6)} more`);
+    // ...and the water, now empty, still says so rather than going blank.
+    expect(body).toContain("Nobody in the water");
+  });
+
   it("says something useful when there are no teams yet", () => {
     const { body } = render(StagedLobby2d, {
       props: {
