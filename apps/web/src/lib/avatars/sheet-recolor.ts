@@ -19,6 +19,23 @@
 // colormaps, against the same per-avatar targets (carried on the sprite manifest since v3).
 // A recoloured sheet frame and the corresponding baked still therefore agree by construction.
 //
+// WHY MATCHING A FLAT PALETTE CELL AGAINST A RENDERED IMAGE WORKS AT ALL. It is not obvious
+// that it should. The bake recolors the flat colormap and THEN renders it under an ambient
+// plus three directional lights, so a lit pixel of a cell is not the cell's own hex, and the
+// targets in the manifest are colormap hexes. It works because Kenney's models are flat-shaded
+// blocks lit ambient-heavy: a face is one even shade, and enough of those shades land inside
+// the bake's own tolerance. Measured over all 27 committed sheets, the share of opaque pixels
+// the avatar's own targets claim is:
+//
+//   pets    14-71% (mean ~50%) - a pet IS its body, so this is most of the silhouette
+//   humans  0.6-22%            - a signature garment is a small part of a person; Preston's
+//                                tie at 0.56% and Otis's shorts at 1.5% are the honest floor
+//   skin    0.1-27% of a human - face and hands, and near zero for Vera, who is in a lab coat
+//
+// The control that makes those numbers mean something: the same targets claim only 0-2.6% of
+// an already-recoloured still, because the bake moved those cells. Re-measure with sharp over
+// static/avatars/ if a pack update ever lands.
+//
 // COST, AND WHY IT IS PAID ONCE. One decode + one 1280x128 canvas pass per distinct
 // (avatar, accent, tone), cached at module scope and shared by every component instance. A
 // player flipping through eight accents pays eight; a hundred-player roster pays once per
@@ -77,20 +94,31 @@ async function recolorToDataUrl(request: RecolorRequest): Promise<string | null>
     // (the manifest gate holds skin cells and accent targets apart by more than either
     // tolerance), and running accent first means that if a future pack update ever broke that,
     // the visible result is a garment keeping its accent rather than a face turning gold.
-    recolorPixels(
+    let changed = recolorPixels(
       image.data,
       request.avatar.recolorTargets,
       request.accentHex,
       request.avatar.tolerance ?? undefined,
     );
     if (request.toneHex !== null) {
-      recolorPixels(
+      changed += recolorPixels(
         image.data,
         avatarManifest.skinRecolor.targets,
         request.toneHex,
         avatarManifest.skinRecolor.tolerance,
       );
     }
+
+    // The same assertion the bake makes ("recolor targets matched no colormap pixels"), in its
+    // runtime half and demoted from a throw to a fallback. Zero changed pixels means the
+    // targets no longer describe this image - a pack update that moved the colormap, or a
+    // roster edit committed without a re-bake - and the honest response is to keep painting
+    // the per-accent still, which is baked and therefore still correct, rather than to show a
+    // walking avatar in pack colors. That is the bug this module exists to fix, so it must not
+    // be the failure mode. Deliberately "> 0" and not a percentage: Preston's tie is 0.56% of
+    // him, and a threshold generous enough to feel safe would silently drop the avatars whose
+    // accent is a small, deliberate detail.
+    if (changed === 0) return null;
 
     context.putImageData(image, 0, 0);
     // A data URL rather than an object URL: these are cached for the life of the page and
