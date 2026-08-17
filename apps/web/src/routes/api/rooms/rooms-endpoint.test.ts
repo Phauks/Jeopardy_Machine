@@ -6,6 +6,8 @@
 // not, and the response always says which world it is in.
 import { describe, expect, it } from "vitest";
 import { GET, POST } from "./+server.ts";
+import { blankCreateForm, createRoomBody } from "#lib/landing/create-room-request.ts";
+import { createRoomRequestSchema } from "@jeopardy/protocol/room/create";
 import type { LobbyListing } from "@jeopardy/protocol/room/registry";
 import type { RequestHandler } from "@sveltejs/kit";
 
@@ -188,5 +190,175 @@ describe("POST /api/rooms - creation reports its own listability", () => {
       platform: { env: {} },
     } as unknown as Event);
     expect(response.status).toBe(503);
+  });
+});
+
+// ---------------------------------------------------------------------------------------
+// The create payload, end to end (owner report 2026-08-17: "I made a public room but settings
+// said it was private. Also didn't carry title or host name.").
+//
+// The chain is: the front door's form -> createRoomBody -> POST /api/rooms -> the DO's
+// initialize -> the settings the room reports back. This test walks all of it EXCEPT the DO
+// itself, which lives in another Worker: the stub below parses the forwarded body with the
+// real protocol schema and derives the settings exactly as apps/realtime/src/room/storage.ts's
+// roomSettingsPayload does, so a field that this route drops, renames or fails to forward
+// shows up here as a settings object that disagrees with the form.
+//
+// It found no drop. The chain carries listing, title and host label intact, and the registry
+// row is written from the DO's own reading rather than from the body we happened to send. The
+// symptom the owner saw comes from the far end: the host console the front door hands off to
+// still runs the MOCK store (apps/web/src/lib/room/create-room-store.ts returns
+// LocalSimRoomStore unconditionally until the M3 reconcile), whose settings are
+// defaultRoomSettings + empty strings - private, untitled, unattributed - for every room.
+// ---------------------------------------------------------------------------------------
+
+/** The DO's initialize, in miniature: parse, derive, answer 201 - and record what it got. */
+function recordingNamespace(): {
+  namespace: unknown;
+  initialized: () => Record<string, unknown> | null;
+} {
+  let seen: Record<string, unknown> | null = null;
+  return {
+    initialized: () => seen,
+    namespace: {
+      idFromName: (name: string) => name,
+      get: () => ({
+        fetch: async (request: Request) => {
+          const parsed = createRoomRequestSchema.safeParse(await request.json());
+          if (!parsed.success) return Response.json({ error: "bad-request" }, { status: 400 });
+          seen = parsed.data as unknown as Record<string, unknown>;
+          const body = parsed.data;
+          return Response.json(
+            {
+              hostToken: "0".repeat(32),
+              expiresAt: Date.now() + 7_200_000,
+              settings: {
+                listing: body.listing,
+                // Derived from whether a password was set, never stored twice
+                // (packages/protocol/src/room/visibility.ts).
+                entry: body.password === undefined ? "open" : "password",
+                maxPlayers: body.maxPlayers,
+                maxSpectators: body.maxSpectators,
+                spectatorsAllowed: body.spectatorsAllowed,
+                hideJoinCode: body.hideJoinCode,
+                title: body.title ?? "",
+                hostLabel: body.hostLabel ?? "",
+              },
+            },
+            { status: 201 },
+          );
+        },
+      }),
+    },
+  };
+}
+
+/** A D1 stand-in that keeps the bound values, so the lobby row can be inspected. */
+function recordingDatabase(): { database: unknown; binds: () => unknown[][] } {
+  const calls: unknown[][] = [];
+  return {
+    binds: () => calls,
+    database: {
+      prepare: () => ({
+        bind(...values: unknown[]) {
+          calls.push(values);
+          return this;
+        },
+        run: () => Promise.resolve({}),
+        all: () => Promise.resolve({ results: [] }),
+      }),
+      batch: () => Promise.resolve([]),
+    },
+  };
+}
+
+describe("POST /api/rooms - a public titled room stays public and titled", () => {
+  const filledForm = {
+    ...blankCreateForm(),
+    listing: "public" as const,
+    title: "Thursday pub quiz",
+    hostLabel: "Board Game Club",
+    maxPlayers: 40,
+  };
+
+  it("carries the form's listing, title and host label all the way to the room", async () => {
+    const { namespace, initialized } = recordingNamespace();
+    const { database } = recordingDatabase();
+    const response = await POST({
+      request: new Request("https://test/api/rooms", {
+        method: "POST",
+        body: JSON.stringify(
+          createRoomBody(filledForm, { kind: "compact", rounds: [{ columns: 3, rows: 3 }] }),
+        ),
+      }),
+      platform: { env: { GAME_ROOM: namespace, DB: database } },
+    } as unknown as Event);
+
+    expect(response.status).toBe(201);
+    // What the DO was actually asked for - the link the report suspected was broken.
+    expect(initialized()).toMatchObject({
+      listing: "public",
+      title: "Thursday pub quiz",
+      hostLabel: "Board Game Club",
+      maxPlayers: 40,
+    });
+    // What the room reports back about itself.
+    const body = (await response.json()) as {
+      settings: { listing: string; title: string; hostLabel: string; maxPlayers: number };
+      registry: unknown;
+    };
+    expect(body.settings.listing).toBe("public");
+    expect(body.settings.title).toBe("Thursday pub quiz");
+    expect(body.settings.hostLabel).toBe("Board Game Club");
+    expect(body.settings.maxPlayers).toBe(40);
+    expect(body.registry).toEqual({ status: "ok" });
+  });
+
+  it("writes the same three facts into the lobby row, from the room's own reading", async () => {
+    const { namespace } = recordingNamespace();
+    const { database, binds } = recordingDatabase();
+    await POST({
+      request: new Request("https://test/api/rooms", {
+        method: "POST",
+        body: JSON.stringify(
+          createRoomBody(filledForm, { kind: "compact", rounds: [{ columns: 3, rows: 3 }] }),
+        ),
+      }),
+      platform: { env: { GAME_ROOM: namespace, DB: database } },
+    } as unknown as Event);
+
+    // The upsert binds code, title, host_label, listing, has_password, ... in that order
+    // (src/lib/server/room-registry.ts). A row that came out private or unnamed is the lobby
+    // half of the reported bug.
+    const upsert = binds()[0] ?? [];
+    expect(upsert[1]).toBe("Thursday pub quiz");
+    expect(upsert[2]).toBe("Board Game Club");
+    expect(upsert[3]).toBe("public");
+  });
+
+  it("keeps a private titled room private, and still carries its name", async () => {
+    const { namespace } = recordingNamespace();
+    const { database } = recordingDatabase();
+    const response = await POST({
+      request: new Request("https://test/api/rooms", {
+        method: "POST",
+        body: JSON.stringify(
+          createRoomBody(
+            { ...filledForm, listing: "private", password: "quizzy" },
+            { kind: "compact", rounds: [{ columns: 3, rows: 3 }] },
+          ),
+        ),
+      }),
+      platform: { env: { GAME_ROOM: namespace, DB: database } },
+    } as unknown as Event);
+    const body = (await response.json()) as {
+      settings: { listing: string; entry: string; title: string; hostLabel: string };
+    };
+    expect(body.settings).toMatchObject({
+      listing: "private",
+      entry: "password",
+      title: "Thursday pub quiz",
+      hostLabel: "Board Game Club",
+    });
   });
 });

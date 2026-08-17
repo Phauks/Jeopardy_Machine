@@ -80,6 +80,7 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.16em;
+    text-wrap: balance;
     color: var(--rejoin-muted);
   }
 

@@ -15,7 +15,8 @@
   // an answer arrives (the standing layout law, same decision doc).
   import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
   import RoomCard from "#lib/lobby/room-card.svelte";
-  import { formatRoomAge } from "#lib/lobby/room-age.ts";
+  import { formatClockTime } from "#lib/lobby/room-age.ts";
+  import { filterRooms } from "#lib/lobby/room-search.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 
@@ -25,10 +26,10 @@
     listingError?: string | null;
     /** False until the first fetch answers - an empty list with no verdict behind it yet. */
     loaded?: boolean;
-    /** Clock for the "updated Xm ago" line; injected so the region renders deterministically. */
-    now?: number;
     /** A complete code is in the box: the list steps back rather than competing for the tap. */
     dimmed?: boolean;
+    /** Seed for the search box, so the filtered state can be server-rendered in a test. */
+    initialQuery?: string;
     onJoinRoom: (room: RoomSummary, password: string) => void;
     onRefresh?: (() => void) | null;
   };
@@ -36,23 +37,42 @@
     listing,
     listingError = null,
     loaded = true,
-    now = Date.now(),
     dimmed = false,
+    initialQuery = "",
     onJoinRoom,
     onRefresh = null,
   }: Props = $props();
 
   let expandedRoomCode = $state<string | null>(null);
+  // A seed, read once: after the first render the box belongs to whoever is typing in it.
+  // svelte-ignore state_referenced_locally
+  let query = $state(initialQuery);
 
   const registryBroken = $derived(listing.registry.status !== "ok");
   const rooms = $derived(listing.rooms);
-  // "Updated new ago" is what the coarse age formatter produces for a fresh fetch, which is
-  // not a sentence - the freshest state gets its own words.
-  const age = $derived(formatRoomAge(listing.fetchedAt, now));
-  const freshness = $derived(age === "new" ? "Updated just now" : `Updated ${age} ago`);
+  // Filtering is instant and local - the whole listing is already in hand, capped at
+  // limits.lobby.listingMax (room-search.ts explains why no request is involved).
+  const shown = $derived(filterRooms(rooms, query));
+  const filtering = $derived(query.trim() !== "");
+  // The fetch's own wall-clock stamp rather than "updated 2m ago": a relative phrase is only
+  // true while something re-renders it, and staleness is the exact question this line answers
+  // (owner call 2026-08-17, room-age.ts).
+  const freshness = $derived(`Updated ${formatClockTime(listing.fetchedAt)}`);
 </script>
 
 <div class="room-browser" class:dimmed>
+  <!-- The search box is always drawn, whatever the list is doing: a control that appears when
+       the first rooms arrive would move everything under it (the standing layout law). -->
+  <label class="search">
+    <span class="visually-hidden">Search public rooms</span>
+    <input
+      type="search"
+      autocomplete="off"
+      placeholder="Search by room or host"
+      bind:value={query}
+    />
+  </label>
+
   {#if registryBroken || listingError !== null}
     <div class="state-block" aria-label="Room list unavailable">
       <RegistryStatusLine status={listing.registry} />
@@ -68,15 +88,24 @@
   {:else if rooms.length === 0}
     <div class="state-block empty" aria-label="No public rooms">
       <h3>Nobody is hosting publicly right now</h3>
-      <p class="state-note">
-        That is the normal state, not a fault: rooms are unlisted unless the host chooses to
-        advertise one. If someone gave you a {limits.room.roomCodeLength}-character code, type
-        it on the left and you are in.
-      </p>
+      <p class="state-note">Most rooms are private. A code still gets you in.</p>
+    </div>
+  {:else if shown.length === 0}
+    <div class="state-block empty" aria-label="No matching rooms">
+      <h3>No room matches that search</h3>
+      <button
+        type="button"
+        class="clear-search"
+        onclick={() => {
+          query = "";
+        }}
+      >
+        Show all {rooms.length}
+      </button>
     </div>
   {:else}
     <ul class="room-list">
-      {#each rooms as room (room.code)}
+      {#each shown as room (room.code)}
         <li>
           <RoomCard
             {room}
@@ -99,10 +128,13 @@
   {/if}
 
   <footer class="browser-footer">
+    <span class="stamp">{freshness}</span>
     <span>
-      {rooms.length === limits.lobby.listingMax
-        ? `Showing the newest ${String(limits.lobby.listingMax)} rooms`
-        : freshness}
+      {#if filtering && shown.length > 0}
+        {shown.length} of {rooms.length}
+      {:else if rooms.length === limits.lobby.listingMax}
+        Newest {limits.lobby.listingMax}
+      {/if}
     </span>
     {#if onRefresh !== null}
       <button type="button" class="refresh" onclick={onRefresh}>Refresh now</button>
@@ -131,6 +163,61 @@
 
   .room-browser.dimmed {
     opacity: 0.4;
+  }
+
+  .search {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* A well sunk into the panel, like every other field on this page - not a rounded pill on a
+     card, which is the generic search box the art direction rejects. */
+  .search input {
+    font: inherit;
+    font-size: 0.95rem;
+    padding: 0.5rem 0.65rem;
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--browser-rule);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--board-cell-bg) 45%, #000000);
+    color: var(--browser-ink);
+  }
+
+  .search input::placeholder {
+    color: var(--browser-muted);
+  }
+
+  .search input:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .clear-search {
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.75rem;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid var(--browser-rule);
+    border-radius: 2px;
+    background: transparent;
+    color: var(--board-value-color);
+    cursor: pointer;
+  }
+
+  .clear-search:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .room-list {
@@ -163,6 +250,9 @@
     letter-spacing: 0.06em;
     font-size: 1rem;
     margin: 0;
+    /* Balanced: an empty-state heading that drops its last word alone is the ragged break the
+       owner reported, in the one place the eye has nothing else to look at. */
+    text-wrap: balance;
     color: var(--browser-ink);
   }
 
@@ -174,8 +264,11 @@
     color: var(--browser-muted);
   }
 
+  /* Reserved like every other state in this block: "looking for rooms" occupies the height the
+     rooms will, so the answer arriving changes words rather than positions. */
   .waiting {
     flex: 1;
+    min-height: 6rem;
   }
 
   .browser-footer {
@@ -191,6 +284,13 @@
     letter-spacing: 0.1em;
     font-size: 0.68rem;
     color: var(--browser-muted);
+  }
+
+  /* The stamp is the fact this footer exists for, so it is the one that keeps the value color
+     and never wraps mid-time. */
+  .stamp {
+    white-space: nowrap;
+    color: var(--board-value-color);
   }
 
   .refresh {

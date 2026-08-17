@@ -13,7 +13,11 @@
   // was created cleanly hands straight off to the host console, because a confirmation screen
   // between the button and the game is a wizard step nobody asked for.
   import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
-  import { createFormProblems } from "#lib/landing/create-room-request.ts";
+  import {
+    clampPlayerCap,
+    createFormProblems,
+    playerCapBounds,
+  } from "#lib/landing/create-room-request.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
   import type { RegistryStatus } from "@jeopardy/protocol/room/registry";
@@ -43,14 +47,7 @@
 </script>
 
 <section class="create" aria-labelledby="create-heading">
-  <h2 class="panel-heading" id="create-heading">
-    <span class="marker">02</span>
-    <span class="heading-text">Create a room</span>
-  </h2>
-  <p class="panel-lede">
-    You host, everyone else scans. The room opens with the built-in sample game until the
-    editor lands - every setting below is editable afterwards from the console.
-  </p>
+  <h2 class="panel-heading" id="create-heading">Create a room</h2>
 
   <form
     class="create-form"
@@ -61,7 +58,7 @@
   >
     <label class="field name-field">
       <span class="field-label">
-        Room name
+        <span>Room name<span class="required" aria-hidden="true">*</span></span>
         <span class="counter" aria-hidden="true">
           {form.title.length}/{limits.room.roomTitleMaxLength}
         </span>
@@ -69,6 +66,7 @@
       <input
         type="text"
         autocomplete="off"
+        required
         maxlength={limits.room.roomTitleMaxLength}
         placeholder="Thursday pub quiz"
         bind:value={form.title}
@@ -76,12 +74,18 @@
     </label>
 
     <label class="field">
-      <span class="field-label">Hosted by</span>
+      <span class="field-label">
+        <span>Hosted by<span class="required" aria-hidden="true">*</span></span>
+        <span class="counter" aria-hidden="true">
+          {form.hostLabel.length}/{limits.room.hostLabelMaxLength}
+        </span>
+      </span>
       <input
         type="text"
         autocomplete="off"
+        required
         maxlength={limits.room.hostLabelMaxLength}
-        placeholder="Optional"
+        placeholder="Board Game Club"
         bind:value={form.hostLabel}
       />
     </label>
@@ -114,13 +118,26 @@
     </label>
 
     <label class="field cap-field">
-      <span class="field-label">Player cap</span>
+      <!-- The bound is printed, not hidden behind a refusal: the field took 128 because the
+           only thing that knew the real ceiling was the validator (owner report 2026-08-17). -->
+      <span class="field-label">
+        <span>Player cap</span>
+        <span class="counter" aria-hidden="true">
+          {playerCapBounds.min}-{playerCapBounds.max}
+        </span>
+      </span>
       <input
         type="number"
-        min="1"
-        max={limits.room.playerHardCap}
+        min={playerCapBounds.min}
+        max={playerCapBounds.max}
+        step="1"
         inputmode="numeric"
         bind:value={form.maxPlayers}
+        onchange={() => {
+          // Clamped on commit rather than per keystroke: mid-typing, "1" on the way to "15"
+          // would become the minimum and swallow the next digit.
+          form.maxPlayers = clampPlayerCap(form.maxPlayers);
+        }}
       />
     </label>
 
@@ -130,18 +147,14 @@
     </label>
 
     <!-- Reserved: problems and refusals land in this block rather than growing the form, so
-         the button never moves out from under a thumb that is already reaching for it. -->
+         the button never moves out from under a thumb that is already reaching for it. It is
+         empty when nothing is wrong - a form that narrates its own settings back at the person
+         filling it in was the front door's biggest source of prose (owner call 2026-08-17). -->
     <div class="verdict" role="status">
       {#if state.status === "failed"}
         <p class="failure">{state.message}</p>
       {:else if problems.length > 0}
         <p class="problem">{firstProblem}</p>
-      {:else if form.password !== ""}
-        <p class="hint">Everyone joining will be asked for this password.</p>
-      {:else if form.listing === "public"}
-        <p class="hint">Anyone can see this room in the list and walk in.</p>
-      {:else}
-        <p class="hint">Only people you give the code to can join.</p>
       {/if}
     </div>
 
@@ -180,36 +193,15 @@
   }
 
   .panel-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 0.7rem;
     margin: 0;
     font-family: var(--font-chrome);
     font-size: 0.95rem;
+    font-weight: 400;
     text-transform: uppercase;
     letter-spacing: 0.14em;
-  }
-
-  /* Chrome face, not the value face: the latter is an ultra-condensed projector face that
-     reads as noise below about 2rem. The value COLOR carries the resemblance. */
-  .marker {
-    font-family: var(--font-chrome);
-    font-size: 1.05rem;
-    line-height: 1;
-    letter-spacing: 0.18em;
-    color: var(--board-value-color);
-  }
-
-  .heading-text {
-    font-weight: 400;
-  }
-
-  .panel-lede {
-    margin: 0;
-    max-inline-size: 44ch;
-    font-size: 0.85rem;
-    line-height: 1.5;
-    color: var(--create-muted);
+    /* Balanced with the other panel headings: a two-word heading must never drop its last
+       word onto a line of its own when the control column narrows. */
+    text-wrap: balance;
   }
 
   .create-form {
@@ -253,6 +245,14 @@
     font-family: var(--font-chrome);
     letter-spacing: 0.1em;
     font-size: 0.7rem;
+    white-space: nowrap;
+    color: var(--board-value-color);
+  }
+
+  /* Required is marked where the eye already is - on the label, in the one color this panel
+     uses for "the machine is talking to you". */
+  .required {
+    padding-left: 0.15rem;
     color: var(--board-value-color);
   }
 
@@ -348,10 +348,6 @@
     line-height: 1.4;
   }
 
-  .hint {
-    color: var(--create-muted);
-  }
-
   .problem,
   .failure {
     color: var(--score-negative);
@@ -388,6 +384,7 @@
 
   .held-line {
     margin: 0;
+    max-inline-size: 52ch;
     font-size: 0.9rem;
     line-height: 1.45;
   }

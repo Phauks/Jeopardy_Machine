@@ -3,11 +3,16 @@
 // lobby"): one screen where rejoining, joining by code, browsing and creating are all present
 // at once, in that order of priority, with the code box still winning when a code is complete.
 // If a future change re-splits any of that onto its own page, this test is what says so.
+//
+// It also holds the 2026-08-17 simplification: the page is a header, four controls and no
+// narration. The deleted copy has its own gate below - by exact string, because "we deleted
+// the marketing block" is only true until someone writes a new one.
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import FrontDoor from "#lib/landing/front-door.svelte";
 import { blankCreateForm } from "#lib/landing/create-room-request.ts";
 import { devSurfaces } from "#lib/landing/surface-cards.ts";
+import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
 import type { CreateState } from "#lib/landing/create-room-panel.svelte";
 import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 import type { RejoinCandidate } from "#lib/landing/rejoin-panel.svelte";
@@ -37,6 +42,8 @@ type Overrides = {
   listingLoaded?: boolean;
   rejoins?: RejoinCandidate[];
   initialCode?: string;
+  initialSearch?: string;
+  createForm?: CreateRoomForm;
   createState?: CreateState;
 };
 
@@ -44,7 +51,6 @@ function renderFrontDoor(overrides: Overrides = {}): string {
   return render(FrontDoor, {
     props: {
       listing: listingOf([room]),
-      now: fetchedAt,
       surfaces: devSurfaces,
       createForm: blankCreateForm(),
       createState: { status: "idle" },
@@ -80,23 +86,67 @@ describe("one front door", () => {
     expect(body).not.toContain('href="/lobby"');
   });
 
-  it("keeps the no-accounts promise a stranger reads first", () => {
-    expect(body).toContain("Players never log in");
-    expect(body).toContain("No app, no account");
-  });
-
   it("says the password field is a password field and nothing more", () => {
     // Owner copy fix: the helper prose ("shouted across the hall, not emailed") is gone.
     expect(body).toContain(">Password<");
     expect(body).not.toContain("Shouted across the hall");
   });
+});
 
-  it("breaks the hero into a short lead and a supporting line, not one long sentence", () => {
-    const lead = /class="lead[^"]*">([^<]+)</.exec(body)?.[1]?.trim() ?? "";
-    expect(lead).toBe("Quiz night, on everyone's phone.");
-    // Short enough to survive the narrowest column without a ragged block (owner report).
-    expect(lead.length).toBeLessThan(40);
-    expect(body).toContain("You run the board on the big screen");
+// The 2026-08-17 pass, asserted as deletions. Each string below is one the owner quoted while
+// reading the deployed page; each explains something the control beside it already says.
+describe("the page does not narrate itself", () => {
+  const body = renderFrontDoor();
+
+  it("makes the wordmark a header, with nothing arranged around it", () => {
+    expect(body).toContain("Jeopardy Machine");
+    expect(body).not.toContain("Self-hosted quiz-show night");
+    expect(body).not.toContain("Quiz night, on everyone's phone.");
+    expect(body).not.toContain("You run the board on the big screen");
+    // The statistics rail that flanked the title went with it.
+    expect(body).not.toContain("None, ever");
+    expect(body).not.toContain("<dl");
+  });
+
+  it("keeps the three-pillar footer block deleted, all of it", () => {
+    for (const gone of [
+      "Players never log in",
+      "Scan the QR or type the code",
+      "no cookie banner",
+      "Two to a hundred, in teams",
+      "Everyone buzzes from their own phone",
+      "Your questions, your look",
+      "Games, question packs, and themes are portable files",
+      "run the whole thing on your own Cloudflare account",
+    ]) {
+      expect(body).not.toContain(gone);
+    }
+  });
+
+  it("keeps the listing and browsing explanations deleted", () => {
+    for (const gone of [
+      "A public room needs a name",
+      "it is the line people read in the list",
+      "Anyone can see this room in the list and walk in",
+      "Only people you give the code to can join",
+      "Hosts opt in to being listed",
+      "Picking one here does exactly what typing its code does",
+      "Everyone joining will be asked for this password",
+    ]) {
+      expect(body).not.toContain(gone);
+    }
+  });
+
+  it("keeps the create panel's preamble deleted", () => {
+    expect(body).not.toContain("You host, everyone else scans");
+    expect(body).not.toContain("editable afterwards from the console");
+  });
+
+  it("says nothing in the reserved blocks when there is nothing to say", () => {
+    // The blocks still EXIST (the layout law reserves their height); they are simply silent.
+    expect(body).not.toContain("A code from the big screen beats anything");
+    expect(body).toContain('class="join-note');
+    expect(body).toContain('class="verdict');
   });
 });
 
@@ -144,6 +194,13 @@ describe("the live listing states", () => {
     const body = renderFrontDoor({ listing: listingOf([]), listingLoaded: false });
     expect(body).toContain("Looking for rooms");
     expect(body).not.toContain("Nobody is hosting publicly");
+  });
+
+  it("offers the search box on the list, and filters what it renders", () => {
+    expect(renderFrontDoor()).toContain('type="search"');
+    const filtered = renderFrontDoor({ initialSearch: "zzz" });
+    expect(filtered).toContain("No room matches that search");
+    expect(filtered).not.toContain("Pub quiz night");
   });
 });
 
@@ -195,25 +252,27 @@ describe("creating a room from the front page", () => {
     expect(body).not.toContain('href="/dev/rooms">Create');
   });
 
-  it("explains what being public means before anyone chooses it", () => {
-    expect(renderFrontDoor()).toContain("Only people you give the code to can join");
-    const publicForm = { ...blankCreateForm(), listing: "public" as const, title: "Quiz" };
-    expect(
-      render(FrontDoor, {
-        props: {
-          listing: listingOf([]),
-          now: fetchedAt,
-          surfaces: devSurfaces,
-          createForm: publicForm,
-          createState: { status: "idle" } as CreateState,
-          onJoin: () => undefined,
-          onJoinRoom: () => undefined,
-          onRejoin: () => undefined,
-          onCreate: () => undefined,
-          onContinueCreate: () => undefined,
-        },
-      }).body,
-    ).toContain("Anyone can see this room in the list");
+  it("marks name and host as required, and starts with the button off", () => {
+    const body = renderFrontDoor();
+    // Two required inputs, marked in the markup and visibly on the label.
+    expect((body.match(/required/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    expect(body).toContain('class="required');
+    expect(body).toMatch(/class="create-button[^>]*disabled/);
+  });
+
+  it("prints the player cap's real bound instead of hiding it in a refusal", () => {
+    const body = renderFrontDoor();
+    expect(body).toContain("2-100");
+    expect(body).toContain('max="100"');
+    // The hard cap is refusal headroom and was never a number to offer a host.
+    expect(body).not.toContain('max="128"');
+  });
+
+  it("enables the button once both required fields are filled", () => {
+    const body = renderFrontDoor({
+      createForm: { ...blankCreateForm(), title: "Pub quiz", hostLabel: "Board Game Club" },
+    });
+    expect(body).not.toMatch(/class="create-button[^>]*disabled/);
   });
 
   it("holds a public room that could not be listed, with its code and the fix", () => {
@@ -248,11 +307,21 @@ describe("creating a room from the front page", () => {
 describe("the developer index", () => {
   const body = renderFrontDoor();
 
-  it("stays complete but demoted - present, closed, and last (the owner's freshness rule)", () => {
+  it("lives in the header now - a closed menu, not a drawer at the foot of the page", () => {
     expect(body).toContain("<details");
     expect(body).not.toContain("<details open");
-    expect(body).toContain("Developer surfaces");
-    expect(body.indexOf("Developer surfaces")).toBeGreaterThan(body.indexOf("Public rooms"));
+    expect(body).toContain('aria-label="Developer surfaces"');
+    // In the masthead, above everything the page is actually for.
+    expect(body.indexOf("Developer surfaces")).toBeLessThan(body.indexOf("Join a room"));
+  });
+
+  it("leaves nothing of the old bottom drawer behind - it moved, it was not copied", () => {
+    expect(body).not.toContain("Developer surfaces</span>");
+    expect(body).not.toContain("the suite is still being built milestone by milestone");
+    expect((body.match(/Developer surfaces/g) ?? []).length).toBe(1);
+  });
+
+  it("stays complete - the owner's rule is unchanged, only the place moved", () => {
     for (const surface of devSurfaces) {
       expect(body).toContain(surface.href);
       expect(body).toContain(surface.title);

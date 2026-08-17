@@ -11,7 +11,7 @@ import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import RoomBrowser from "#lib/lobby/room-browser.svelte";
 import RoomCard from "#lib/lobby/room-card.svelte";
-import { formatRoomAge, formatRoomPhase } from "#lib/lobby/room-age.ts";
+import { formatClockTime, formatRoomAge, formatRoomPhase } from "#lib/lobby/room-age.ts";
 import { playerSeats, roomUnavailableReason, spectatorSeats } from "#lib/lobby/room-capacity.ts";
 import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 
@@ -53,7 +53,7 @@ const noopHandlers = {
 
 describe("room browser: rooms listed", () => {
   const { body } = render(RoomBrowser, {
-    props: { listing: listingOf([lobbyRoom, playingRoom]), now: fetchedAt, ...noopHandlers },
+    props: { listing: listingOf([lobbyRoom, playingRoom]), ...noopHandlers },
   });
 
   it("gives the title and the host label as different facts", () => {
@@ -86,13 +86,14 @@ describe("room browser: rooms listed", () => {
 });
 
 describe("room browser: the empty and unavailable states differ", () => {
-  it("an empty lobby explains that unlisted is the default", () => {
+  it("an empty lobby says so in one line, without a paragraph about why", () => {
     const { body } = render(RoomBrowser, {
-      props: { listing: listingOf([]), now: fetchedAt, ...noopHandlers },
+      props: { listing: listingOf([]), ...noopHandlers },
     });
     expect(body).toContain("Nobody is hosting publicly right now");
-    expect(body).toContain("unlisted unless the host chooses");
     expect(body).not.toContain("Registry");
+    // Owner copy deletion 2026-08-17: the empty state used to explain the listing model.
+    expect(body).not.toContain("unlisted unless the host chooses");
   });
 
   it("a broken registry names the reason and the fix, and never says 'no rooms'", () => {
@@ -103,7 +104,6 @@ describe("room browser: the empty and unavailable states differ", () => {
           fetchedAt,
           registry: { status: "unavailable", reason: "no-table", detail: "no such table: rooms" },
         },
-        now: fetchedAt,
         ...noopHandlers,
       },
     });
@@ -115,7 +115,7 @@ describe("room browser: the empty and unavailable states differ", () => {
 
   it("distinguishes 'not fetched yet' from 'no rooms'", () => {
     const { body } = render(RoomBrowser, {
-      props: { listing: listingOf([]), loaded: false, now: fetchedAt, ...noopHandlers },
+      props: { listing: listingOf([]), loaded: false, ...noopHandlers },
     });
     expect(body).toContain("Looking for rooms");
     expect(body).not.toContain("Nobody is hosting publicly");
@@ -130,12 +130,78 @@ describe("room browser: the empty and unavailable states differ", () => {
           registry: { status: "unavailable", reason: "error", detail: "boom" },
         },
         listingError: "lobby responded 500",
-        now: fetchedAt,
         ...noopHandlers,
       },
     });
     expect(body).toContain("lobby responded 500");
     expect(body).toContain("joined by code");
+  });
+});
+
+// Searching the list (owner request 2026-08-17). The filter itself is unit-tested in
+// room-search.test.ts; what is asserted here is that the region WIRES it - the box exists in
+// every state, a query narrows the rendered cards, and a query that matches nothing says so
+// instead of looking like an empty lobby.
+describe("room browser: searching the fetched list", () => {
+  const searchable = [lobbyRoom, playingRoom];
+
+  it("offers the box in every state, so it never appears and shoves the list", () => {
+    for (const props of [
+      { listing: listingOf(searchable) },
+      { listing: listingOf([]) },
+      { listing: listingOf([]), loaded: false },
+    ]) {
+      const { body } = render(RoomBrowser, { props: { ...props, ...noopHandlers } });
+      expect(body).toContain('type="search"');
+      expect(body).toContain("Search by room or host");
+    }
+  });
+
+  it("keeps only the rooms whose title or host answers the query", () => {
+    const byTitle = render(RoomBrowser, {
+      props: { listing: listingOf(searchable), initialQuery: "environment", ...noopHandlers },
+    }).body;
+    expect(byTitle).toContain("Environment trivia");
+    expect(byTitle).not.toContain("Pub quiz night");
+
+    const byHost = render(RoomBrowser, {
+      props: { listing: listingOf(searchable), initialQuery: "board game", ...noopHandlers },
+    }).body;
+    expect(byHost).toContain("Pub quiz night");
+    expect(byHost).not.toContain("Environment trivia");
+  });
+
+  it("counts what survived beside the total, rather than silently showing fewer", () => {
+    const { body } = render(RoomBrowser, {
+      props: { listing: listingOf(searchable), initialQuery: "pub", ...noopHandlers },
+    });
+    expect(body).toContain("1");
+    expect(body).toContain("of 2");
+  });
+
+  it("says a search found nothing - never reuses the 'nobody is hosting' state", () => {
+    const { body } = render(RoomBrowser, {
+      props: { listing: listingOf(searchable), initialQuery: "zzzz", ...noopHandlers },
+    });
+    expect(body).toContain("No room matches that search");
+    expect(body).not.toContain("Nobody is hosting publicly");
+    expect(body).toContain("Show all 2");
+  });
+});
+
+describe("room browser: freshness is a clock time, not a phrase", () => {
+  it("stamps the listing with the hour it was fetched", () => {
+    const at = new Date(2026, 7, 17, 20, 14, 32).getTime();
+    const { body } = render(RoomBrowser, {
+      props: {
+        listing: { rooms: [lobbyRoom], fetchedAt: at, registry: { status: "ok" } },
+        ...noopHandlers,
+      },
+    });
+    expect(body).toContain("Updated 20:14:32");
+    // The relative phrasing is gone: it decays the moment it is painted (owner call).
+    expect(body).not.toContain("Updated just now");
+    expect(body).not.toContain("Updated 0m ago");
   });
 });
 
@@ -231,6 +297,13 @@ describe("row helpers", () => {
     expect(formatRoomAge(fetchedAt - 3 * 3_600_000, fetchedAt)).toBe("3h");
     // A clock skew must never render as a negative age.
     expect(formatRoomAge(fetchedAt + 10_000, fetchedAt)).toBe("new");
+  });
+
+  it("stamps a fetch with a zero-padded 24-hour clock, identically everywhere", () => {
+    expect(formatClockTime(new Date(2026, 7, 17, 20, 14, 32).getTime())).toBe("20:14:32");
+    // Zero padding on every field, and never a locale's 12-hour form with an AM/PM tail.
+    expect(formatClockTime(new Date(2026, 7, 17, 9, 5, 4).getTime())).toBe("09:05:04");
+    expect(formatClockTime(new Date(2026, 7, 17, 0, 0, 0).getTime())).toBe("00:00:00");
   });
 
   it("names the three phases in lobby vocabulary", () => {
