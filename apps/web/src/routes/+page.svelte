@@ -44,7 +44,6 @@
   });
   let listingError = $state<string | null>(null);
   let listingLoaded = $state(false);
-  let now = $state(Date.now());
 
   async function refreshListing(): Promise<void> {
     try {
@@ -57,8 +56,9 @@
       // that matters (guiding principle 3).
       listingError = error instanceof Error ? error.message : String(error);
     }
+    // The list stamps itself with the SERVER's fetchedAt (room-browser.svelte prints it as a
+    // wall clock), so nothing here has to keep a ticking clock alive to stay honest.
     listingLoaded = true;
-    now = Date.now();
   }
 
   $effect(() => {
@@ -191,7 +191,6 @@
     {listing}
     {listingError}
     {listingLoaded}
-    {now}
     {rejoins}
     {createForm}
     {createState}

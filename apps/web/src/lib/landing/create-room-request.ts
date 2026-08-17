@@ -23,46 +23,84 @@ export type CreateRoomForm = {
   spectatorsAllowed: boolean;
 };
 
-/** Every control on the form is editable afterwards from the host console, so the opening
- * position is allowed to be small: a private, open room for a hundred people. */
+/**
+ * The form a host opens on: private, open, full house. Every control is editable afterwards
+ * from the host console, so these are opening positions rather than commitments.
+ *
+ * Name and host start EMPTY and are required (createFormProblems), so the button starts
+ * disabled - two fields is the whole price of admission, and a room with no name is a room
+ * nobody can refer to afterwards.
+ */
 export function blankCreateForm(): CreateRoomForm {
   return {
     title: "",
     hostLabel: "",
     listing: "private",
     password: "",
-    maxPlayers: limits.room.playerSoftCap,
+    maxPlayers: playerCapBounds.max,
     spectatorsAllowed: true,
   };
 }
 
 export type CreateProblem = {
-  field: "title" | "password" | "maxPlayers";
+  field: "title" | "hostLabel" | "password" | "maxPlayers";
   message: string;
 };
 
 /**
+ * The bounds the player-cap field may be set to, and the ones it SHOWS.
+ *
+ * The ceiling is the SOFT cap, not the hard one (@jeopardy/protocol/limits): the hard cap is
+ * refusal headroom so a team rebalance never bounces player 101 of a full room, and it was
+ * never a number a host is invited to type. 2-100 is the product promise, so 2-100 is what the
+ * field accepts and what it prints beside itself - a control whose maximum is a secret is how
+ * the field ended up taking 128 (owner report 2026-08-17).
+ */
+export const playerCapBounds = { min: 2, max: limits.room.playerSoftCap } as const;
+
+/**
+ * A typed player cap, brought inside the bounds. A number input hands back anything - an empty
+ * box (NaN), a pasted 5000, a fractional value from a spinner - and hosts tune DOWN, never up
+ * (docs/design/expansion-and-boundaries.md boundary 2.7), so the field clamps rather than
+ * arguing. Called on commit (change/blur) rather than per keystroke: clamping mid-typing turns
+ * "1" on the way to "15" into "2" and eats the next digit.
+ */
+export function clampPlayerCap(value: number): number {
+  if (!Number.isFinite(value)) return playerCapBounds.max;
+  return Math.min(Math.max(Math.round(value), playerCapBounds.min), playerCapBounds.max);
+}
+
+/**
  * What is wrong with this form right now. Empty = the button works.
  *
- * The title rule is the interesting one and it is NOT "a room needs a name": a private room
- * genuinely does not - nobody but its own players ever reads it. A public room does, because
- * an unnamed row in a server browser is noise rather than an invitation. Same rule the
- * protocol enforces, said here in words instead of as a 400.
+ * Name and host are BOTH unconditionally required (owner call 2026-08-17). They used to be
+ * public-only, on the reasoning that nobody but a private room's own players ever reads them -
+ * which was wrong twice over: the host console, the display's title card and this tab's rejoin
+ * offer all render them for a private room too, and a conditional requirement means the field
+ * a host skipped becomes mandatory later, when they flip the room public mid-game. One rule,
+ * always, is both simpler to obey and simpler to state.
  */
 export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
   const problems: CreateProblem[] = [];
   const title = form.title.trim();
+  const hostLabel = form.hostLabel.trim();
 
-  if (form.listing === "public" && title === "") {
-    problems.push({
-      field: "title",
-      message: "A public room needs a name - it is the line people read in the list.",
-    });
+  if (title === "") {
+    problems.push({ field: "title", message: "Give the room a name." });
   }
   if (title.length > limits.room.roomTitleMaxLength) {
     problems.push({
       field: "title",
       message: `Room name is longer than ${String(limits.room.roomTitleMaxLength)} characters.`,
+    });
+  }
+  if (hostLabel === "") {
+    problems.push({ field: "hostLabel", message: "Say who is hosting." });
+  }
+  if (hostLabel.length > limits.room.hostLabelMaxLength) {
+    problems.push({
+      field: "hostLabel",
+      message: `Host name is longer than ${String(limits.room.hostLabelMaxLength)} characters.`,
     });
   }
   if (form.password !== "" && form.password.length < limits.room.roomPasswordMinLength) {
@@ -79,12 +117,12 @@ export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
   }
   if (
     !Number.isInteger(form.maxPlayers) ||
-    form.maxPlayers < 1 ||
-    form.maxPlayers > limits.room.playerHardCap
+    form.maxPlayers < playerCapBounds.min ||
+    form.maxPlayers > playerCapBounds.max
   ) {
     problems.push({
       field: "maxPlayers",
-      message: `Between 1 and ${String(limits.room.playerHardCap)} players.`,
+      message: `Between ${String(playerCapBounds.min)} and ${String(playerCapBounds.max)} players.`,
     });
   }
   return problems;
@@ -96,9 +134,10 @@ export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
  * weight for the visitors who only came to type a code (the route imports it dynamically at
  * the moment of the tap).
  *
- * Empty optional strings are omitted rather than sent: `hostLabel: ""` and `title: ""` are
- * schema-invalid, and "the host did not say who they are" is a real, rendered state in the
- * lobby row rather than an empty string to store.
+ * Empty strings are omitted rather than sent, which `createFormProblems` now makes unreachable
+ * from the UI and which stays here anyway: `title: ""` and `hostLabel: ""` are schema-invalid
+ * (packages/protocol/src/room/visibility.ts), so a caller that skips the form must fail the
+ * server's own refusal rather than write an empty name into a lobby row.
  */
 export function createRoomBody(form: CreateRoomForm, game: unknown): Record<string, unknown> {
   const title = form.title.trim();
