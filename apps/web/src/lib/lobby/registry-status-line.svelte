@@ -29,19 +29,21 @@
 {/if}
 
 <style>
-  /* Token-only styling (docs/design/theming.md): this renders on the landing page and the
-     lobby, which are themed surfaces, as well as inside the unthemed dev panel - where the
-     tokens fall back to their retro-tv defaults in tokens.css and it still reads correctly. */
+  /* Token-only styling (docs/design/theming.md): this renders on the front door, which is
+     built from the BOARD tokens, as well as inside the unthemed dev panel - where the tokens
+     fall back to their retro-tv defaults in tokens.css and it still reads correctly. Derived
+     from --board-cell-bg + --clue-text-color rather than the chrome tokens because that pair
+     is the one the theme contract guarantees to be legible together under every preset. */
   .registry-status {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
     padding: 0.7rem 0.8rem;
     font-size: 0.85rem;
-    border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-raised);
-    color: var(--surface-text);
+    border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--clue-text-color) 24%, transparent);
+    background: color-mix(in srgb, var(--board-cell-bg) 62%, #000000);
+    color: var(--clue-text-color);
   }
 
   .registry-status[data-tone="ok"] {
@@ -60,13 +62,13 @@
     font-size: 0.75rem;
     overflow-x: auto;
     padding: 0.4rem 0.5rem;
-    border-radius: var(--board-radius);
-    border: 1px solid var(--surface-border);
-    background: var(--surface-page);
+    border-radius: 2px;
+    border: 1px solid color-mix(in srgb, var(--clue-text-color) 24%, transparent);
+    background: color-mix(in srgb, var(--board-cell-bg) 40%, #000000);
   }
 
   .detail {
     font-size: 0.75rem;
-    color: var(--surface-text-muted);
+    color: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
   }
 </style>

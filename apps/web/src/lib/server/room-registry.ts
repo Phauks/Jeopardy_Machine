@@ -202,6 +202,17 @@ export async function readRegistryRow(
 }
 
 /**
+ * Would a client be walking into a room that still exists? The listing query answers this for
+ * PUBLIC rooms only; the front door's rejoin offer needs the same verdict for a private room
+ * it holds the code for (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md).
+ * Same three liveness facts as `listSql`, minus the listing predicate - deliberately, because
+ * being browsable and being alive are the two independent axes this milestone is built on.
+ */
+export function registryRowIsLive(row: RegistryRowState, now: number): boolean {
+  return row.endedAt === null && row.phase !== "ended" && row.expiresAt > now;
+}
+
+/**
  * Turn a D1 failure into the wire's registry status. The SQLite message is the only signal
  * that separates "this deployment never had its migration applied" - the overwhelmingly
  * common cause of an empty lobby, and the one an owner can fix in one command - from a

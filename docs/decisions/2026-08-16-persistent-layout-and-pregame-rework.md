@@ -51,3 +51,21 @@ This reverses part of the pre-game build: the four-stage `playerRouteStageFor` b
 ## Sequencing
 
 The principle first (it changes the shape of the pre-game), then the front door, then the staged-lobby fixes, then the host cog. Nothing here needs new protocol beyond team-move/rename messages and a skin-tone field on player identity.
+
+## Landed 2026-08-16: the front door, rebuilt
+
+The first item of the batch, implemented. What it is now, and the reasoning that is not obvious from the diff:
+
+**One screen, four regions.** `/` carries the rejoin offer, the code box + password, the create form, and the live public list at once; `/lobby` and its screen component are deleted with no redirect (docs/decisions/2026-08-14-room-visibility-and-lobby.md, amended there). On a laptop it is two columns - a control column (join, create) beside a full-height list - and on a phone it is the same regions stacked in priority order. That is the layout answer to the crowding problem the 2026-08-15 split tried to solve with navigation.
+
+**Create is real, and it ends in the game.** The form posts to `POST /api/rooms` with the built-in sample game (dynamically imported at the moment of the tap, so the front door carries none of the engine's weight for the visitors who only came to type a code), stashes the returned host token in sessionStorage under a per-code key, remembers the room, and navigates to `/room/<CODE>/host`. It hands off IMMEDIATELY in every case but one: a room that asked to be PUBLIC and could not be listed stops here and says so with its code and the fix, because navigating away would replace that sentence with a host console that looks perfectly normal (owner report 2026-08-14). The rules are pure and tested (`src/lib/landing/create-room-request.ts`); the room's own refusals remain the server's.
+
+**Rejoin is a note this tab wrote to itself.** `src/lib/lobby/room-memory.ts` records `{code, title, role, at}` in sessionStorage whenever this browser enters a room; the front door reads it synchronously on mount, draws the offer, and asks `/api/rooms/<CODE>/live` per room. `gone` deletes the entry silently; `unknown` (no D1 binding, unapplied migration, offline) keeps the offer, because the room itself refuses on connect and a probe that cannot answer must not be allowed to delete anything. No token, no player id and no password is ever stored in that list - the two secrets keep their own keys, for one hop, in `join-hand-off.ts`.
+
+**Art direction: the page is built from the board's own materials.** The masthead is a full-bleed category-colored band with a gold wordmark; panels are ink blocks separated by the same thick gutters that separate board cells; listed rooms are drawn as cells; every number is in the theme's value face and value color; corners are square and nothing floats on a soft shadow. Two consequences worth keeping: the palette is guaranteed rather than hand-picked (`--board-cell-bg`, `--board-category-bg`, `--board-value-color` and `--clue-text-color` are pairs the theme contract already guarantees legible, so all four presets render this page correctly - including the light paper one, where the DERIVED chrome tokens converge toward each other), and one type scale plus one spacing rhythm are declared at the top of the screen rather than re-guessed per element.
+
+**The hero no longer reflows.** A short lead ("Quiz night, on everyone's phone.", `text-wrap: balance`, 22ch) plus a supporting line (44ch, `text-wrap: pretty`) replaces the single long sentence. Held by a source gate alongside the reserved blocks - the join note, the create form's verdict line and the room list all declare a minimum height, so an arriving answer changes words rather than positions.
+
+**Copy.** The password field is labelled `Password` and says nothing else. The create form's name field carries the live counter the batch asks for.
+
+**The way back is a component.** `src/lib/chrome/home-button.svelte` - an anchor (never `history.back()`: a QR arrival has nothing behind it), `inline` or `floating`, tokenized, with an optional confirm for a surface that is mid-game. The `/dev` layout adopted it; the play surfaces adopt it in their own passes.
