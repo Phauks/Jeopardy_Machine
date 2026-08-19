@@ -119,6 +119,8 @@ export {
   resolveGameRules,
 } from "./modes/jeopardy/game-definition.ts";
 export type { GameDefinition, GameDefinitionBody } from "./modes/jeopardy/game-definition.ts";
+export { embedContentPack, referencedItemIds } from "./modes/jeopardy/compose.ts";
+export type { EmbedRefusal, EmbedResult } from "./modes/jeopardy/compose.ts";
 
 // the assembled registry - the one entry point for opening any portable document
 export { documentRegistry, parsePortableDocument } from "./migrations/registry.ts";
