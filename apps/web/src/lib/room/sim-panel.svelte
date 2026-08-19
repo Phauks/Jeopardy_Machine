@@ -43,6 +43,16 @@
             simStore.simCompleteFinal();
           }}>Auto-fill final</button
         >
+        <!-- A display holds no seat, so nothing else in the sim can produce one - and the
+             console's game-screen readout is driven by exactly this census
+             (src/lib/room/game-screen.ts). Plug one in, pull it out mid-game, watch the header. -->
+        <button
+          type="button"
+          onclick={() => {
+            simStore.simSetConnections({ displays: (view.connections?.display ?? 0) > 0 ? 0 : 1 });
+          }}
+          >{(view.connections?.display ?? 0) > 0 ? "Unplug display" : "Plug in a display"}</button
+        >
       </div>
       <ul class="sim-roster">
         {#each view.roster.players.slice(0, 12) as player (player.playerId)}

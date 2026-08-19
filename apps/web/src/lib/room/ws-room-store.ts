@@ -77,6 +77,12 @@ export class WsRoomStore implements RoomStore {
       lastJudged: null,
       wagerRange: null,
       finalWagerRanges: [],
+      // Null until the room says otherwise: the census is the DO's to count, and a shell that
+      // invented one would tell a host a projector was attached to a socket that is not open.
+      // Wiring: the `snapshot` message gains the protocol's `connectionCensus`
+      // (packages/protocol/src/room/diagnostics.ts) - the same counts the host-authenticated
+      // GET /api/rooms/<CODE> already returns - and is refreshed on join/leave broadcasts.
+      connections: null,
       paused: false,
       // The room's defaults until the socket says otherwise. `hideJoinCode: false` is the
       // right shell value: the connecting screen shows no code anyway, and a room that turns

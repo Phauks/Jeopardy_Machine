@@ -7,6 +7,7 @@
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
+import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 
 export type RoomConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
@@ -135,6 +136,22 @@ export type RoomView = {
   lastJudged: LastJudgedView | null;
   wagerRange: WagerRangeView | null;
   finalWagerRanges: WagerRangeView[];
+  /**
+   * WHO IS ACTUALLY ON A SOCKET, by the role they joined as - the protocol's own census type
+   * (packages/protocol/src/room/diagnostics.ts), counts only, never people.
+   *
+   * The console's first question at 19:55 is "is anything on the projector", and the roster
+   * cannot answer it: a display holds no seat by design (the projector is the host's own screen,
+   * not a participant). `connections.display` is the answer, and it counts displays this console
+   * never opened - a Chromecast, a co-host's laptop, a second projector.
+   *
+   * NULL means "this store cannot know", which is the honest answer in mock mode: the local sim
+   * is one isolated room per tab, so a display window opened beside it is a different room and
+   * counting it would be a lie. The console falls back to the window handle it owns
+   * (src/lib/room/game-screen.ts), which is first-hand either way. The ws store fills this from
+   * the room's snapshot when M3 carries it (docs/design/surfaces.md, the mapping table).
+   */
+  connections: ConnectionCensus | null;
   /** Host pause (C4): a driver concern, not an engine phase - timers freeze, display dims. */
   paused: boolean;
   /**

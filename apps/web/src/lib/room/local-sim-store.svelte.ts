@@ -146,6 +146,11 @@ export class LocalSimRoomStore implements RoomStore {
     hostLabel: "",
   });
   private refusalState = $state.raw<RoomRefusalView | null>(null);
+  // The non-player connections the sim is pretending exist: a projector plugged in, an audience
+  // watching. Players are counted from the roster instead, because the sim already tracks their
+  // connectedness (simSetConnected) and a seat outlives a dropped phone.
+  private simDisplays = $state(0);
+  private simSpectators = $state(0);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
@@ -180,10 +185,28 @@ export class LocalSimRoomStore implements RoomStore {
       lastJudged: this.lastJudged,
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
+      // The census the DO would count (packages/protocol/src/room/diagnostics.ts). The sim can
+      // justify every number here: one host connection (this console, or the one the simulated
+      // room implies), players from the roster's own connectedness, and displays/spectators from
+      // what the sim panel has been told to pretend. Crucially it does NOT count a display
+      // window the host opened beside this tab: in mock mode that window is a different isolated
+      // room, and the console's own window handle is what answers for it (game-screen.ts).
+      connections: {
+        total: 1 + this.connectedPlayerCount + this.simDisplays + this.simSpectators,
+        host: 1,
+        player: this.connectedPlayerCount,
+        display: this.simDisplays,
+        spectator: this.simSpectators,
+        unjoined: 0,
+      },
       paused: this.pausedState,
       settings: this.roomSettings,
       refusal: this.refusalState,
     };
+  }
+
+  private get connectedPlayerCount(): number {
+    return this.rosterPlayers.filter((player) => player.connected).length;
   }
 
   // --- engine dispatch + event fan-out ---------------------------------------------------
@@ -787,6 +810,18 @@ export class LocalSimRoomStore implements RoomStore {
         playerId: player.id,
       });
     });
+  }
+
+  /**
+   * Attach or unplug simulated projectors and audience - the census the host console reads to
+   * answer "is anything on the big screen" (RoomView.connections). Displays hold no seat and are
+   * in neither participant budget, so this touches the roster not at all.
+   */
+  simSetConnections(patch: { displays?: number; spectators?: number }): void {
+    if (patch.displays !== undefined) this.simDisplays = Math.max(0, Math.trunc(patch.displays));
+    if (patch.spectators !== undefined) {
+      this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
+    }
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

@@ -4,31 +4,61 @@
   // score-override drawer, roster health, pause - plus the C5 wizards (Double Down, Final)
   // and manual mode (host-award, resolved UX question 1).
   //
-  // Mirror mode (C1b, per-DEVICE toggle): the laptop screen IS the projector, so the console
-  // reshapes into the display layout with a slim dock the room may see - and the private
-  // layer (answers, wager ranges) does not render AT ALL in mirror mode. Keyboard shortcuts
-  // keep working; the dock is for visibility, not the only input.
+  // THE TWO SETUPS, one choice (C1/C1b, per-DEVICE - `screenSetup`, never a room setting):
+  //
+  //   second-screen  the projector is another output. The console OPENS the game screen as its
+  //                  own window (game-screen-panel.svelte), tracks whether it is still there, and
+  //                  keeps the private layer: answers, wager cells, the judge row.
+  //   mirror         the laptop screen IS the projector, so the console reshapes into the display
+  //                  layout with a slim dock the room may see - and the private layer does not
+  //                  render AT ALL. Keyboard shortcuts keep working; the dock is for visibility,
+  //                  not the only input.
   import DisplayScreen from "#lib/room/display-screen.svelte";
+  import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
+  import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
+  import JoinPanel from "#lib/room/join-panel.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
   import SettingsPanel from "#lib/host-settings/settings-panel.svelte";
   import SimPanel from "#lib/room/sim-panel.svelte";
   import { cellKey } from "@jeopardy/engine/state";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
   import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
+  import { GameScreenWindow } from "#lib/room/game-screen.svelte.ts";
+  import { startReadiness } from "#lib/room/game-screen.ts";
   import { entityDisplayName, standingsFor } from "#lib/room/room-view.ts";
   import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
   import type { RoomStore } from "#lib/room/room-store.ts";
+  import type { ShareTarget } from "#lib/room/join-share.ts";
 
   type Props = {
     store: RoomStore;
     /** Dev flag from the route: renders the sim panel when the store is the local sim. */
     showSimPanel?: boolean;
-    /** Initial mirror state (a per-device toggle, never a room setting). */
+    /** Force mirror mode for this render (the route's ?mirror) whatever the device prefers. */
     mirror?: boolean;
     /** Start with the settings panel open - the route's ?settings, and what tests render. */
     settingsOpen?: boolean;
+    /** Start with the join panel open; null = open in the lobby, where doors-open lives. */
+    joinOpen?: boolean | null;
+    /** Origin for the join link + QR; this window's own at runtime. */
+    joinOrigin?: string | null;
+    /** Theme id carried onto the game-screen window so the projector matches this console. */
+    themeId?: string | null;
+    /** Injected in tests: the window this console opens, and the share sheet it reaches for. */
+    gameScreen?: GameScreenWindow | null;
+    shareTarget?: ShareTarget | null;
   };
-  let { store, showSimPanel = false, mirror = false, settingsOpen = false }: Props = $props();
+  let {
+    store,
+    showSimPanel = false,
+    mirror = false,
+    settingsOpen = false,
+    joinOpen = null,
+    joinOrigin = null,
+    themeId = null,
+    gameScreen = null,
+    shareTarget = null,
+  }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -43,10 +73,42 @@
   // svelte-ignore state_referenced_locally - deliberately the INITIAL value only.
   let panelOpen = $state(settingsOpen);
   const device = $derived(devicePreferences.current);
-  const mirrorMode = $derived(device.mirror || mirror);
+  const mirrorMode = $derived(device.screenSetup === "mirror" || mirror);
   const manualMode = $derived(device.manualMode);
   let scoreDrawerOpen = $state(false);
   let hostWagerEntry = $state<number | null>(null);
+
+  // THE GAME SCREEN this console opened, and whether it is still there (src/lib/room/game-screen
+  // .svelte.ts). Owned by the console rather than by the panel that draws it, because the header
+  // readout, the lobby panel and the start guard are all asking the same window one question.
+  // svelte-ignore state_referenced_locally - the injected window is a construction-time choice.
+  const gameScreenWindow = gameScreen ?? new GameScreenWindow();
+  // The join panel is OPEN in the lobby by default: at that moment the console has exactly one
+  // job, which is getting thirty people into the room (C2 doors open).
+  // svelte-ignore state_referenced_locally - the INITIAL value only.
+  let joinPanelOpen = $state(joinOpen ?? store.view.phase === "lobby");
+
+  // STARTING. Two different failures, one readout (src/lib/room/game-screen.ts): an empty room is
+  // refused by the engine, and a room whose projector shows a desktop starts perfectly well and
+  // nobody sees it. The second is warned once and never blocked - a small room run off one laptop
+  // is a legitimate setup.
+  const readiness = $derived(
+    startReadiness({
+      seatedPlayers: view.roster.players.length,
+      mirrored: mirrorMode,
+      gameScreen: gameScreenWindow.state,
+      connectedDisplays: view.connections?.display ?? null,
+    }),
+  );
+  let startWarned = $state(false);
+  function attemptStart(): void {
+    if (readiness.kind === "blocked") return;
+    if (readiness.kind === "warn" && !startWarned) {
+      startWarned = true;
+      return;
+    }
+    store.startGame();
+  }
 
   // The per-surface type scale, and the whole reason it is per-surface: in mirror mode this
   // laptop IS the projector, so it wears the DISPLAY scale; otherwise it is the host's own
@@ -227,7 +289,7 @@
         type="button"
         class="dock-button subtle"
         onclick={() => {
-          devicePreferences.update({ mirror: false });
+          devicePreferences.update({ screenSetup: "second-screen" });
         }}
       >
         Exit mirror
@@ -242,6 +304,15 @@
         <span class="roster-health" title="connected / total players">
           {connectedCount}/{view.roster.players.length} connected
         </span>
+        <!-- The game screen's state, in every phase: a projector can be unplugged at any point in
+             the night, and this console is the only thing in the room that would notice. -->
+        <GameScreenPanel
+          {view}
+          gameScreen={gameScreenWindow}
+          preferences={devicePreferences}
+          {themeId}
+          variant="chip"
+        />
         {#if manualMode}
           <!-- Modes the host has switched on stay VISIBLE on the console even though they are
                set in the cog: a host must never wonder why the buzzers are dead. -->
@@ -264,6 +335,18 @@
         </button>
         <!-- THE COG. Opens a rail beside the console, never a screen: the board, the clue and
              the judge row stay live while it is open (the persistent-layout law). -->
+        <!-- Join info opens IN PLACE beside the console, like the cog: a host holding the laptop
+             up to the room must not lose the roster filling up behind it. -->
+        <button
+          type="button"
+          class="chip"
+          aria-expanded={joinPanelOpen}
+          onclick={() => {
+            joinPanelOpen = !joinPanelOpen;
+          }}
+        >
+          Join info
+        </button>
         <button
           type="button"
           class="chip cog"
@@ -278,31 +361,52 @@
       </div>
     </header>
 
+    {#if view.phase === "lobby"}
+      <!-- START IS AN ACTION, not the last line of a checklist (owner, 2026-08-19). It lives in
+           the console's own chrome with its readiness attached: the refusal when there is nobody
+           to seat, and the one-press warning when nothing is on the projector. -->
+      <div class="start-row">
+        <button
+          type="button"
+          class="primary"
+          disabled={readiness.kind === "blocked"}
+          onclick={attemptStart}>Start game</button
+        >
+        {#if readiness.kind === "blocked"}
+          <p class="start-note" role="status">
+            <strong>{readiness.headline}</strong>
+            {readiness.detail}
+          </p>
+        {:else if readiness.kind === "warn" && startWarned}
+          <p class="start-note warn" role="alert">
+            <strong>{readiness.headline}</strong>
+            {readiness.detail}
+          </p>
+          <button type="button" class="chip" onclick={() => store.startGame()}>Start anyway</button>
+        {:else}
+          <p class="start-note" role="status"></p>
+        {/if}
+      </div>
+    {/if}
+
     <!-- The console proper and the settings rail, side by side. The rail SHRINKS the console
          rather than covering it, so nothing the host was reading disappears when they open it. -->
     <div class="console-body">
       <div class="console-main">
         {#if view.phase === "lobby"}
-          <section class="panel preflight">
-            <h2>Pre-flight</h2>
-            <ul class="checklist">
-              <li>{view.roster.players.length} players in ({connectedCount} connected)</li>
-              <li>{view.roster.teams.length} teams</li>
-              <li>Display: open <code>/room/{view.roomCode}/display</code> on the projector</li>
-            </ul>
-            <!-- An empty room cannot start: the engine has nobody to seat, so `start-game` is
-                 refused and the room stays in its lobby. It used to be a button that did
-                 nothing (2026-08-16 host-loop walk); now it says why. -->
-            <button
-              type="button"
-              class="primary"
-              disabled={view.roster.players.length === 0}
-              onclick={() => store.startGame()}>Start game</button
-            >
-            {#if view.roster.players.length === 0}
-              <p class="wizard-line">Nobody has joined yet - the game needs at least one player.</p>
-            {/if}
-          </section>
+          <!-- The lobby is two questions, each answered by the thing that can act on it: how does
+               the room see this game, and who is in it. The old "Pre-flight" panel restated the
+               roster's own counts as a second list and printed the display URL as a hint -
+               deleted 2026-08-19 (owner: "they should be combined or not exist separately"). -->
+          <div class="lobby-grid">
+            <GameScreenPanel
+              {view}
+              gameScreen={gameScreenWindow}
+              preferences={devicePreferences}
+              {themeId}
+            />
+            <HostRosterPanel {view} />
+          </div>
         {:else}
           <div class="console-grid">
             <section class="panel minimap-panel">
@@ -708,14 +812,30 @@
         {/if}
       </div>
 
-      {#if panelOpen}
-        <SettingsPanel
-          {store}
-          preferences={devicePreferences}
-          onClose={() => {
-            panelOpen = false;
-          }}
-        />
+      <!-- The rail. Both panels open IN PLACE beside the console and NARROW it rather than
+           covering it, so nothing the host was reading disappears (the persistent-layout law). -->
+      {#if joinPanelOpen || panelOpen}
+        <div class="console-rail">
+          {#if joinPanelOpen}
+            <JoinPanel
+              {store}
+              {joinOrigin}
+              {shareTarget}
+              onClose={() => {
+                joinPanelOpen = false;
+              }}
+            />
+          {/if}
+          {#if panelOpen}
+            <SettingsPanel
+              {store}
+              preferences={devicePreferences}
+              onClose={() => {
+                panelOpen = false;
+              }}
+            />
+          {/if}
+        </div>
       {/if}
     </div>
   </div>
@@ -737,12 +857,50 @@
     color: var(--surface-text);
   }
 
-  /* The console and the settings rail side by side: opening the cog narrows the console
-     rather than covering it, so a clue being judged stays readable throughout. */
+  /* The console and its rail side by side: opening the cog or the join panel narrows the
+     console rather than covering it, so a clue being judged stays readable throughout. */
   .console-body {
     display: flex;
     align-items: flex-start;
     gap: 0.8rem;
+  }
+
+  /* One rail, both panels: they stack rather than fight for the same column, and neither one
+     hides the other (the persistent-layout law - nothing shown gets hidden by a later step). */
+  .console-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+    align-items: stretch;
+  }
+
+  /* The lobby's two questions, side by side on a laptop and stacked on a narrow window: how the
+     room sees this game, and who is in it. */
+  .lobby-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    gap: 0.8rem;
+    align-items: start;
+  }
+
+  /* Start lives in the console's own chrome with its state beside it. The note slot is reserved
+     so an arriving warning changes words rather than positions. */
+  .start-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .start-note {
+    margin: 0;
+    min-height: 1.2em;
+    font-size: 0.85em;
+    color: var(--surface-text-muted);
+  }
+
+  .start-note.warn {
+    color: var(--score-negative);
   }
 
   .console-main {
@@ -1093,15 +1251,6 @@
     font-size: 0.65em;
     opacity: 0.65;
     margin-left: 0.25em;
-  }
-
-  .checklist {
-    margin: 0;
-    padding-left: 1.1rem;
-    font-size: 0.92em;
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
   }
 
   .score-drawer {

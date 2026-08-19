@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-16 (staged-lobby placement fixes + the host settings cog + the C4 verification walk; before that, the reconcile between the two parallel milestones: the spectator budget reaches the lobby row, the theme document gains its `environment` + `staging` slots, streamer mode reaches the display, and the room's caps refuse in human copy. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-19 (the game screen + the console's join panel; before that, staged-lobby placement fixes + the host settings cog + the C4 verification walk; before that, the reconcile between the two parallel milestones: the spectator budget reaches the lobby row, the theme document gains its `environment` + `staging` slots, streamer mode reaches the display, and the room's caps refuse in human copy. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -148,6 +148,14 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 - [x] **The host settings cog** (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md): an in-place rail, never a screen, split into **this device** (independent display and console type scales, room audio + volume, mirror, manual mode, timers, roster density, stage motion) and **this room** (streamer mode with the code reveal, listing + title, password, caps, spectators). The two type scales are one `--type-scale` token scoped per surface, and the display's reaches the projector window of the same browser live through the device-preferences document
 - [x] **The C4 loop walked end to end** (`host-loop.verify.test.ts`), and seven breaks fixed: Start in an empty room took the projector off the staged lobby silently, sudden death was unrunnable (a tiebreaker has no clue, and every control lived inside the clue branch), everyone-answers stopped dead at all-judging, reopen-a-clue had no surface, a rebound never named who was locked out, timer hints accumulated, and space on a select armed the buzzers
 - [ ] Next: reveal-a-hidden-code and the caps panel now exist on the console, but they write through `RoomStore.updateRoomSettings`, whose ws implementation is still a stub - it wires with the rest of the store at reconcile
+
+      Progress 2026-08-19 - the game screen and the join panel (owner, docs/decisions/2026-08-19-game-screen-and-join-panel.md):
+
+- [x] **"How does the room see this game" is one choice with an action attached**: the `mirror` boolean becomes `screenSetup` (second screen / mirror), and the console's game-screen panel OPENS the display as a named 16:9 popup carrying the console's theme - the setup that used to be a URL printed in a checklist. The window is then tracked: never-opened / open / closed (a poll of `window.closed`, since a closing popup fires nothing reliable), shown as a lobby panel and a header chip in every phase, with a blocked pop-up reported rather than silently believed. Closing the console never closes the display
+- [x] **Starting with nothing attached warns once and never blocks**, and an empty room is still refused with its reason on the button - two failures, kept apart (`startReadiness`)
+- [x] **The console knows what is connected**: `RoomView.connections` is the protocol's `ConnectionCensus` (counts, never people), null when the store cannot know, so a display driven by a Chromecast or a co-host outranks the window this console opened. The sim panel gained "Plug in a display" to drive it in mock mode
+- [x] **The join panel** (in place, never a page): the room code at value-face size, a QR scannable from a few feet, the join link with Web-Share-then-clipboard sharing, and a fullscreen state for holding the laptop up to a room. **Streamer mode inverts here** - the display drops the code, QR and URL from its markup; the console keeps them and says they are not on the big screen, because the console is the host's own screen and already shows every answer
+- [x] **The Pre-flight checklist is deleted** (owner: "pre-flight and roster look the exact same"): the roster panel owns who is here by name and health, the game-screen panel owns what the room can see, and Start game is an action in the console's chrome. One place per fact - the persistent-layout law applied to information
 - [ ] Reconcile with M3: flip `createRoomStore` to the ws store and wire the gap list in docs/design/surfaces.md (content channel, timers, pause, room-closed screens) - exit criteria (real phones in one room) blocks on this
 - [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups, bundled sound files, PWA precache growth (tracked in docs/design/surfaces.md "Known gaps")
 
@@ -224,6 +232,7 @@ Resolved 2026-08-13: code license = **AGPL-3.0-only** (owner pick; four-surface 
 | Owner directives + feature ideas log                             | docs/research/00-user-directives.md          |
 | Expansion paths + customization boundaries (the design law)      | docs/design/expansion-and-boundaries.md      |
 | End-to-end user flows: guest / creator / host                    | docs/design/user-flows.md                    |
+| Play surfaces, the room-store seam, the M3 reconcile             | docs/design/surfaces.md                      |
 | Game rules, buzzer mechanics, 42-setting rules matrix            | docs/research/01-game-anatomy.md             |
 | Competitor features, paywalls, lessons                           | docs/research/02-landscape.md                |
 | Stack, DO design, storage, auth phases, costs                    | docs/research/03-architecture.md             |

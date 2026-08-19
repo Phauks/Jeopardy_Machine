@@ -133,7 +133,7 @@ describe("stored preferences are read tolerantly", () => {
   it("resets to the shipped defaults", () => {
     const preferences = new DevicePreferencesStore();
     preferences.attach(fakeStorage());
-    preferences.update({ mirror: true, displayTypeScale: 1.8, manualMode: true });
+    preferences.update({ screenSetup: "mirror", displayTypeScale: 1.8, manualMode: true });
     preferences.reset();
     expect(preferences.current).toEqual(defaultDevicePreferences);
   });
@@ -148,7 +148,7 @@ describe("device preferences never touch the room", () => {
     preferences.update({
       displayTypeScale: 1.7,
       consoleTypeScale: 1.3,
-      mirror: true,
+      screenSetup: "mirror",
       manualMode: true,
       displayAudio: false,
       stageMotion: "off",
@@ -267,7 +267,11 @@ describe("the panel itself", () => {
     for (const control of [
       "Room audio on this device",
       "Volume",
-      "Mirror mode",
+      // ONE control for the two setups, not a lone mirror checkbox (2026-08-19): the panel asks
+      // how the room sees the game, and the console's game-screen panel acts on the answer.
+      "How the room sees this game",
+      "Second screen (projector or TV)",
+      "Mirror this screen",
       "Manual mode",
       "Show timers",
       "Roster density",
