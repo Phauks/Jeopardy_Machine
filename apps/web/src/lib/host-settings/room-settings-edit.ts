@@ -34,8 +34,8 @@ export function settingsRejectionCopy(reason: SettingsRejection): SettingsRefusa
     case "title-required":
       return {
         reason,
-        headline: "A public room needs a name",
-        advice: "Give the game a title first - an unnamed row in the browser is not an invitation.",
+        headline: "Room name required",
+        advice: "Add a room name before making this room public.",
       };
     case "below-current":
       return {
