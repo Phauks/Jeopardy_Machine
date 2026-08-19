@@ -2,11 +2,11 @@
 
 The picture-round image pipeline for the first event: takes the eight Wikimedia Commons files the curation pass verified (docs/content/media-and-sounds.md section 1) and produces the committed, projector-sized set the game actually shows.
 
-| Output             | Where it lands                                      | Who reads it                                    |
-| ------------------ | --------------------------------------------------- | ----------------------------------------------- |
-| **8 WebP images**  | `events/board-game-club-x-els/media/img-0N.webp`    | The board display, through the pack's media ids |
-| **Rewritten pack** | `events/board-game-club-x-els/event-pack.pack.json` | Real `bytes`/`sha256`/`mime`, `bundled` storage |
-| **Rewritten game** | `events/board-game-club-x-els/event-game.game.json` | `content.sha256` re-pointed at the new pack     |
+| Output             | Where it lands                                                     | Who reads it                                    |
+| ------------------ | ------------------------------------------------------------------ | ----------------------------------------------- |
+| **8 WebP images**  | `apps/web/static/games/board-game-club-x-els/media/img-0N.webp`    | The board display, through the pack's media ids |
+| **Rewritten pack** | `apps/web/static/games/board-game-club-x-els/event-pack.pack.json` | Real `bytes`/`sha256`/`mime`, `bundled` storage |
+| **Rewritten game** | `apps/web/static/games/board-game-club-x-els/event-game.game.json` | `content.sha256` re-pointed at the new pack     |
 
 This package is tooling, not shipped code: one plain Node script driving `ffmpeg`. It has no build/test/check scripts, so recursive workspace commands skip it.
 

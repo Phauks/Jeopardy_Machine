@@ -1,6 +1,6 @@
 // The game <-> pack join, against the REAL event documents rather than a fixture, because the
-// thing being proved is that the event night can actually be hosted: events/board-game-club-x-
-// els/ is an external-pack game, and until this module existed there was no way to turn it
+// thing being proved is that the event night can actually be hosted: the club night's game is
+// an external-pack game, and until this module existed there was no way to turn it
 // into something a room could be created from.
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
@@ -10,7 +10,10 @@ import { parsePortableDocument } from "../../migrations/registry.ts";
 import type { ContentPack } from "../../content/content-pack.ts";
 import type { GameDefinition } from "./game-definition.ts";
 
-const eventDirectory = new URL("../../../../../events/board-game-club-x-els/", import.meta.url);
+const eventDirectory = new URL(
+  "../../../../../apps/web/static/games/board-game-club-x-els/",
+  import.meta.url,
+);
 
 function readEvent(name: string): { text: string; sha256: string } {
   const bytes = readFileSync(new URL(name, eventDirectory));

@@ -384,7 +384,7 @@ Every file is CC0 1.0, verified by re-reading each Freesound page's license line
 
 ### Images - 8 files, 3,473 KiB
 
-The picture round's eight Commons files are acquired and committed at `events/board-game-club-x-els/media/img-0N.webp`, produced by `tools/event-media-bake`. The credits table (a row per file, public-domain files included, per checklist 5.5) is in that event's README; the per-file provenance record lives in the pack's own `ext` bag.
+The picture round's eight Commons files are acquired and committed at `apps/web/static/games/board-game-club-x-els/media/img-0N.webp`, produced by `tools/event-media-bake`. The credits table (a row per file, public-domain files included, per checklist 5.5) is in that event's README; the per-file provenance record lives in the pack's own `ext` bag.
 
 | ID     | Commons original        | Committed      | Bytes       |
 | ------ | ----------------------- | -------------- | ----------- |

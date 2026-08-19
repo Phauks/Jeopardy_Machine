@@ -3,7 +3,7 @@
 //
 // There is no source table here on purpose. The pack IS the source table: every image's file
 // page, author, license and Commons sha1 already ride in
-// events/board-game-club-x-els/event-pack.pack.json under
+// apps/web/static/games/board-game-club-x-els/event-pack.pack.json under
 // ext["com.jeopardy-machine.event.media-verification"], put there by the curation pass. A
 // second copy in this directory would be one more thing to drift.
 //
@@ -33,7 +33,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 
 const repositoryRoot = new URL("../../../", import.meta.url);
-const eventDirectory = new URL("events/board-game-club-x-els/", repositoryRoot);
+const eventDirectory = new URL("apps/web/static/games/board-game-club-x-els/", repositoryRoot);
 const packFile = new URL("event-pack.pack.json", eventDirectory);
 const gameFile = new URL("event-game.game.json", eventDirectory);
 const mediaDirectory = new URL("media/", eventDirectory);

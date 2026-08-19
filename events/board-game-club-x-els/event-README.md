@@ -13,7 +13,7 @@
 
 Both documents open through `parsePortableDocument` (the `@jeopardy/protocol` public entry point) and are gate-tested by `packages/protocol/src/event-documents.test.ts`: every cell resolves to a pack item, bench/alternate items are present-but-unreferenced, every media ref resolves to a committed file whose sha256 and dimensions still check out, and the external pack link's sha256 matches this directory's exact `event-pack.pack.json` bytes.
 
-**After ANY edit to `event-pack.pack.json`** recompute the hash and paste it into `event-game.game.json` -> `body.content.sha256`, or the gate test will fail (by design): `node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('events/board-game-club-x-els/event-pack.pack.json')).digest('hex'))"` - and run `pnpm fmt` BEFORE hashing, since the hash covers the formatted bytes. (`pnpm -F @jeopardy/event-media-bake bake` does that whole chain itself when it rewrites the media refs.)
+**After ANY edit to `event-pack.pack.json`** recompute the hash and paste it into `event-game.game.json` -> `body.content.sha256`, or the gate test will fail (by design): `node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('apps/web/static/games/board-game-club-x-els/event-pack.pack.json')).digest('hex'))"` - and run `pnpm fmt` BEFORE hashing, since the hash covers the formatted bytes. (`pnpm -F @jeopardy/event-media-bake bake` does that whole chain itself when it rewrites the media refs.)
 
 ## How swapping works (the one-line-edit contract)
 

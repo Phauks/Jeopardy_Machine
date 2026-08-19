@@ -18,6 +18,7 @@
     createFormProblems,
     playerCapBounds,
   } from "#lib/landing/create-room-request.ts";
+  import { gameCatalog } from "#lib/landing/game-catalog.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
   import type { RegistryStatus } from "@jeopardy/protocol/room/registry";
@@ -104,6 +105,39 @@
           <span class="segment-note">Listed here</span>
         </label>
       </div>
+    </fieldset>
+
+    <!-- WHICH GAME. First, because it is the only choice here that decides what the night
+         actually is - everything below it is about the room, not the game. The file option is a
+         choice by name rather than an import affordance hidden somewhere: "the game I brought"
+         is a first-class answer (game-catalog.ts). -->
+    <fieldset class="field listing-field game-field">
+      <legend class="field-label">Which game</legend>
+      <div class="segmented">
+        {#each gameCatalog as entry (entry.id)}
+          <label class:selected={form.gameChoice === entry.id}>
+            <input type="radio" name="game-choice" value={entry.id} bind:group={form.gameChoice} />
+            <span class="segment-title">{entry.title}</span>
+            <span class="segment-note">{entry.note}</span>
+          </label>
+        {/each}
+      </div>
+      {#if form.gameChoice === "file"}
+        <!-- Both files at once: a game that keeps its questions in a separate pack needs the
+             pack too, and asking for them one at a time is a wizard step. Which file is which
+             is decided by the FORMAT inside, never by the name. -->
+        <label class="file-field">
+          <span class="field-label">Game file, and its pack if it has one</span>
+          <input
+            type="file"
+            accept=".json,application/json"
+            multiple
+            onchange={(event) => {
+              form.gameFiles = Array.from(event.currentTarget.files ?? []);
+            }}
+          />
+        </label>
+      {/if}
     </fieldset>
 
     <!-- HOW PEOPLE PLAY, and it belongs on this form because there is nowhere else to put it:
@@ -261,6 +295,7 @@
   .name-field,
   .listing-field,
   .player-mode-field,
+  .game-field,
   .verdict,
   .create-button {
     grid-column: 1 / -1;
@@ -314,6 +349,19 @@
 
   /* auto-fit rather than a fixed two: the listing control has two options and "how people play"
      has three since mixed landed, and a hard column count would have squeezed the third out. */
+  .file-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+  }
+
+  .file-field input {
+    font: inherit;
+    font-size: 0.8rem;
+    color: var(--create-ink);
+  }
+
   .segmented {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));

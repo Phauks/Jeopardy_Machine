@@ -329,6 +329,30 @@ describe("hosting is a button, and its form opens in place", () => {
     }
   });
 
+  it("asks WHICH GAME, including the club night and a file the host brought", () => {
+    // The form always sent the built-in sample, so the one game this software exists to run
+    // could be authored, validated, hashed and never played (2026-08-19).
+    const body = renderFrontDoor({ createState: { status: "creating" } });
+    expect(body).toContain("Which game");
+    expect(body).toContain("Sample game");
+    expect(body).toContain("Board Game Club");
+    expect(body).toContain("A game file");
+    for (const choice of ["sample", "event", "file"]) {
+      expect(body).toContain(`value="${choice}"`);
+    }
+  });
+
+  it("shows the file picker only once a host has asked for a file", () => {
+    const idle = renderFrontDoor({ createState: { status: "creating" } });
+    expect(idle).not.toContain('type="file"');
+    const bringing = { ...blankCreateForm(), gameChoice: "file" as const, title: "Quiz" };
+    const body = renderFrontDoor({ createForm: bringing, createState: { status: "creating" } });
+    expect(body).toContain('type="file"');
+    // Both files at once - asking for them one at a time is a wizard step, and a game that
+    // keeps its questions in a separate pack needs the pack too.
+    expect(body).toContain("multiple");
+  });
+
   it("asks how people play, because nothing else can (owner report 2026-08-19)", () => {
     // Teams mode is a RULE of the game, fixed when the room opens - there is no console switch
     // that can flip it mid-night, so if this form does not ask, every room the front door makes

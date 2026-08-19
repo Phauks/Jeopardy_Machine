@@ -13,6 +13,7 @@
 import { limits } from "@jeopardy/protocol/limits";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
 import type { GameDefinitionBody } from "@jeopardy/protocol";
+import type { GameChoiceId } from "#lib/landing/game-catalog.ts";
 import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 
 export type CreateRoomForm = {
@@ -31,6 +32,14 @@ export type CreateRoomForm = {
    * it learns everything else about the game (`withPlayerMode` below).
    */
   playerMode: PlayerMode;
+  /**
+   * Which game the room opens with (game-catalog.ts). Not part of the POST body - it decides
+   * which DEFINITION the route loads and sends, which is a different thing: the room stores a
+   * game, never a catalog id, so a room outlives whatever this app happens to offer.
+   */
+  gameChoice: GameChoiceId;
+  /** The files a host picked when `gameChoice` is "file"; empty until they choose. */
+  gameFiles: File[];
 };
 
 /**
@@ -53,6 +62,8 @@ export function blankCreateForm(): CreateRoomForm {
     // settings/groups/teams.ts) - so the opening position of the form and the opening position
     // of an unmodified game agree.
     playerMode: "individuals",
+    gameChoice: "sample",
+    gameFiles: [],
   };
 }
 

@@ -1,4 +1,4 @@
-// The first-event documents (events/board-game-club-x-els/) validated through the public
+// The first-event documents (apps/web/static/games/board-game-club-x-els/) validated through
 // entry point, exactly as an import would open them. This is a referential-integrity gate for
 // REAL data, not a schema unit test: the board draft's curation contract (every cell resolves,
 // bench and alternate clues ride along unreferenced, picture cells carry committed media whose
@@ -37,7 +37,10 @@ function readWebpSize(bytes: Buffer): { width: number; height: number } {
   throw new Error(`unknown WebP chunk "${chunk}"`);
 }
 
-const eventDirectory = new URL("../../../events/board-game-club-x-els/", import.meta.url);
+const eventDirectory = new URL(
+  "../../../apps/web/static/games/board-game-club-x-els/",
+  import.meta.url,
+);
 const packBytes = readFileSync(new URL("event-pack.pack.json", eventDirectory));
 const gameBytes = readFileSync(new URL("event-game.game.json", eventDirectory));
 
