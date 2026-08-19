@@ -13,6 +13,7 @@
   //                  layout with a slim dock the room may see - and the private layer does not
   //                  render AT ALL. Keyboard shortcuts keep working; the dock is for visibility,
   //                  not the only input.
+  import { onDestroy } from "svelte";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
   import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
@@ -83,6 +84,16 @@
   // readout, the lobby panel and the start guard are all asking the same window one question.
   // svelte-ignore state_referenced_locally - the injected window is a construction-time choice.
   const gameScreenWindow = gameScreen ?? new GameScreenWindow();
+  // Release the poll when this console goes away - and ONLY the poll: the projector window
+  // deliberately outlives its opener (src/lib/room/game-screen.svelte.ts). An injected one
+  // belongs to the caller, so it is left alone entirely.
+  // svelte-ignore state_referenced_locally - construction-time again, same prop.
+  const ownsGameScreenWindow = gameScreen === null;
+  if (ownsGameScreenWindow) {
+    onDestroy(() => {
+      gameScreenWindow.destroy();
+    });
+  }
   // The join panel is OPEN in the lobby by default: at that moment the console has exactly one
   // job, which is getting thirty people into the room (C2 doors open).
   // svelte-ignore state_referenced_locally - the INITIAL value only.

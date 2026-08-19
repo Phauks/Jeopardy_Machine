@@ -208,12 +208,18 @@
   }
 
   /* The code is the one thing a room reads off a laptop held above someone's head, so it is
-     sized like a board value rather than like chrome. */
+     sized like a board value - and DRAWN like a board cell, on the cell background rather than
+     on the panel's. `--board-cell-bg` + `--board-value-color` is a pair the theme contract
+     guarantees legible (docs/design/theming.md); the same gold on a raised chrome surface is
+     the pair that is only legible on the dark presets, which would have failed on paper. */
   .room-code {
     margin: 0;
+    padding: 0.1em 0.35em 0.16em;
+    background: var(--board-cell-bg);
+    border-radius: var(--board-radius);
     font-family: var(--font-values);
     font-size: 3.4em;
-    line-height: 0.95;
+    line-height: 1;
     letter-spacing: 0.12em;
     color: var(--board-value-color);
   }
