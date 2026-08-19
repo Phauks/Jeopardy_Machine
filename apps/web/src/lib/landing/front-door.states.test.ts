@@ -329,6 +329,18 @@ describe("hosting is a button, and its form opens in place", () => {
     }
   });
 
+  it("asks how people play, because nothing else can (owner report 2026-08-19)", () => {
+    // Teams mode is a RULE of the game, fixed when the room opens - there is no console switch
+    // that can flip it mid-night, so if this form does not ask, every room the front door makes
+    // is an individuals room and the pre-game screen's teams region can only say so. The choice
+    // is written onto the game definition (create-room-request.ts, withPlayerMode).
+    const body = renderFrontDoor({ createState: { status: "creating" } });
+    expect(body).toContain("How people play");
+    expect(body).toContain("Individuals");
+    expect(body).toContain("Teams");
+    expect(body).toContain('value="teams"');
+  });
+
   it("marks the two fields the room cannot open without (owner call 2026-08-17)", () => {
     const body = renderFrontDoor({ createState: { status: "creating" } });
     // Room name and Hosted by are required, and the panel says so on the labels rather than

@@ -122,8 +122,14 @@ describe("the regions are ALL present in every pre-game state", () => {
     }
   });
 
-  it("offers a way home from the surface", () => {
-    expect(bodyOf(newStore())).toContain("home-button");
+  it("offers a way home from the surface - the wordmark in the shared header bar", () => {
+    // It was a lone "home" button floated to the right of the room line until 2026-08-19; the
+    // way back is now the same bar the front door wears (#lib/chrome/app-bar.svelte), and the
+    // wordmark is the link. Still an ANCHOR, never history.back(): half the arrivals here are a
+    // QR scan with nothing behind them.
+    const body = bodyOf(newStore());
+    expect(body).toContain('class="wordmark');
+    expect(body).toContain('href="/"');
   });
 });
 

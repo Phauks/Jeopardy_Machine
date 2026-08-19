@@ -20,6 +20,7 @@
     createRoomBody,
     describeCreateFailure,
     handOffAfterCreate,
+    withPlayerMode,
   } from "#lib/landing/create-room-request.ts";
   import { devSurfaces } from "#lib/landing/surface-cards.ts";
   import { limits } from "@jeopardy/protocol/limits";
@@ -107,11 +108,17 @@
       // it, and the front door must not carry that weight for the visitors who only came to
       // type a code. It is fetched at the moment of the tap and never before.
       const { sampleGameDefinition } = await import("#lib/hotseat/sample-game.ts");
+      // The host's individuals-or-teams choice rides on the GAME, not on the room: teams mode
+      // is a rule (create-room-request.ts, withPlayerMode), so it travels with the document
+      // and a room never holds a second copy of the same fact.
       const response = await fetch("/api/rooms", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          createRoomBody(createForm, { kind: "definition", body: sampleGameDefinition.body }),
+          createRoomBody(createForm, {
+            kind: "definition",
+            body: withPlayerMode(sampleGameDefinition.body, createForm.playerMode),
+          }),
         ),
       });
       if (!response.ok) {

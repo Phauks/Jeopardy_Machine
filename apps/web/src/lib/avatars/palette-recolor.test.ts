@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultRecolorTolerance,
   luminance,
+  minimumRecolorAlpha,
   parseHexColor,
   recolorPixels,
   tintTowardAccent,
@@ -87,6 +88,29 @@ describe("recolorPixels", () => {
     const near: readonly [number, number, number] = [234, 120, 84];
     expect(recolorPixels(pixelsOf(near), [target], "#2d6cdf", defaultRecolorTolerance)).toBe(1);
     expect(recolorPixels(pixelsOf(near), [target], "#2d6cdf", 28)).toBe(0);
+  });
+
+  // THE TRANSPARENT GUTTER (owner report 2026-08-19, colour artifacting on the character
+  // screen). A sprite is cut out against transparency, and the RGB left behind an alpha of 0
+  // is the encoder's business, not evidence of a garment. Tinting it is invisible in the
+  // buffer and very visible after the strip is re-encoded, because the accent sitting in the
+  // gutter is real colour for an encoder to bleed back across the silhouette.
+  it("leaves a fully transparent pixel alone even when its colour matches a cell", () => {
+    const pixels = pixelsOf([204, 120, 84]);
+    pixels[3] = 0;
+    expect(recolorPixels(pixels, [target], "#2d6cdf")).toBe(0);
+    expect(Array.from(pixels.subarray(0, 3))).toEqual([204, 120, 84]);
+  });
+
+  it("leaves the antialiased rim alone, where un-premultiplied colour is mostly rounding", () => {
+    const rim = pixelsOf([204, 120, 84]);
+    rim[3] = minimumRecolorAlpha - 1;
+    expect(recolorPixels(rim, [target], "#2d6cdf")).toBe(0);
+
+    // ...and the pixel just inside the floor is a real pixel of the character, so it moves.
+    const body = pixelsOf([204, 120, 84]);
+    body[3] = minimumRecolorAlpha;
+    expect(recolorPixels(body, [target], "#2d6cdf")).toBe(1);
   });
 
   it("applies only the first matching target so overlapping shade cells never double-tint", () => {

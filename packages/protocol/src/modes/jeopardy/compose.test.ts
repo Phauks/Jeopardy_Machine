@@ -123,7 +123,7 @@ describe("embedContentPack", () => {
     // is why coverage is checked separately rather than trusted to the hash.
     const result = embedContentPack(eventGame(), thinned, sha256);
     if (result.ok) throw new Error("a pack missing two cells was accepted");
-    expect(result.reason).toBe("missing-items");
+    if (result.reason !== "missing-items") throw new Error(`refused as ${result.reason}`);
     expect(result.missingItemIds).toEqual(wanted);
     expect(result.message).toContain("2 questions");
   });

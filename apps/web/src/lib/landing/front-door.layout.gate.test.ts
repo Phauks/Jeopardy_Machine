@@ -62,13 +62,19 @@ describe("no reflow when content arrives", () => {
 describe("the masthead is a wordmark, not a hero", () => {
   const masthead = sourceOf("lib/landing/masthead-bar.svelte");
 
+  // The bar's SHELL moved to #lib/chrome/app-bar.svelte on 2026-08-19, when the play surfaces
+  // adopted the same header (owner: "we should have a header bar, same one on the other page").
+  // The gate follows it there rather than being dropped - it now holds the height and the
+  // wordmark scale for every surface at once, which is more than it used to guarantee.
+  const appBar = sourceOf("lib/chrome/app-bar.svelte");
+
   it("is one line of text tall, and says so in a declaration rather than by accident", () => {
-    const height = /\.masthead-inner\s*{[^}]*min-height:\s*([\d.]+)rem/.exec(masthead)?.[1] ?? "99";
+    const height = /\.bar-inner\s*{[^}]*min-height:\s*([\d.]+)rem/.exec(appBar)?.[1] ?? "99";
     expect(Number(height)).toBeLessThanOrEqual(3.5);
   });
 
   it("sets the wordmark at chrome scale - no display step, no viewport-scaled title", () => {
-    const wordmark = /\.wordmark\s*{[^}]*}/.exec(masthead)?.[0] ?? "";
+    const wordmark = /\.wordmark\s*{[^}]*}/.exec(appBar)?.[0] ?? "";
     expect(wordmark).toMatch(/font-size:\s*1\.\d+rem/);
     expect(wordmark).not.toContain("clamp(");
     // The hero's display step is gone from the page's scale, so it cannot be reached for.

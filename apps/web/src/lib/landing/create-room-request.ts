@@ -12,6 +12,7 @@
 // password floor is a sentence under the field rather than a bad-request after the tap.
 import { limits } from "@jeopardy/protocol/limits";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
+import type { GameDefinitionBody } from "@jeopardy/protocol";
 
 export type CreateRoomForm = {
   title: string;
@@ -21,6 +22,14 @@ export type CreateRoomForm = {
   password: string;
   maxPlayers: number;
   spectatorsAllowed: boolean;
+  /**
+   * Individuals or teams. It is NOT a room setting: whether a game is played in teams is a
+   * RULE, and rules live in the game document (the design law, docs/design/expansion-and-
+   * boundaries.md). So this control does not add a field to the room - it writes a settings
+   * override onto the game definition being hosted, and the room learns teams mode the same
+   * way it learns everything else about the game (`withPlayerMode` below).
+   */
+  playerMode: "individuals" | "teams";
 };
 
 /**
@@ -39,6 +48,10 @@ export function blankCreateForm(): CreateRoomForm {
     password: "",
     maxPlayers: playerCapBounds.max,
     spectatorsAllowed: true,
+    // Individuals, which is also the settings registry's default (packages/protocol/src/
+    // settings/groups/teams.ts) - so the opening position of the form and the opening position
+    // of an unmodified game agree.
+    playerMode: "individuals",
   };
 }
 
@@ -139,6 +152,40 @@ export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
  * (packages/protocol/src/room/visibility.ts), so a caller that skips the form must fail the
  * server's own refusal rather than write an empty name into a lobby row.
  */
+/**
+ * Return the game definition body this room should be created with, carrying the host's
+ * individuals-or-teams choice as a RULES OVERRIDE on the document.
+ *
+ * This is the whole implementation of the teams control, and it is deliberately not a room
+ * field. Teams mode is matrix row 34 - a rule of the game (packages/protocol/src/settings/
+ * groups/teams.ts), which the room reads from the definition it was created with and reports
+ * to every client as `teamsMode`. A parallel room-level flag would be a second source of truth
+ * for the same fact and would leave a downloaded game playing differently than it did here.
+ *
+ * A definition carrying a whole inline RULE SET (`rules.kind === "inline"`) rather than a
+ * preset is left alone: that
+ * document is somebody's authored rules, and quietly overriding a field inside it would be the
+ * front door editing a document it did not write. Such a game plays in whatever mode its rule
+ * set says, and the control has nothing to add - which is why the form's choice is an opening
+ * position on the games the front door itself offers, not a promise about every file.
+ */
+export function withPlayerMode(
+  body: GameDefinitionBody,
+  playerMode: CreateRoomForm["playerMode"],
+): GameDefinitionBody {
+  if (body.rules.kind !== "preset") return body;
+  return {
+    ...body,
+    rules: {
+      ...body.rules,
+      overrides: {
+        ...body.rules.overrides,
+        teams: { ...body.rules.overrides.teams, playerMode },
+      },
+    },
+  };
+}
+
 export function createRoomBody(form: CreateRoomForm, game: unknown): Record<string, unknown> {
   const title = form.title.trim();
   const hostLabel = form.hostLabel.trim();

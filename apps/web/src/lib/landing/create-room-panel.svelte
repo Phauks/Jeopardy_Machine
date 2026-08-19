@@ -106,6 +106,33 @@
       </div>
     </fieldset>
 
+    <!-- HOW PEOPLE PLAY, and it belongs on this form because there is nowhere else to put it:
+         teams mode is a rule of the GAME, so it is fixed the moment the room opens and no
+         console switch can flip it mid-night. Without this control every room the front door
+         made was an individuals room, and the pre-game screen's teams region said so - "this
+         room plays as individuals" with no way to have asked for anything else (owner report
+         2026-08-19, "main join screen does not show how to create a team or join a team"). -->
+    <fieldset class="field listing-field">
+      <legend class="field-label">How people play</legend>
+      <div class="segmented">
+        <label class:selected={form.playerMode === "individuals"}>
+          <input
+            type="radio"
+            name="player-mode"
+            value="individuals"
+            bind:group={form.playerMode}
+          />
+          <span class="segment-title">Individuals</span>
+          <span class="segment-note">Everyone for themselves</span>
+        </label>
+        <label class:selected={form.playerMode === "teams"}>
+          <input type="radio" name="player-mode" value="teams" bind:group={form.playerMode} />
+          <span class="segment-title">Teams</span>
+          <span class="segment-note">Players make and join teams</span>
+        </label>
+      </div>
+    </fieldset>
+
     <label class="field">
       <span class="field-label">Password</span>
       <input

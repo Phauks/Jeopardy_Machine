@@ -70,8 +70,27 @@ function distanceSquared(red: number, green: number, blue: number, target: RgbCo
 }
 
 /**
+ * Below this alpha a pixel's colour is not evidence of anything and must not be recoloured.
+ *
+ * Canvas stores pixels PREMULTIPLIED and `getImageData` hands them back un-premultiplied, so a
+ * barely-visible edge pixel's RGB has been divided by a tiny alpha and is mostly rounding
+ * error - and a fully transparent pixel's RGB is whatever the encoder happened to leave there,
+ * frequently a flat colour that lands within tolerance of a palette cell. Painting the accent
+ * into either is invisible on its own, and then very visible once the strip is re-encoded: the
+ * accent sitting in the transparent gutter is real colour for the encoder to smear back across
+ * the silhouette (owner report 2026-08-19, "strange color artifacting when selecting a player
+ * avatar and color").
+ *
+ * 24 rather than 1: it also excludes the antialiased rim, where the un-premultiplied colour is
+ * a blend of the character and the void behind it and tinting produces a coloured halo. The
+ * rim is one pixel of a hard-edged sprite and reads as the outline it already is.
+ */
+export const minimumRecolorAlpha = 24;
+
+/**
  * Recolor an RGBA byte array in place: every pixel within `tolerance` of one of the target
- * palette cells becomes the accent at that pixel's own luminance ratio. Alpha is untouched.
+ * palette cells becomes the accent at that pixel's own luminance ratio. Alpha is untouched and,
+ * below `minimumRecolorAlpha`, the pixel is skipped entirely.
  * Returns how many pixels changed - the bake asserts it is non-zero, which is what catches a
  * roster entry whose recolorTargets no longer exist after a pack update.
  */
@@ -87,6 +106,7 @@ export function recolorPixels(
   const [accentRed, accentGreen, accentBlue] = accent;
   let changed = 0;
   for (let offset = 0; offset < pixels.length; offset += 4) {
+    if ((pixels[offset + 3] ?? 0) < minimumRecolorAlpha) continue;
     const red = pixels[offset] ?? 0;
     const green = pixels[offset + 1] ?? 0;
     const blue = pixels[offset + 2] ?? 0;

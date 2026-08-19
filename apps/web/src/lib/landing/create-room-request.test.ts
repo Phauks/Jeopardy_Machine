@@ -11,7 +11,10 @@ import {
   describeCreateFailure,
   handOffAfterCreate,
   playerCapBounds,
+  withPlayerMode,
 } from "#lib/landing/create-room-request.ts";
+import { resolveGameRules, ruleSetSchema } from "@jeopardy/protocol";
+import { sampleGameDefinition } from "#lib/hotseat/sample-game.ts";
 import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
 
@@ -218,5 +221,57 @@ describe("refusals in the words of the person who tried", () => {
 
   it("falls back to the status code rather than to silence", () => {
     expect(describeCreateFailure(500, null)).toContain("500");
+  });
+});
+
+describe("withPlayerMode - the teams choice, written onto the GAME", () => {
+  it("turns the sample game into a teams game through a rules override", () => {
+    const teamed = withPlayerMode(sampleGameDefinition.body, "teams");
+    // The room learns teams mode by resolving the definition's rules, exactly as it resolves
+    // every other rule - there is no room-level teams flag to disagree with this one.
+    expect(resolveGameRules(teamed.rules).teams.playerMode).toBe("teams");
+    // ...and the rest of the game is untouched: same board, same value scheme, same theme.
+    expect(teamed.rounds).toEqual(sampleGameDefinition.body.rounds);
+    expect(teamed.valueScheme).toEqual(sampleGameDefinition.body.valueScheme);
+  });
+
+  it("leaves individuals as the mode when that is what was chosen", () => {
+    const solo = withPlayerMode(sampleGameDefinition.body, "individuals");
+    expect(resolveGameRules(solo.rules).teams.playerMode).toBe("individuals");
+  });
+
+  it("keeps the other overrides a game already carried", () => {
+    const carrying = {
+      ...sampleGameDefinition.body,
+      rules: {
+        kind: "preset" as const,
+        preset: "casual-party" as const,
+        overrides: { buzzing: { lockoutMs: 250 } },
+      },
+    };
+    const teamed = withPlayerMode(carrying, "teams");
+    if (teamed.rules.kind !== "preset") throw new Error("the rules stopped being a preset");
+    expect(teamed.rules.overrides.buzzing).toEqual({ lockoutMs: 250 });
+    expect(teamed.rules.overrides.teams).toEqual({ playerMode: "teams" });
+  });
+
+  it("never edits an embedded RULE SET - that document is somebody else's authored rules", () => {
+    const authored = {
+      ...sampleGameDefinition.body,
+      rules: {
+        kind: "inline" as const,
+        ruleSet: ruleSetSchema.parse({
+          format: "rule-set",
+          schemaVersion: "1.0.0",
+          meta: {
+            title: "House rules",
+            created: "2026-08-19T00:00:00.000Z",
+            modified: "2026-08-19T00:00:00.000Z",
+          },
+          body: { base: "casual-party", overrides: {} },
+        }),
+      },
+    };
+    expect(withPlayerMode(authored, "teams")).toEqual(authored);
   });
 });

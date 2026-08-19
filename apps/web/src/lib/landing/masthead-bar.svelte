@@ -1,6 +1,11 @@
 <script lang="ts">
-  // The masthead, as a STRIP. One row: the wordmark, one short line saying what this is, and
-  // the developer index behind a gear.
+  // The masthead, as a STRIP: the shared header bar (#lib/chrome/app-bar.svelte) plus the two
+  // things only the front door puts in it - one short line saying what this is, and the
+  // developer index behind a gear.
+  //
+  // The SHELL is shared on purpose since 2026-08-19 (owner: "we should have a header bar, same
+  // one on the other page"): the wordmark's size, the bar's ground and its rule live in one
+  // file, so a room and the front door cannot drift into two different tops of page.
   //
   // The band this replaces was a full-bleed hero - an eyebrow, a display-size wordmark, a lead,
   // a supporting line and a three-fact strip - roughly 340px of the first screen on a laptop,
@@ -8,6 +13,7 @@
   // against (Kahoot, Jackbox, Google Meet, Among Us) puts a hero above its entry control
   // (docs/research/06-join-flow-patterns.md, pattern 7). The title here is a WORDMARK, not a
   // hero: one line of chrome type, the same height as the gear beside it.
+  import AppBar from "#lib/chrome/app-bar.svelte";
   import type { SurfaceCard } from "#lib/landing/surface-cards.ts";
 
   type Props = {
@@ -17,9 +23,10 @@
   let { surfaces }: Props = $props();
 </script>
 
-<header class="masthead-bar">
-  <div class="masthead-inner">
-    <p class="wordmark">Jeopardy Machine</p>
+<!-- href null: the wordmark is already on this page, and a link to where you are is a control
+     that cannot do anything. -->
+<AppBar href={null}>
+  {#snippet trailing()}
     <p class="tagline">Quiz night, on everyone's phone</p>
 
     <!-- `details` rather than a hand-rolled popover: it opens without JavaScript, closes on
@@ -59,38 +66,12 @@
         </ul>
       </div>
     </details>
-  </div>
-</header>
+  {/snippet}
+</AppBar>
 
 <style>
-  .masthead-bar {
-    background: var(--board-category-bg);
-    border-bottom: var(--rule) solid var(--board-bg);
-  }
-
-  .masthead-inner {
-    display: flex;
-    align-items: center;
-    gap: 0.9rem;
-    /* The whole point of this file: one line of text plus padding. The band it replaces was
-       ten times this tall (decision 2026-08-18 §5). */
-    min-height: 3rem;
-    max-width: var(--measure);
-    margin: 0 auto;
-    padding: 0.4rem var(--page-inset);
-  }
-
-  .wordmark {
-    margin: 0;
-    font-family: var(--font-chrome);
-    font-size: 1.15rem;
-    line-height: 1.1;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: var(--board-value-color);
-    white-space: nowrap;
-  }
-
+  /* The bar's own shell - ground, rule, height, wordmark - lives in #lib/chrome/app-bar.svelte
+     now. What is left here is what only the front door hangs in it. */
   .tagline {
     margin: 0;
     flex: 1;

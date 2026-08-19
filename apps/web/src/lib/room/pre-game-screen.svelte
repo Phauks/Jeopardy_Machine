@@ -25,7 +25,7 @@
   // play devices"). The breakpoints are on the CONTAINER, so a narrow window on a big screen
   // gets the phone layout rather than a stretched one.
   import CharacterPanel from "#lib/room/character-panel.svelte";
-  import HomeButton from "#lib/chrome/home-button.svelte";
+  import AppBar from "#lib/chrome/app-bar.svelte";
   import RosterPanel from "#lib/room/roster-panel.svelte";
   import TeamsPanel from "#lib/room/teams-panel.svelte";
   import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
@@ -147,15 +147,22 @@
 </script>
 
 <div class="pre-game" data-seated={regions.seated} data-teams-mode={regions.teams.shown}>
-  <header class="room-bar">
-    <p class="room-line">
-      Room <strong>{roomCode}</strong>
-      {#if roomNote !== null}<span class="room-note" role="status">{roomNote}</span>{/if}
-    </p>
-    <HomeButton variant="inline" />
-  </header>
+  <!-- The same header bar the front door wears (#lib/chrome/app-bar.svelte). It used to be a
+       room line with a lone "home" button floated to the far right, which read as a stray
+       control rather than as chrome and made a room's top-of-page a different object from the
+       front door's (owner, 2026-08-19). The wordmark IS the way home now, so the button is
+       gone rather than moved - one control, one place, on every surface. -->
+  <AppBar>
+    {#snippet trailing()}
+      <p class="room-line">
+        Room <strong>{roomCode}</strong>
+        {#if roomNote !== null}<span class="room-note" role="status">{roomNote}</span>{/if}
+      </p>
+    {/snippet}
+  </AppBar>
 
-  <div class="regions">
+  <div class="pre-game-body">
+    <div class="regions">
     <div class="region region-character">
       <CharacterPanel
         value={character}
@@ -193,10 +200,10 @@
     </div>
   </div>
 
-  <!-- Sticky on a phone because the regions are long and the way in should never be a scroll
-       away; a static footer on a laptop, where it always is. It stays MOUNTED after joining and
-       becomes the confirmation line - removing it would be a region disappearing. -->
-  <div class="action-bar">
+    <!-- Sticky on a phone because the regions are long and the way in should never be a scroll
+         away; a static footer on a laptop, where it always is. It stays MOUNTED after joining
+         and becomes the confirmation line - removing it would be a region disappearing. -->
+    <div class="action-bar">
     {#if blocked !== null && !regions.seated}
       <p class="refusal" role="status">
         <strong>{blocked.headline}</strong>
@@ -217,7 +224,8 @@
       <button type="button" class="primary" disabled={blocked !== null} onclick={join}>
         {blocked === null ? (regions.lateJoin ? "Join the game" : "Join the room") : "Waiting for a seat"}
       </button>
-    {/if}
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -230,20 +238,21 @@
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    padding: 0.8rem 1rem max(0.8rem, env(safe-area-inset-bottom));
     color: var(--surface-text);
   }
 
-  .room-bar {
+  /* The bar is full-bleed - it is the page's own top edge, exactly as it is on the front door -
+     so the surface's inset lives here rather than on .pre-game. */
+  .pre-game-body {
+    flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.4rem;
+    flex-direction: column;
+    padding: 0.8rem 1rem max(0.8rem, env(safe-area-inset-bottom));
   }
 
+  /* Pushed to the far end of the bar, where a room's identity belongs beside the wordmark. */
   .room-line {
-    margin: 0;
+    margin-left: auto;
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.12em;
