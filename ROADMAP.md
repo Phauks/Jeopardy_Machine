@@ -2,7 +2,7 @@
 
 > **This is a living document.** It is updated in the same commit as any work that changes it - milestones move between sections, shipped items get pruned to the changelog, and open decisions get resolved into dated records under `docs/decisions/`. If this file disagrees with the code, fix this file.
 >
-> Last updated: 2026-08-17 (M6 buzz latency compensation, server AND client: buzzes ranked by reaction time upstream of the engine, per-arming round-trip measurement, and the web surfaces acking the arm and stamping their elapsed. Before it, THE RECONCILE: the play surfaces talk to real rooms - one code, one GameRoomDO, many devices - plus the console review that rode in with it: the roster panel, unthemed control chrome, the caps control rewritten, mirror mode in the header, and the fixture roster stopped leaking into real rooms. M1 editor phase open; M0 awaits owner's first manual deploy)
+> Last updated: 2026-08-19 (the game screen + the console's join panel, and the Pre-flight checklist deleted with it. Before that, M6 buzz latency compensation, server AND client: buzzes ranked by reaction time upstream of the engine, per-arming round-trip measurement, and the web surfaces acking the arm and stamping their elapsed. Before that, THE RECONCILE: the play surfaces talk to real rooms - one code, one GameRoomDO, many devices - plus the console review that rode in with it: the roster panel, unthemed control chrome, the caps control rewritten, and the fixture roster stopped leaking into real rooms. M1 editor phase open; M0 awaits owner's first manual deploy)
 
 ## What we are building
 
@@ -168,6 +168,14 @@ Progress 2026-08-14 - phase 2 (the surfaces) landed mock-first on the room-store
 - [x] **And every one of those host powers reaches a real room**: the console review was written against the mock store, so its own closing item was "these all write through `RoomStore` methods whose ws implementations are still stubs". Merged into the reconcile, they are not - `renamePlayer`, `kickFromRoom`, `kickFromTeam`, `handOffLeadership`, `updateTeam`, `updateRoomSettings` and the new `assignPlayerToTeam` all send their real messages, and `settingsKnown` is false on the ws store until `room-settings` lands rather than true by construction
 - [ ] Deferred in-milestone: FLIP zoom-from-cell reveal, host companion view for mirrored setups (tracked in docs/design/surfaces.md "Known gaps"). Bundled sound files and the PWA precache growth landed in the M5 asset pass below
 
+      Progress 2026-08-19 - the game screen and the join panel (owner, docs/decisions/2026-08-19-game-screen-and-join-panel.md):
+
+- [x] **"How does the room see this game" is one choice with an action attached**: the `mirror` boolean becomes `screenSetup` (second screen / mirror), and the console's game-screen panel OPENS the display as a named 16:9 popup carrying the console's theme - the setup that used to be a URL printed in a checklist. The window is then tracked: never-opened / open / closed (a poll of `window.closed`, since a closing popup fires nothing reliable), shown as a lobby panel and a header chip in every phase, with a blocked pop-up reported rather than silently believed. Closing the console never closes the display
+- [x] **Starting with nothing attached warns once and never blocks**, and an empty room is still refused with its reason on the button - two failures, kept apart (`startReadiness`)
+- [x] **The console knows what is connected**: `RoomView.connections` is the protocol's `ConnectionCensus` (counts, never people), null when the store cannot know, so a display driven by a Chromecast or a co-host outranks the window this console opened. The sim panel gained "Plug in a display" to drive it in mock mode
+- [x] **The join panel** (in place, never a page): the room code at value-face size, a QR scannable from a few feet, the join link with Web-Share-then-clipboard sharing, and a fullscreen state for holding the laptop up to a room. **Streamer mode inverts here** - the display drops the code, QR and URL from its markup; the console keeps them and says they are not on the big screen, because the console is the host's own screen and already shows every answer
+- [x] **The Pre-flight checklist is deleted** (owner: "pre-flight and roster look the exact same"): the roster panel owns who is here by name and health, the game-screen panel owns what the room can see, and Start game is an action in the console's chrome. One place per fact - the persistent-layout law applied to information
+
 ### M5 - Event readiness (the club night)
 
 Team mode (shared-phone first), the event's board built in the editor from the curated content pool, per-event theme (environmental green/gold variant), picture/audio clue support (R2 media upload, Worker-proxied), sound pack (original/royalty-free - never sampled from the show), projector-boost display mode, and a full dress rehearsal - whose checklist includes the PWA drills: airplane-mode editor test and a service-worker-update-during-game drill (docs/decisions/2026-08-13-pwa.md). **Exit criteria: the Board Game Club x Environmental Law Society game runs on this software.**
@@ -257,6 +265,7 @@ Resolved 2026-08-13: code license = **AGPL-3.0-only** (owner pick; four-surface 
 | Owner directives + feature ideas log                             | docs/research/00-user-directives.md          |
 | Expansion paths + customization boundaries (the design law)      | docs/design/expansion-and-boundaries.md      |
 | End-to-end user flows: guest / creator / host                    | docs/design/user-flows.md                    |
+| Play surfaces, the room-store seam, the M3 reconcile             | docs/design/surfaces.md                      |
 | Game rules, buzzer mechanics, 42-setting rules matrix            | docs/research/01-game-anatomy.md             |
 | Competitor features, paywalls, lessons                           | docs/research/02-landscape.md                |
 | Stack, DO design, storage, auth phases, costs                    | docs/research/03-architecture.md             |

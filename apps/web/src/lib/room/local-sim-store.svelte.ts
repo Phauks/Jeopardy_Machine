@@ -125,6 +125,15 @@ export class LocalSimRoomStore implements RoomStore {
     hostLabel: "",
   });
   private refusalState = $state.raw<RoomRefusalView | null>(null);
+  // The non-player connections the sim is pretending exist: a projector plugged in, an audience
+  // watching. Players are counted from the roster instead, because the sim already tracks their
+  // connectedness (simSetConnected) and a seat outlives a dropped phone.
+  private simDisplays = $state(0);
+  // NULL until the sim panel plugs one in, and that is the difference between "nobody is
+  // watching" and "nothing has told me" (room-view.ts, `spectatorCount`): the census below
+  // counts the sockets this simulated room actually has, and the roster reports only what the
+  // room has been told to claim.
+  private simSpectators = $state<number | null>(null);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
@@ -153,11 +162,13 @@ export class LocalSimRoomStore implements RoomStore {
       roster: {
         players: this.rosterPlayers,
         teams: this.rosterTeams,
-        // NULL, not 0. A mock room is one tab (docs/design/surfaces.md "Known gaps"): a
-        // spectator would be a separate simulation in another tab, so this store genuinely
-        // cannot know whether anyone is watching, and saying "0 watching" would be the console
-        // inventing a number about a room it cannot see. Only the DO counts spectators.
-        spectatorCount: null,
+        // NULL, not 0, until something says otherwise. A mock room is one tab
+        // (docs/design/surfaces.md "Known gaps"): a spectator would be a separate simulation in
+        // another tab, so an untold store cannot know whether anyone is watching, and "0
+        // watching" would be the console inventing a number about a room it cannot see. The sim
+        // panel's "audience" control is the one thing that can tell it, and then the roster and
+        // the census below report the SAME number rather than disagreeing on one screen.
+        spectatorCount: this.simSpectators,
       },
       teamsMode: this.setup.settings.teams.playerMode === "teams",
       myPlayerId: this.myPlayerId,
@@ -172,6 +183,20 @@ export class LocalSimRoomStore implements RoomStore {
       lastJudged: this.lastJudged,
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
+      // The census the DO would count (packages/protocol/src/room/diagnostics.ts). The sim can
+      // justify every number here: one host connection (this console, or the one the simulated
+      // room implies), players from the roster's own connectedness, and displays/spectators from
+      // what the sim panel has been told to pretend. Crucially it does NOT count a display
+      // window the host opened beside this tab: in mock mode that window is a different isolated
+      // room, and the console's own window handle is what answers for it (game-screen.ts).
+      connections: {
+        total: 1 + this.connectedPlayerCount + this.simDisplays + (this.simSpectators ?? 0),
+        host: 1,
+        player: this.connectedPlayerCount,
+        display: this.simDisplays,
+        spectator: this.simSpectators ?? 0,
+        unjoined: 0,
+      },
       paused: this.pausedState,
       settings: this.roomSettings,
       // This store IS the room it describes: its settings are the ones in force, whether they
@@ -180,6 +205,10 @@ export class LocalSimRoomStore implements RoomStore {
       settingsKnown: true,
       refusal: this.refusalState,
     };
+  }
+
+  private get connectedPlayerCount(): number {
+    return this.rosterPlayers.filter((player) => player.connected).length;
   }
 
   // --- engine dispatch + event fan-out ---------------------------------------------------
@@ -754,6 +783,20 @@ export class LocalSimRoomStore implements RoomStore {
         playerId: player.id,
       });
     });
+  }
+
+  /**
+   * Attach or unplug simulated projectors and audience - the census the host console reads to
+   * answer "is anything on the big screen" (RoomView.connections). Displays hold no seat and are
+   * in neither participant budget, so this touches the roster's PLAYERS not at all; naming an
+   * audience does reach `roster.spectatorCount`, because a room that can count watchers reports
+   * the same number in both places.
+   */
+  simSetConnections(patch: { displays?: number; spectators?: number }): void {
+    if (patch.displays !== undefined) this.simDisplays = Math.max(0, Math.trunc(patch.displays));
+    if (patch.spectators !== undefined) {
+      this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
+    }
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

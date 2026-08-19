@@ -27,7 +27,25 @@
  * host changes the display type scale on their console and the projector re-lays itself out
  * without the room ever becoming aware of a setting.
  */
-export const preferencesKey = "jeopardy.device-preferences.v1";
+export const preferencesKey = "jeopardy.device-preferences.v2";
+
+/**
+ * HOW THE ROOM SEES THIS GAME - the first decision a host makes on arrival, and one decision
+ * rather than two features (docs/design/user-flows.md C1/C1b).
+ *
+ * - `second-screen` - the laptop is on the podium and the projector is a second output. The
+ *   console opens the game screen as its own window (src/lib/room/game-screen.ts), the host drags
+ *   it across, and the console keeps the private layer: answers, wager cells, the judge row.
+ * - `mirror` - the laptop screen IS the projector, so whatever the host sees, the room sees. The
+ *   console wears the display layout with a slim dock, and the private layer does not render at
+ *   all.
+ *
+ * Per DEVICE, never a room setting: a co-host on a second laptop runs the full private console at
+ * the same time. It replaced the old `mirror` boolean at the 2026-08-19 game-screen pass - the
+ * boolean made mirror mode look like an unrelated toggle, so the other setup had no home and no
+ * action, which is exactly the gap the owner reported.
+ */
+export type ScreenSetup = "second-screen" | "mirror";
 
 /** How the stage (the 3D diorama / staged lobby) behaves on this device's display surfaces. */
 export type StageMotion =
@@ -56,8 +74,8 @@ export type DevicePreferences = {
   consoleAudio: boolean;
   /** Master volume for whichever of the two is on, 0..1. One pair of speakers per device. */
   audioVolume: number;
-  /** Mirror mode (user-flows C1b) - explicitly a per-device toggle, never a room setting. */
-  mirror: boolean;
+  /** Which of the two projector setups this laptop is in (user-flows C1/C1b). */
+  screenSetup: ScreenSetup;
   /** Manual mode: no buzzers, the host awards from the console (resolved UX question 1). */
   manualMode: boolean;
   /** Whether the console draws the pending-timer countdowns (game-anatomy section 8 step 4). */
@@ -77,7 +95,7 @@ export const defaultDevicePreferences: DevicePreferences = {
   displayAudio: true,
   consoleAudio: false,
   audioVolume: 0.8,
-  mirror: false,
+  screenSetup: "second-screen",
   manualMode: false,
   showTimers: true,
   rosterDensity: "comfortable",
@@ -128,7 +146,7 @@ export function parseDevicePreferences(raw: string | null): DevicePreferences {
     displayAudio: readBoolean(source.displayAudio, defaultDevicePreferences.displayAudio),
     consoleAudio: readBoolean(source.consoleAudio, defaultDevicePreferences.consoleAudio),
     audioVolume: clamp(readNumber(source.audioVolume, defaultDevicePreferences.audioVolume), 0, 1),
-    mirror: readBoolean(source.mirror, defaultDevicePreferences.mirror),
+    screenSetup: source.screenSetup === "mirror" ? "mirror" : "second-screen",
     manualMode: readBoolean(source.manualMode, defaultDevicePreferences.manualMode),
     showTimers: readBoolean(source.showTimers, defaultDevicePreferences.showTimers),
     rosterDensity: source.rosterDensity === "compact" ? "compact" : "comfortable",

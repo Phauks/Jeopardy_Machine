@@ -248,6 +248,12 @@ export class WsRoomStore implements RoomStore {
         spectatorCount: this.spectatorCountState,
       },
       teamsMode: this.teamsModeState,
+      // Null until the wire carries a census: the DO counts connections, and a store that
+      // invented one would tell a host a projector was attached to a socket nobody opened
+      // (room-view.ts). The `snapshot` message gains the protocol's `connectionCensus`
+      // (packages/protocol/src/room/diagnostics.ts, already served by the host-authenticated
+      // GET /api/rooms/<CODE>) refreshed on join/leave - tracked in docs/design/surfaces.md.
+      connections: null,
       myPlayerId: this.myPlayerIdState,
       game: this.engineState,
       content: this.contentView(),

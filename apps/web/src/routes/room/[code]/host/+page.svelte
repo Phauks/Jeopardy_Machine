@@ -72,6 +72,9 @@
     if (preferences.consoleAudio) consoleAudio.prime();
   });
 
+  // ?mirror forces the mirrored layout for THIS render whatever the device prefers - a link a
+  // host can hand to a second machine. The lasting choice is the device's `screenSetup`
+  // preference, which the console's game-screen panel sets (src/lib/room/game-screen.ts).
   const startInMirror = page.url.searchParams.has("mirror");
   const startWithSettings = page.url.searchParams.has("settings");
   const theme = $derived(
@@ -110,6 +113,7 @@
       showSimPanel={dev}
       mirror={startInMirror}
       settingsOpen={startWithSettings}
+      themeId={theme.id}
     />
   {/if}
 </div>
