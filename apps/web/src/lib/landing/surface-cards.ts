@@ -4,7 +4,7 @@
 // OWNER RULE, still in force: every new meaningful surface gets a card here, in the same PR
 // that ships it. Only its PLACE has moved. It used to BE the front page; on 2026-08-15 it
 // became a closed drawer at the foot of it; on 2026-08-17 it moved again, into the dev menu in
-// the front door's header (#lib/landing/dev-menu.svelte) - because the last thing a visitor
+// the front door's header (#lib/landing/masthead-bar.svelte) - because the last thing a visitor
 // scrolled past should not be a list of engineering routes, and the owner's own shortcut to
 // those routes should not be the furthest thing on the page from where they arrive. (The
 // creator Library, user-flows B1, is what eventually replaces it.) It lives in a data module

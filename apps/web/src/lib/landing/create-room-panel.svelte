@@ -176,39 +176,44 @@
 
 <style>
   /* Board materials (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md, art
-     direction): a category-colored panel with fields sunk into it as wells. Derived from
-     --board-* rather than the chrome tokens so it stays legible under every preset, including
-     the light paper one where --surface-page and --surface-text converge. */
+     direction): fields sunk into the surrounding cell as wells. It carries no fill of its own
+     since 2026-08-18 - it opens INSIDE the counter band rather than standing beside it as a
+     slab of its own, and a second colored panel inside a cell reads as a page within a page
+     (docs/decisions/2026-08-18-front-door-architecture.md). Derived from --board-* rather than
+     the chrome tokens so it stays legible under every preset, including the light paper one
+     where --surface-page and --surface-text converge. */
   .create {
     --create-ink: var(--clue-text-color);
     --create-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
     --create-rule: color-mix(in srgb, var(--clue-text-color) 24%, transparent);
-    --create-well: color-mix(in srgb, var(--board-category-bg) 58%, #000000);
+    --create-well: color-mix(in srgb, var(--board-cell-bg) 55%, #000000);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: clamp(1rem, 2.2vw, 1.5rem);
-    background: var(--board-category-bg);
     color: var(--create-ink);
   }
 
+  /* No section number any more: the numbered headings ("01 Join", "02 Create", "03 Public
+     rooms") belonged to a page of four equal panels, and this panel is now a disclosure the
+     Host button opens (docs/decisions/2026-08-18-front-door-architecture.md). */
   .panel-heading {
     margin: 0;
     font-family: var(--font-chrome);
-    font-size: 0.95rem;
     font-weight: 400;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
-    /* Balanced with the other panel headings: a two-word heading must never drop its last
-       word onto a line of its own when the control column narrows. */
-    text-wrap: balance;
+    letter-spacing: 0.16em;
   }
 
+  /* A form column, not a page width: name and password fields stretched across a 1440px laptop
+     look like a database admin screen, and the eye has to travel the whole window to read a
+     label and reach its input. */
   .create-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.6rem 0.7rem;
     align-items: end;
+    max-width: 46rem;
   }
 
   .field {
@@ -364,7 +369,7 @@
     background: var(--board-value-color);
     /* Near-black derived from the panel's own hue, so the slab reads as ink on gold in every
        preset instead of borrowing a chrome token that may be the same color as the panel. */
-    color: color-mix(in srgb, var(--board-category-bg) 26%, #000000);
+    color: color-mix(in srgb, var(--board-cell-bg) 26%, #000000);
     cursor: pointer;
   }
 

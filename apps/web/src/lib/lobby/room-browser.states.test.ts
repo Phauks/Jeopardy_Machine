@@ -1,4 +1,4 @@
-// The room browser's four states, server-rendered (the repo's component-test pattern:
+// The room browser's five states, server-rendered (the repo's component-test pattern:
 // svelte/server render, no browser mode - docs/DEVELOPMENT.md).
 //
 // The states are the point. "Rooms listed", "genuinely nobody hosting", and "the registry
@@ -6,7 +6,9 @@
 // the failure this region was rebuilt around - so each one is asserted to say something
 // different. The browser is now a REGION of the front door rather than the /lobby page
 // (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md); the code box that used
-// to be repeated above it is the front door's own, tested in front-door.states.test.ts.
+// to be repeated above it is the front door's own counter, which also does this region's
+// searching (docs/decisions/2026-08-18-front-door-architecture.md) - so the fifth state is
+// "the filter left nothing", which is a different sentence from "nobody is hosting".
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import RoomBrowser from "#lib/lobby/room-browser.svelte";
@@ -85,6 +87,32 @@ describe("room browser: rooms listed", () => {
   });
 });
 
+describe("room browser: the head row", () => {
+  const { body } = render(RoomBrowser, {
+    props: { listing: listingOf([lobbyRoom, playingRoom]), ...noopHandlers },
+  });
+
+  it("carries the count, the one filter, and the real fetch timestamp on one line", () => {
+    expect(body).toContain("2 live");
+    expect(body).toContain("Open rooms only");
+    expect(body).toContain(`Updated ${formatClockTime(fetchedAt)}`);
+  });
+
+  it("counts against the whole listing while a filter is narrowing it", () => {
+    const filtered = render(RoomBrowser, {
+      props: {
+        listing: listingOf([lobbyRoom, playingRoom]),
+        visibleRooms: [playingRoom],
+        filterActive: true,
+        ...noopHandlers,
+      },
+    });
+    expect(filtered.body).toContain("1 of 2");
+    expect(filtered.body).toContain("Environment trivia");
+    expect(filtered.body).not.toContain("Pub quiz night");
+  });
+});
+
 describe("room browser: the empty and unavailable states differ", () => {
   it("an empty lobby says so in one line, without a paragraph about why", () => {
     const { body } = render(RoomBrowser, {
@@ -113,6 +141,19 @@ describe("room browser: the empty and unavailable states differ", () => {
     expect(body).not.toContain("Nobody is hosting publicly");
   });
 
+  it("says 'nothing matches' rather than 'nobody is hosting' when a filter emptied it", () => {
+    const { body } = render(RoomBrowser, {
+      props: {
+        listing: listingOf([lobbyRoom, playingRoom]),
+        visibleRooms: [],
+        filterActive: true,
+        ...noopHandlers,
+      },
+    });
+    expect(body).toContain("Nothing here matches");
+    expect(body).not.toContain("Nobody is hosting publicly");
+  });
+
   it("distinguishes 'not fetched yet' from 'no rooms'", () => {
     const { body } = render(RoomBrowser, {
       props: { listing: listingOf([]), loaded: false, ...noopHandlers },
@@ -135,57 +176,6 @@ describe("room browser: the empty and unavailable states differ", () => {
     });
     expect(body).toContain("lobby responded 500");
     expect(body).toContain("joined by code");
-  });
-});
-
-// Searching the list (owner request 2026-08-17). The filter itself is unit-tested in
-// room-search.test.ts; what is asserted here is that the region WIRES it - the box exists in
-// every state, a query narrows the rendered cards, and a query that matches nothing says so
-// instead of looking like an empty lobby.
-describe("room browser: searching the fetched list", () => {
-  const searchable = [lobbyRoom, playingRoom];
-
-  it("offers the box in every state, so it never appears and shoves the list", () => {
-    for (const props of [
-      { listing: listingOf(searchable) },
-      { listing: listingOf([]) },
-      { listing: listingOf([]), loaded: false },
-    ]) {
-      const { body } = render(RoomBrowser, { props: { ...props, ...noopHandlers } });
-      expect(body).toContain('type="search"');
-      expect(body).toContain("Search by room or host");
-    }
-  });
-
-  it("keeps only the rooms whose title or host answers the query", () => {
-    const byTitle = render(RoomBrowser, {
-      props: { listing: listingOf(searchable), initialQuery: "environment", ...noopHandlers },
-    }).body;
-    expect(byTitle).toContain("Environment trivia");
-    expect(byTitle).not.toContain("Pub quiz night");
-
-    const byHost = render(RoomBrowser, {
-      props: { listing: listingOf(searchable), initialQuery: "board game", ...noopHandlers },
-    }).body;
-    expect(byHost).toContain("Pub quiz night");
-    expect(byHost).not.toContain("Environment trivia");
-  });
-
-  it("counts what survived beside the total, rather than silently showing fewer", () => {
-    const { body } = render(RoomBrowser, {
-      props: { listing: listingOf(searchable), initialQuery: "pub", ...noopHandlers },
-    });
-    expect(body).toContain("1");
-    expect(body).toContain("of 2");
-  });
-
-  it("says a search found nothing - never reuses the 'nobody is hosting' state", () => {
-    const { body } = render(RoomBrowser, {
-      props: { listing: listingOf(searchable), initialQuery: "zzzz", ...noopHandlers },
-    });
-    expect(body).toContain("No room matches that search");
-    expect(body).not.toContain("Nobody is hosting publicly");
-    expect(body).toContain("Show all 2");
   });
 });
 
