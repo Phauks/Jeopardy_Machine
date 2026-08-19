@@ -51,7 +51,7 @@ function welcomeAndSeat(serve: (payload: Record<string, unknown>) => void, playe
     // M6: the host freeze, the redacted clue text, the seating rule, the board material and
     // the room's running timers. A bot ignores every one of them - it plays by events - but a
     // snapshot without them is not a valid frame, and this fixture is a real frame on purpose.
-    teamsMode: false,
+    playerMode: "individuals" as const,
     board: { rounds: [{ categoryTitles: ["Bots"], cellValues: [[100, 200, 300]] }] },
     paused: false,
     clueContent: null,

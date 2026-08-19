@@ -26,6 +26,7 @@
 // full (players AND spectators - both budgets are "this room has no space for you"), 4403
 // join refused, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
 import { z } from "zod";
+import { playerModeSchema } from "../settings/groups/teams.ts";
 import { mediaRefSchema } from "../content/media-ref.ts";
 import { extensionBagSchema } from "../ext.ts";
 import { protocolVersion } from "../envelope/wire.ts";
@@ -249,7 +250,12 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // room SETTING - it belongs to the game's rule set, not to the host's live controls - and
     // a client cannot derive it: in the lobby the engine has met nobody, so an empty `teams`
     // record says nothing. Without it a teams room's join screen offers no teams at all.
-    teamsMode: z.boolean(),
+    //
+    // The MODE, not a boolean: it was `teamsMode: boolean` until the third mode landed
+    // (2026-08-19), and "mixed" is precisely the case a boolean cannot carry - teams exist AND
+    // playing solo is a legitimate choice, which are two different answers a client needs to
+    // give different screens (settings/groups/teams.ts: teamsAreOffered vs teamsAreRequired).
+    playerMode: playerModeSchema,
     board: boardMaterialSchema,
     // Host-held freeze (the console's pause button). Room-level, not engine-level: the
     // engine has no pause concept, so the room parks its timers and says so.

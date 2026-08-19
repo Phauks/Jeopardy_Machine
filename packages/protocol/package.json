@@ -21,7 +21,8 @@
     "./room/visibility": "./src/room/visibility.ts",
     "./room/room-settings": "./src/room/room-settings.ts",
     "./room/registry": "./src/room/registry.ts",
-    "./room/diagnostics": "./src/room/diagnostics.ts"
+    "./room/diagnostics": "./src/room/diagnostics.ts",
+    "./settings/player-mode": "./src/settings/groups/teams.ts"
   },
   "scripts": {
     "check": "tsc --noEmit",

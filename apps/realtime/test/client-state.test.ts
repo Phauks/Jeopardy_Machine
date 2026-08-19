@@ -26,6 +26,11 @@ const teamsGame: CreateRoomRequestInput["game"] = {
   hasFinalClue: false,
 };
 
+const mixedGame: CreateRoomRequestInput["game"] = {
+  ...teamsGame,
+  overrides: { ...teamsGame.overrides, teams: { playerMode: "mixed" } },
+};
+
 describe("the snapshot carries the room's static facts", () => {
   it("ships the board's titles and values so a display has something to paint", async () => {
     const code = uniqueCode();
@@ -50,15 +55,25 @@ describe("the snapshot carries the room's static facts", () => {
     const individualsCode = uniqueCode();
     const individuals = await initializeRoom(individualsCode, undefined, "seating-solo");
     const soloHost = await connectHost(individualsCode, individuals.hostToken);
-    expect((await soloHost.waitFor("snapshot")).teamsMode).toBe(false);
+    expect((await soloHost.waitFor("snapshot")).playerMode).toBe("individuals");
 
     const teamsCode = uniqueCode();
     const teams = await initializeRoom(teamsCode, teamsGame, "seating-teams");
     const teamsHost = await connectHost(teamsCode, teams.hostToken);
     const snapshot = await teamsHost.waitFor("snapshot");
-    expect(snapshot.teamsMode).toBe(true);
+    expect(snapshot.playerMode).toBe("teams");
     // Nothing else on the wire says it: the engine has met nobody yet.
     expect(Object.keys((snapshot.game as GameState).teams)).toHaveLength(0);
+  });
+
+  it("carries MIXED as its own answer, which a boolean could never have", async () => {
+    // The case the wire's old `teamsMode: boolean` could not express: teams exist AND playing
+    // solo is a legitimate choice. A client needs both halves to draw the right screen - offer
+    // the teams region, and do not treat a teamless player as unfinished.
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code, mixedGame, "seating-mixed");
+    const host = await connectHost(code, hostToken);
+    expect((await host.waitFor("snapshot")).playerMode).toBe("mixed");
   });
 
   it("a compact room reports empty titles rather than inventing any", async () => {

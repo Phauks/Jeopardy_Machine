@@ -5,6 +5,7 @@
   // touches the game (C1); reopening the route restores everything from the store.
   // Never shows answers, wagers in progress, or wager-cell positions: its store role is
   // "display", so that data does not even reach this component (C1b's rule, data-level).
+  import { teamsAreOffered } from "@jeopardy/protocol/settings/player-mode";
   import { fade, scale } from "svelte/transition";
   import { prefersReducedMotion } from "svelte/motion";
   import { renderSVG } from "uqr";
@@ -152,7 +153,7 @@
     // Teams mode double confirmation: team name big, the buzzing MEMBER small underneath
     // (identification without audio clutter - owner directive).
     const winner = game?.clue?.buzzWinner ?? null;
-    if (winner === null || !view.teamsMode) return null;
+    if (winner === null || !teamsAreOffered(view.playerMode)) return null;
     if (winner.playerId === winner.entityId) return null;
     const member = view.roster.players.find((player) => player.playerId === winner.playerId);
     return member?.nickname ?? null;
@@ -197,23 +198,32 @@
   // the same entity vocabulary buzz and winner events speak. A team borrows its avatar from
   // its leader (the face the room already associates with it) and wears the team's color.
   const dioramaOccupants: DioramaOccupant[] = $derived.by(() => {
-    if (!view.teamsMode) {
-      return view.roster.players.map((player) => ({
+    const soloists = view.roster.players
+      .filter((player) => player.teamId === null)
+      .map((player) => ({
         entityId: player.playerId,
         avatarId: player.avatarId,
         accentId: player.accentId,
       }));
-    }
-    return view.roster.teams.map((team) => {
-      const leader = view.roster.players.find(
-        (player) => player.playerId === team.leaderPlayerId,
-      );
-      return {
-        entityId: team.teamId,
-        avatarId: leader?.avatarId ?? null,
-        accentId: team.colorId,
-      };
-    });
+    // Individuals: every player is their own entity, and there are no teams to draw.
+    if (!teamsAreOffered(view.playerMode)) return soloists;
+    // Teams and MIXED share one rule - one avatar per scoring entity - and mixed is where the
+    // two halves are both non-empty at once: the teams below, plus everyone who chose to play
+    // for themselves. In teams mode the soloist list is empty by construction (the room seats
+    // stragglers as teams of one at start-game), so this is not a branch, it is the general
+    // case the old one was a special case of.
+    return view.roster.teams
+      .map((team) => {
+        const leader = view.roster.players.find(
+          (player) => player.playerId === team.leaderPlayerId,
+        );
+        return {
+          entityId: team.teamId,
+          avatarId: leader?.avatarId ?? null,
+          accentId: team.colorId,
+        };
+      })
+      .concat(soloists);
   });
 
   const celebratingEntityIds = $derived(game?.phase === "game-over" ? (game.winners ?? []) : []);

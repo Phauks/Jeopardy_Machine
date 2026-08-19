@@ -45,7 +45,7 @@ function snapshotFrame(overrides: Record<string, unknown> = {}) {
     phase: "lobby",
     game: null,
     roster: { players: [], teams: [] },
-    teamsMode: false,
+    playerMode: "individuals" as const,
     board: emptyBoard,
     paused: false,
     clueContent: null,
@@ -191,7 +191,7 @@ describe("ws room store: messages become a view", () => {
     room.serve(
       snapshotFrame({
         phase: "lobby",
-        teamsMode: true,
+        playerMode: "teams" as const,
         roster: {
           players: [rosterEntry("p-1", "Ada", "t-1")],
           teams: [
@@ -210,7 +210,7 @@ describe("ws room store: messages become a view", () => {
     room.serve({ type: "room-settings", settings: { ...settings, hideJoinCode: true }, at: 1 });
 
     const view = room.store.view;
-    expect(view.teamsMode).toBe(true);
+    expect(view.playerMode).toBe("teams");
     expect(view.roster.players[0]).toMatchObject({
       playerId: "p-1",
       nickname: "Ada",

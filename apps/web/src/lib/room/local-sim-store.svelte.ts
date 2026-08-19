@@ -8,6 +8,7 @@
 // Room tier vs engine tier (mirrors the M3 split in packages/protocol/src/room/roster.ts):
 // the roster (identity, teams, leadership) lives HERE and never in engine state; the engine
 // only learns seats at start-game. Roster edits in the lobby need no engine actions.
+import { teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -170,7 +171,7 @@ export class LocalSimRoomStore implements RoomStore {
         // the census below report the SAME number rather than disagreeing on one screen.
         spectatorCount: this.simSpectators,
       },
-      teamsMode: this.setup.settings.teams.playerMode === "teams",
+      playerMode: this.setup.settings.teams.playerMode,
       myPlayerId: this.myPlayerId,
       game: this.engineState,
       content: this.content,
@@ -655,14 +656,15 @@ export class LocalSimRoomStore implements RoomStore {
       player.teamId === null
         ? undefined
         : this.rosterTeams.find((entry) => entry.teamId === player.teamId);
-    // Teams mode requires a teamId on every seat; an unteamed player (fixture late joiners,
-    // solo-minded guests) becomes a solo team of one, named after them - the same seating
-    // policy the M3 room will need for the "2 unteamed late joiners" roster case.
-    const teamsMode = this.setup.settings.teams.playerMode === "teams";
+    // Teams mode REQUIRES a teamId on every seat, so an unteamed player (fixture late joiners,
+    // solo-minded guests) becomes a solo team of one named after them - the same seating policy
+    // the real room applies at start-game. Mixed does NOT: a teamless player there chose to
+    // play solo, and their scoring entity is themselves (@jeopardy/protocol
+    // settings/groups/teams.ts, teamsAreRequired).
     const seatTeam =
       team !== undefined
         ? { teamId: team.teamId, teamName: team.name }
-        : teamsMode
+        : teamsAreRequired(this.setup.settings.teams.playerMode)
           ? { teamId: player.playerId, teamName: player.nickname }
           : {};
     this.dispatch({

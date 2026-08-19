@@ -167,7 +167,8 @@
       <CharacterPanel
         value={character}
         mode={regions.identityMode}
-        teamsMode={regions.teams.shown}
+        teamsOffered={regions.teams.shown}
+        teamsRequired={regions.teams.required}
         {nameProblem}
         onChange={changeCharacter}
         onPreviewSound={onPreviewSound}

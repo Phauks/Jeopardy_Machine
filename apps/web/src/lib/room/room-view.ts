@@ -6,6 +6,7 @@
 // nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
 import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -154,8 +155,16 @@ export type RoomView = {
   connection: RoomConnectionState;
   phase: RoomPhaseView;
   roster: RoomRosterView;
-  /** True when the room plays in teams (team cards on join, team-scoped room buzz sounds). */
-  teamsMode: boolean;
+  /**
+   * How this room seats people (rules row 34, frozen when the room was created).
+   *
+   * The MODE, not a boolean, since 2026-08-19: "mixed" is a room where teams exist AND playing
+   * solo is a legitimate choice, and that is two different answers a surface needs to give
+   * different screens. Ask through the protocol's predicates rather than comparing here -
+   * `teamsAreOffered` decides whether to draw team machinery at all, `teamsAreRequired` decides
+   * whether a teamless player is unfinished or is simply a soloist.
+   */
+  playerMode: PlayerMode;
   /** This connection's seat; null for host/display/spectator connections. */
   myPlayerId: string | null;
   /**

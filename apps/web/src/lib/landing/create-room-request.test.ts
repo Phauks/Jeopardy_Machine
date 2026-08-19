@@ -14,6 +14,7 @@ import {
   withPlayerMode,
 } from "#lib/landing/create-room-request.ts";
 import { resolveGameRules, ruleSetSchema } from "@jeopardy/protocol";
+import { teamsAreOffered, teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { sampleGameDefinition } from "#lib/hotseat/sample-game.ts";
 import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
@@ -233,6 +234,13 @@ describe("withPlayerMode - the teams choice, written onto the GAME", () => {
     // ...and the rest of the game is untouched: same board, same value scheme, same theme.
     expect(teamed.rounds).toEqual(sampleGameDefinition.body.rounds);
     expect(teamed.valueScheme).toEqual(sampleGameDefinition.body.valueScheme);
+  });
+
+  it("writes mixed, which is neither of the other two and not derivable from them", () => {
+    const mixed = withPlayerMode(sampleGameDefinition.body, "mixed");
+    expect(resolveGameRules(mixed.rules).teams.playerMode).toBe("mixed");
+    expect(teamsAreOffered("mixed")).toBe(true);
+    expect(teamsAreRequired("mixed")).toBe(false);
   });
 
   it("leaves individuals as the mode when that is what was chosen", () => {

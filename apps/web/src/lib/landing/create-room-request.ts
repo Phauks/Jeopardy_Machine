@@ -13,6 +13,7 @@
 import { limits } from "@jeopardy/protocol/limits";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
 import type { GameDefinitionBody } from "@jeopardy/protocol";
+import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 
 export type CreateRoomForm = {
   title: string;
@@ -23,13 +24,13 @@ export type CreateRoomForm = {
   maxPlayers: number;
   spectatorsAllowed: boolean;
   /**
-   * Individuals or teams. It is NOT a room setting: whether a game is played in teams is a
+   * Individuals, teams, or mixed. It is NOT a room setting: how a game seats people is a
    * RULE, and rules live in the game document (the design law, docs/design/expansion-and-
    * boundaries.md). So this control does not add a field to the room - it writes a settings
-   * override onto the game definition being hosted, and the room learns teams mode the same
-   * way it learns everything else about the game (`withPlayerMode` below).
+   * override onto the game definition being hosted, and the room learns the mode the same way
+   * it learns everything else about the game (`withPlayerMode` below).
    */
-  playerMode: "individuals" | "teams";
+  playerMode: PlayerMode;
 };
 
 /**
@@ -171,7 +172,7 @@ export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
  */
 export function withPlayerMode(
   body: GameDefinitionBody,
-  playerMode: CreateRoomForm["playerMode"],
+  playerMode: PlayerMode,
 ): GameDefinitionBody {
   if (body.rules.kind !== "preset") return body;
   return {

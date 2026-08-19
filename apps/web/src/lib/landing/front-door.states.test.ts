@@ -336,9 +336,14 @@ describe("hosting is a button, and its form opens in place", () => {
     // is written onto the game definition (create-room-request.ts, withPlayerMode).
     const body = renderFrontDoor({ createState: { status: "creating" } });
     expect(body).toContain("How people play");
+    // Three modes, because a room night is rarely all pairs or all soloists (owner,
+    // 2026-08-19): mixed lets teams exist without forcing the odd person into a team of one.
     expect(body).toContain("Individuals");
     expect(body).toContain("Teams");
-    expect(body).toContain('value="teams"');
+    expect(body).toContain("Mixed");
+    for (const mode of ["individuals", "teams", "mixed"]) {
+      expect(body).toContain(`value="${mode}"`);
+    }
   });
 
   it("marks the two fields the room cannot open without (owner call 2026-08-17)", () => {

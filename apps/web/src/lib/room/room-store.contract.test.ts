@@ -44,7 +44,7 @@ describe("room-store contract: lobby and roster tier", () => {
     const store = hostStore();
     expect(store.view.phase).toBe("lobby");
     expect(store.view.game).toBeNull();
-    expect(store.view.teamsMode).toBe(true);
+    expect(store.view.playerMode).toBe("teams");
     expect(store.view.roster.players).toHaveLength(fixtureRoster.players.length);
     expect(store.view.roster.teams).toHaveLength(fixtureRoster.teams.length);
   });

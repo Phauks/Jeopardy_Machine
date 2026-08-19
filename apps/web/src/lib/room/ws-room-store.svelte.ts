@@ -15,7 +15,7 @@
 // | refused       | view.refusal (the REASON; room-refusal.ts owns the words). Room-level      |
 // |               | reasons arrive with a close; team/password ones keep the socket            |
 // | snapshot      | replaces game + roster + phase + paused wholesale, and carries the room's  |
-// |               | static facts (teamsMode, board material) so `sync` restores everything     |
+// |               | static facts (playerMode, board material) so `sync` restores everything   |
 // | event         | folds the batch through room-fold.ts and takes the state it carries; a     |
 // |               | stateVersion gap of more than one asks for `sync`                          |
 // | arm-window    | `arm-ack` goes back IMMEDIATELY (see the latency note below), and the     |
@@ -65,6 +65,7 @@ import {
   prunePendingTimers,
 } from "#lib/room/room-fold.ts";
 import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
+import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameState } from "@jeopardy/engine/state";
@@ -194,7 +195,7 @@ export class WsRoomStore implements RoomStore {
    */
   private spectatorCountState = $state<number | null>(null);
   private roomPhase = $state<"lobby" | "active" | "ended">("lobby");
-  private teamsModeState = $state(false);
+  private playerModeState = $state<PlayerMode>("individuals");
   private myPlayerIdState = $state<string | null>(null);
   private fold = $state.raw<RoomFoldState>(emptyFold());
   /** The open arming, with the local paint time the surface stamps on it. */
@@ -247,7 +248,7 @@ export class WsRoomStore implements RoomStore {
         teams: this.rosterTeams,
         spectatorCount: this.spectatorCountState,
       },
-      teamsMode: this.teamsModeState,
+      playerMode: this.playerModeState,
       // Null until the wire carries a census: the DO counts connections, and a store that
       // invented one would tell a host a projector was attached to a socket nobody opened
       // (room-view.ts). The `snapshot` message gains the protocol's `connectionCensus`
@@ -510,7 +511,7 @@ export class WsRoomStore implements RoomStore {
     this.stateVersion = message.stateVersion;
     this.roomPhase = message.phase;
     this.engineState = message.game as GameState | null;
-    this.teamsModeState = message.teamsMode;
+    this.playerModeState = message.playerMode;
     this.boardRounds = message.board.rounds;
     this.pausedState = message.paused;
     this.applyRoster(message.roster);

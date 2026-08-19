@@ -10,6 +10,7 @@
 // ordered list with each action's `at` rewritten to the credited press time. Nothing here
 // changed and nothing here may: the state machine stays single, unbranched and clockless
 // (docs/design/expansion-and-boundaries.md boundary 2.1).
+import { teamsAreOffered } from "@jeopardy/protocol";
 import { closeClue } from "../flow.ts";
 import { entityForPlayer } from "../state.ts";
 import type { GameAction } from "../actions.ts";
@@ -83,8 +84,10 @@ export function handleArmBuzzers(
 
 /** The participant key early-buzz penalties attach to: the team under #36, the phone otherwise. */
 function earlyLockoutKey(setup: GameSetup, playerId: string, entityId: string): string {
-  const teamsMode = setup.settings.teams.playerMode === "teams";
-  return teamsMode && setup.settings.teams.teamWideEarlyBuzzPenalty ? entityId : playerId;
+  // Offered, not required: in mixed mode a soloist's entity IS their player id, so widening to
+  // the entity cannot over-reach - it lands on exactly the phone that pressed.
+  const offered = teamsAreOffered(setup.settings.teams.playerMode);
+  return offered && setup.settings.teams.teamWideEarlyBuzzPenalty ? entityId : playerId;
 }
 
 export function handleBuzz(
@@ -157,7 +160,7 @@ export function handleBuzz(
   }
   // Rotating captain (#35): only the team's current captain may buzz this clue.
   if (
-    setup.settings.teams.playerMode === "teams" &&
+    teamsAreOffered(setup.settings.teams.playerMode) &&
     setup.settings.teams.teamBuzzer === "rotating-captain"
   ) {
     const team = draft.teams[entityId];

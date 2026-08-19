@@ -298,11 +298,31 @@ describe("the at-cap refusal", () => {
   });
 });
 
-describe("individuals-mode rooms keep the region and say what it is", () => {
+describe("the three seating modes, and the two different questions they answer", () => {
   it("never leaves a hole where the teams would be", () => {
     const store = joinedStore();
-    const view = { ...store.view, teamsMode: false };
+    const view = { ...store.view, playerMode: "individuals" as const };
     expect(preGameRegionsFor(view).teams.shown).toBe(false);
+  });
+
+  it("mixed OFFERS teams without REQUIRING one - the case a boolean could not hold", () => {
+    const store = joinedStore();
+    const mixed = preGameRegionsFor({ ...store.view, playerMode: "mixed" as const });
+    expect(mixed.teams.shown).toBe(true);
+    expect(mixed.teams.required).toBe(false);
+  });
+
+  it("teams mode both offers and requires, which is what makes it the strict one", () => {
+    const store = joinedStore();
+    const teams = preGameRegionsFor({ ...store.view, playerMode: "teams" as const });
+    expect(teams.teams.shown).toBe(true);
+    expect(teams.teams.required).toBe(true);
+  });
+
+  it("individuals requires nothing, because there is nothing to require", () => {
+    const store = joinedStore();
+    const solo = preGameRegionsFor({ ...store.view, playerMode: "individuals" as const });
+    expect(solo.teams.required).toBe(false);
   });
 });
 

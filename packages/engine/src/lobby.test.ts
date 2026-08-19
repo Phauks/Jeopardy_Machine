@@ -141,6 +141,33 @@ describe("matrix #34: teams as scoring entities", () => {
     ).toBe("team-join-in-individuals-mode");
   });
 
+  it("mixed seats teams AND soloists in one game, each scoring as itself", () => {
+    // The mode teams and individuals could not express between them: a room holding two
+    // couples and one person who came alone. The engine needed no new concept for it - a
+    // participant's scoring entity has always been `teamId ?? playerId` - only permission to
+    // let a teamless player through the door (@jeopardy/protocol settings/groups/teams.ts).
+    const mixedSetup = testSetup({ overrides: { teams: { playerMode: "mixed" } } });
+    const game = run(mixedSetup, [
+      { type: "player-join", at: 1, playerId: "a1", name: "Ada", teamId: "tA", teamName: "Alpha" },
+      { type: "player-join", at: 2, playerId: "a2", name: "Al", teamId: "tA" },
+      { type: "player-join", at: 3, playerId: "s1", name: "Sam" },
+    ]);
+    // Two entities, not three: the couple is one score, the soloist is their own.
+    expect(game.state.entityOrder).toEqual(["tA", "s1"]);
+    expect(game.state.teams.tA?.memberIds).toEqual(["a1", "a2"]);
+    expect(game.state.scores).toEqual({ tA: 0, s1: 0 });
+    // No team was manufactured for the soloist - that is the difference from teams mode.
+    expect(Object.keys(game.state.teams)).toEqual(["tA"]);
+    expect(game.state.players.s1?.teamId).toBeNull();
+  });
+
+  it("mixed never demands a team - the refusal teams mode gives here is the whole difference", () => {
+    const mixedSetup = testSetup({ overrides: { teams: { playerMode: "mixed" } } });
+    const joined = run(mixedSetup, [{ type: "player-join", at: 1, playerId: "x", name: "X" }]);
+    expect(joined.state.players.x?.teamId).toBeNull();
+    expect(joined.state.entityOrder).toEqual(["x"]);
+  });
+
   it("late-joining an EXISTING team never re-scores the team", () => {
     const setup = testSetup({
       overrides: { teams: { playerMode: "teams" }, join: { lateJoinScore: "match-lowest" } },

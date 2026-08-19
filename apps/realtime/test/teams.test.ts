@@ -175,8 +175,14 @@ describe("team lifecycle in the lobby", () => {
 describe("team-scoped buzzing", () => {
   it("resolves buzz-won to the TEAM's room-audible sound, not the presser's personal one", async () => {
     const { code, host } = await teamsRoom("teams-sound");
+    // The leader is here to OWN the team's sound, not to race for it. instantBot buzzes with
+    // probability 1 at zero reaction, so leaving that on put two identical thumbs in the same
+    // arm window and the winner came down to arrival order under load - a real race in the
+    // test, since either bot winning is a legitimate outcome of the room's own ranking. The
+    // claim being made is about which SOUND carries the room, so only one of them presses.
     const leader = await connectBot(code, {
       ...instantBot("Leader"),
+      behavior: { ...instantBot("Leader").behavior, buzzProbability: 0 },
       buzzSoundId: "pack/personal-quack",
       team: { kind: "create", name: "Audio" },
     });

@@ -112,7 +112,7 @@
          made was an individuals room, and the pre-game screen's teams region said so - "this
          room plays as individuals" with no way to have asked for anything else (owner report
          2026-08-19, "main join screen does not show how to create a team or join a team"). -->
-    <fieldset class="field listing-field">
+    <fieldset class="field listing-field player-mode-field">
       <legend class="field-label">How people play</legend>
       <div class="segmented">
         <label class:selected={form.playerMode === "individuals"}>
@@ -123,12 +123,17 @@
             bind:group={form.playerMode}
           />
           <span class="segment-title">Individuals</span>
-          <span class="segment-note">Everyone for themselves</span>
+          <span class="segment-note">No teams at all</span>
         </label>
         <label class:selected={form.playerMode === "teams"}>
           <input type="radio" name="player-mode" value="teams" bind:group={form.playerMode} />
           <span class="segment-title">Teams</span>
-          <span class="segment-note">Players make and join teams</span>
+          <span class="segment-note">Everyone on a team</span>
+        </label>
+        <label class:selected={form.playerMode === "mixed"}>
+          <input type="radio" name="player-mode" value="mixed" bind:group={form.playerMode} />
+          <span class="segment-title">Mixed</span>
+          <span class="segment-note">Teams, or play solo</span>
         </label>
       </div>
     </fieldset>
@@ -255,6 +260,7 @@
 
   .name-field,
   .listing-field,
+  .player-mode-field,
   .verdict,
   .create-button {
     grid-column: 1 / -1;
@@ -306,9 +312,11 @@
     color: var(--create-muted);
   }
 
+  /* auto-fit rather than a fixed two: the listing control has two options and "how people play"
+     has three since mixed landed, and a hard column count would have squeezed the third out. */
   .segmented {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
     gap: 0.4rem;
   }
 

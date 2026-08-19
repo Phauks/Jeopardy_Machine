@@ -30,6 +30,7 @@ import { createInitialState } from "@jeopardy/engine/state";
 import { plainRoundSetup, setupFromGameDefinition } from "@jeopardy/engine/setup";
 import { transition } from "@jeopardy/engine/transition";
 import { resolvePreset } from "@jeopardy/protocol";
+import { teamsAreOffered, teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
 import { limits } from "@jeopardy/protocol/limits";
 import { createRoomRequestSchema, generateSecretToken } from "@jeopardy/protocol/room/create";
@@ -310,7 +311,7 @@ export class GameRoomDO extends Server {
       roster: this.wireRoster(),
       // The room's static facts travel with every snapshot, so `sync` restores a client
       // completely rather than leaving it with live state and no board to draw it on.
-      teamsMode: room.setup.settings.teams.playerMode === "teams",
+      playerMode: room.setup.settings.teams.playerMode,
       board: boardMaterial(room.spec, room.setup),
       paused: room.meta.pausedAt !== null,
       // A phone that reconnects mid-clue must land on the screen it left, so an open clue
@@ -1109,9 +1110,13 @@ export class GameRoomDO extends Server {
       this.refuse(connection, "room-full", roomCloseCodes.roomFull);
       return;
     }
-    const teamsMode = room.setup.settings.teams.playerMode === "teams";
-    if (!teamsMode && message.team !== undefined) {
-      this.sendError(connection, "rejected", "room is not in teams mode");
+    // Offered vs required, the two questions a boolean used to blur (@jeopardy/protocol
+    // settings/groups/teams.ts). A team is only nonsense in individuals mode; in mixed it is
+    // one of two legitimate ways to be here.
+    const teamsOffered = teamsAreOffered(room.setup.settings.teams.playerMode);
+    const teamsRequired = teamsAreRequired(room.setup.settings.teams.playerMode);
+    if (!teamsOffered && message.team !== undefined) {
+      this.sendError(connection, "rejected", "this room plays as individuals");
       return;
     }
 
@@ -1119,7 +1124,7 @@ export class GameRoomDO extends Server {
     // phone can retry on the same socket (server-messages close-code note).
     let teamId: string | null = null;
     let createdTeam: TeamDoc | null = null;
-    if (teamsMode && message.team !== undefined) {
+    if (teamsOffered && message.team !== undefined) {
       if (message.team.kind === "join") {
         const team = room.teams[message.team.teamId];
         if (team === undefined) {
@@ -1173,9 +1178,10 @@ export class GameRoomDO extends Server {
     // Mid-game joins feed the engine NOW (late-join policy #43 decides); lobby joins wait
     // for start-game, so the lobby can rearrange teams without engine actions.
     if (room.meta.lifecycle === "active") {
-      if (teamsMode && teamId === null) {
+      if (teamsRequired && teamId === null) {
         // Same policy as start-game: a straggler joins as a solo team rather than being
-        // bounced off a running game.
+        // bounced off a running game. REQUIRED, not offered: in mixed mode arriving without a
+        // team is the choice to play solo, and manufacturing a team of one would overrule it.
         room.meta.teamCounter += 1;
         createdTeam = {
           teamId: `t-${String(room.meta.teamCounter)}`,
@@ -1424,8 +1430,15 @@ export class GameRoomDO extends Server {
     await this.flushArmWindow();
 
     if (stamped.action.type === "start-game") {
-      const teamsMode = room.setup.settings.teams.playerMode === "teams";
-      if (teamsMode && (await this.seatStragglersAsSoloTeams())) this.broadcastRoster();
+      // Only when teams are REQUIRED. Mixed mode's whole point is that the people who did not
+      // join a team meant it, and seating them as teams of one would put a fake team on the
+      // scoreboard for every soloist in the room.
+      if (
+        teamsAreRequired(room.setup.settings.teams.playerMode) &&
+        (await this.seatStragglersAsSoloTeams())
+      ) {
+        this.broadcastRoster();
+      }
       const seatActions: GameAction[] = Object.values(room.roster)
         .toSorted((a, b) => a.joinedAt - b.joinedAt)
         .filter((entry) => room.state.players[entry.playerId] === undefined)
@@ -1610,8 +1623,8 @@ export class GameRoomDO extends Server {
       this.sendError(connection, "unauthorized", "only players create teams");
       return;
     }
-    if (room.setup.settings.teams.playerMode !== "teams") {
-      this.sendError(connection, "rejected", "room is not in teams mode");
+    if (!teamsAreOffered(room.setup.settings.teams.playerMode)) {
+      this.sendError(connection, "rejected", "this room plays as individuals");
       return;
     }
     if (!this.teamEditsAllowed()) {

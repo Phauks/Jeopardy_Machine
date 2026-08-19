@@ -54,6 +54,8 @@ export type {
   SettingsMap,
 } from "./settings/definition.ts";
 export { settingsGroups } from "./settings/registry.ts";
+export { playerModeSchema, teamsAreOffered, teamsAreRequired } from "./settings/groups/teams.ts";
+export type { PlayerMode } from "./settings/groups/teams.ts";
 export {
   defaultSettings,
   resolveSettings,
