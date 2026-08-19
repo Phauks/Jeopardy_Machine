@@ -49,6 +49,17 @@ export type RoomTeamView = {
 export type RoomRosterView = {
   players: RoomPlayerView[];
   teams: RoomTeamView[];
+  /**
+   * How many spectators are watching, or NULL when this room has not reported its audience.
+   *
+   * Spectators hold no seat and give no identity, so a count is the only honest thing there is
+   * to show (the protocol's `rosterPayload.spectatorCount`, filled from live connections by the
+   * DO). Null is not zero and must not render as zero: "nobody is watching" and "nobody has
+   * counted" are different facts, and a console that prints the second as the first is
+   * inventing a number - the same rule the lobby's capacity lines follow
+   * (src/lib/lobby/room-capacity.ts).
+   */
+  spectatorCount: number | null;
 };
 
 /**
@@ -72,6 +83,28 @@ export type PendingTimerView = {
   kind: TimerKind;
   durationMs: number;
   firesAt: number;
+};
+
+/**
+ * The arming the room is currently running, as the protocol's `arm-window` message describes
+ * it - and the one field the protocol cannot supply: when THIS client painted it.
+ *
+ * The room ranks buzzes by reaction time rather than by arrival order
+ * (docs/decisions/2026-08-17-buzz-latency-compensation.md), and the quantity being ranked is
+ * the human's thumb: the clock starts when the player could first see the button go hot, not
+ * when the message arrived. So `paintedAt` is stamped by the SURFACE, on the frame the armed
+ * state actually reached the screen (`RoomStore.markArmedPainted`), and stays null until then -
+ * a buzz with no paint behind it carries no timing at all, which the room ranks by arrival,
+ * exactly as it did before compensation existed.
+ */
+export type RoomArmingView = {
+  armId: number;
+  /** How long the room may hold buzzes before crowning a winner; 0 = compensation is off. */
+  compensationMs: number;
+  /** True for a re-arm after a wrong answer, so a surface can word it differently. */
+  rebound: boolean;
+  /** Local clock at the moment this client painted the armed state; null until it has. */
+  paintedAt: number | null;
 };
 
 /** The judged-flash payload (A4 "Score delta flash"): cleared when the next clue opens. */
@@ -132,6 +165,12 @@ export type RoomView = {
   content: RoomContentView | null;
   myBuzz: MyBuzzView;
   pendingTimers: PendingTimerView[];
+  /**
+   * The open arming, or null when the buzzers are not armed (and on stores that hold no
+   * window - a local simulation adjudicates a buzz the instant it is pressed, so there is
+   * nothing to measure and nothing to hold).
+   */
+  arming: RoomArmingView | null;
   lastJudged: LastJudgedView | null;
   wagerRange: WagerRangeView | null;
   finalWagerRanges: WagerRangeView[];
@@ -146,6 +185,18 @@ export type RoomView = {
    * password is the one settings field that never leaves the DO.
    */
   settings: RoomSettings;
+  /**
+   * Has the ROOM actually told us the settings above, or are they still the shell a store
+   * carries so surfaces can render before the first message lands?
+   *
+   * False means "not loaded yet" and a surface that edits or reports room settings must SAY so
+   * rather than draw the protocol defaults - a host who reads "40 players, spectators on" off a
+   * console that has heard nothing from the room has been told something untrue about their own
+   * room (owner, 2026-08-17: "I don't think the room I created shows the correct settings").
+   * The local-sim store is the authority for its own room and reports true; the ws store
+   * reports false until the `room-settings` message arrives.
+   */
+  settingsKnown: boolean;
   /**
    * Why the room turned this connection away, in the protocol's own vocabulary, or null. The
    * REASON travels rather than a sentence, so the copy lives in one place

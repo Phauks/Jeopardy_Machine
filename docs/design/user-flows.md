@@ -62,6 +62,7 @@ The buzzer screen is a single fixed layout (no scrolling, no zoom, no pull-to-re
 | Board (someone picking)    | Scoreboard + "**Maya** is picking..."                                                                          |
 | Clue being read            | The buzz button, visually _cold_ + "wait for it..." (buzz text NOT shown by default - listening beats reading) |
 | **Armed**                  | Button goes hot (theme accent, subtle pulse). Tap -> instant local flash + haptic, server confirms             |
+| Buzzed, room deciding      | The same button, held: "BUZZED", pulse dropped. The room ranks the field for up to a quarter second            |
 | You won the buzz           | Full-screen "**YOU!** Answer out loud" + 5s ring timer                                                         |
 | Someone else won           | "**Maya** buzzed" dimmed screen                                                                                |
 | You buzzed early           | "Too soon" + 0.25s lockout ring (the penalty made visible = teachable)                                         |
@@ -73,9 +74,9 @@ The buzzer screen is a single fixed layout (no scrolling, no zoom, no pull-to-re
 
 ### A5. The unglamorous 80% - failure & edge handling
 
-- **Phone sleeps / app backgrounds** (constant at real events): on visibility regain, WS reconnects with session token, state snapshot restores the exact screen. Target: invisible within 2s.
-- **Accidental refresh / tab close+reopen**: same token in `sessionStorage` -> seamless resume. New tab on same phone: token is per-tab; joining again as a new player is prevented by a room-side device hint (best effort, host can merge/kick regardless).
-- **Wi-Fi blip**: thin "reconnecting..." banner; buzzing disabled while stale (never let a player _think_ they buzzed); auto-recover.
+- **Phone sleeps / app backgrounds** (constant at real events): on visibility regain, WS reconnects with session token, state snapshot restores the exact screen - including its CLOCKS, since the snapshot carries every running countdown as remaining ms (M6): a phone that slept mid-answer comes back to a bar that is still draining, not a frozen one, and one that slept through the arm is sent the open `arm-window` so it can still race. Target: invisible within 2s.
+- **Accidental refresh / tab close+reopen**: same token in `sessionStorage` -> seamless resume (live since 2026-08-17: `rememberSessionToken`/`recallSessionToken` in `src/lib/lobby/join-hand-off.ts`, and the browser suite reloads a mid-lobby phone to prove the room still counts one of them, not two). New tab on same phone: token is per-tab; joining again as a new player is prevented by a room-side device hint (best effort, host can merge/kick regardless).
+- **Wi-Fi blip**: thin "reconnecting..." banner; buzzing disabled while stale (never let a player _think_ they buzzed); auto-recover. Wired 2026-08-17 (`ws-room-store.svelte.ts`): a drop that is not a 44xx walks a fixed backoff ladder (0.5s to 15s, last rung repeating - a phone in a pocket over a coffee break must still come back) and re-presents the session token, so the room hands back the same seat and the snapshot restores the screen. The pre-game screen carries the banner; a 44xx never retries, because the room already said no.
 - **Late joiner**: allowed by default (setting), enters at current state with score 0; host can gift a starting score (score override exists anyway).
 - **Player leaves / phone dies**: roster marks them away after missed heartbeats; game NEVER blocks on an absent phone (Final round: missing wager = auto 0 at deadline; host sees who's outstanding).
 - **The host kicks/renames**: takes effect immediately, phone shows a polite screen. The wire says which polite screen: `room-closed` carries `kicked` (this phone only), `host-closed` (the host ended the room for everyone), or `expired` (the room aged out) - the client shows copy per reason, never a generic disconnect.
@@ -134,6 +135,7 @@ Not every venue gives the host an extended desktop - sometimes the laptop screen
 - **Answers never render on a mirrored screen.** The private layer (per-clue correct responses, DD locations, wager amounts in progress) moves to one of: (a) the **host companion view** - a phone-sized route the host opens on their own phone, joined with a host token, showing exactly the private layer synced to the current clue; or (b) the **print pack** (flow B4) as the low-tech fallback.
 - Keyboard shortcuts still work in mirror mode (the dock is for visibility, not the only input).
 - Mirror mode is a per-device toggle (like audio routing), not a room setting - a co-host on a second laptop can run the full private console simultaneously.
+- **It is entered from the console's own chrome** (owner-specified 2026-08-17): a labelled toggle in the header showing its state, the same switch as the cog's and the dock's. It began as a URL query, which is not a control anybody can reach at the moment they discover the projector is mirroring their laptop. `?mirror` survives as a way to OPEN a console already mirrored - it seeds the device preference rather than overriding it, so leaving works from any of the three.
 
 ### C1c. The cog (owner-specified 2026-08-16, shipped)
 
@@ -146,9 +148,20 @@ It has two halves and says which is which, because the difference is not cosmeti
 
 The display type scale reaches the projector window of the same browser live, because both windows read one device-preferences document (C1's laptop-plus-projector setup is two tabs of one origin). A projector driven by a different machine has its own, which the panel says.
 
+**The panel is not themed, and that is a rule** (owner-specified 2026-08-17: "settings show the theme assets, which makes them difficult to read"). A control panel is never painted by the thing it controls - the cog steers the type scale a theme renders at, so rendering the cog IN that theme put its labels in the board's poster faces at whatever contrast the theme chose. The panel's chrome is a fixed palette under every theme, present or future; only the type-scale PREVIEW is themed, because it is a picture of the display and is supposed to look like one.
+
+**Room settings that are TYPED wait for an Apply, and say so.** Switches (streamer mode, listing, spectators allowed) reach the room the moment they move; a title, a password or a cap being typed must not travel letter by letter, so those groups state the edit they are holding ("player cap 30 -> 24") beside a button that names its effect and is dead until there is one. "Save caps" - a button named after itself - was the version the owner could not read.
+
 ### C2. Doors open
 
-Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments (drag to rebalance), rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
+Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments, rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
+
+**The roster panel** (owner-specified 2026-08-17: "show all player data, so host can force renaming of teams, names, kicking, etc. Also show spectators") is a rail beside the console, open by default in the lobby and one click away in the header for the rest of the night - never a screen the host leaves the game for (the persistent-layout law). It carries:
+
+- **Every player**: avatar, name, team, connection state as a WORD (never a dot alone), and the score they are playing for once the game is running.
+- **Every team**: members with the leader marked, colour, lock state, and the team's room-audible buzz sound.
+- **The audience as a count.** Spectators join anonymously and hold no seat, so there is no list of them to show and never will be - what exists is how many are watching, counted by the room. A console that has not been told says so rather than printing zero.
+- **Host powers, behind each row's "..."** (the same overflow rule the team cards follow): rename a player, move them between teams or off one, hand a team's leadership over, rename or lock a team, and remove somebody from the room - which asks a second time, because it ends their evening. Host supremacy holds throughout: a locked team still admits the host's seating, and a host rename is neither rate-limited nor blocked by the armed-window lock.
 
 ### C3. Sound check (optional, 60 seconds, worth it)
 

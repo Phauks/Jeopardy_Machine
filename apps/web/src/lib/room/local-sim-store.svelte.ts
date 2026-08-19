@@ -12,13 +12,21 @@ import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { limits } from "@jeopardy/protocol/limits";
+import { foldEvent, prunePendingTimers } from "#lib/room/room-fold.ts";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
 import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
-import type { IdentityPatch, JoinRequest, RoomStore, TeamPatch } from "#lib/room/room-store.ts";
+import type { RoomFoldState } from "#lib/room/room-fold.ts";
+import type {
+  IdentityPatch,
+  JoinRequest,
+  RoomBuzz,
+  RoomStore,
+  TeamPatch,
+} from "#lib/room/room-store.ts";
 import type {
   LastJudgedView,
   MyBuzzView,
@@ -43,8 +51,15 @@ export type LocalSimStoreOptions = {
   timerAutopilot?: boolean;
   /** Start with the 30-player/6-team dummy roster (default) or an empty room. */
   seedRoster?: "fixture" | "empty";
-  /** Tap into every engine event - the display route drives room audio from this. */
+  /** Tap into every engine event - the display's diorama beats ride this. */
   onEvent?: (event: GameEvent) => void;
+  /**
+   * Room audio: once per arming, with the room-audible sound already resolved TEAM-first (the
+   * double-confirmation directive). The real room resolves this server-side and ships it on
+   * the buzz-won message; the mock applies the same rule to its own roster here, so no surface
+   * has to know which store it is talking to in order to make a noise.
+   */
+  onBuzzWon?: (buzz: RoomBuzz) => void;
   /**
    * The room's own settings, sparse over the protocol defaults. Mock rooms are created by
    * opening a URL rather than by POST /api/rooms, so this is where a surface review (or a
@@ -76,43 +91,6 @@ function expiryActionFor(kind: TimerKind, at: number): GameAction {
   }
 }
 
-/**
- * Which timer a phase can legitimately be waiting on. Exhaustive by construction, so a new
- * engine phase has to declare what it waits for rather than inheriting somebody else's clock.
- * `round-time-limit` rides alongside the per-clue windows because it spans the whole round.
- */
-function timerKindsFor(phase: GameState["phase"]): TimerKind[] {
-  const round: TimerKind[] = ["round-time-limit"];
-  switch (phase) {
-    case "awaiting-selection":
-      return [...round, "selection-shot-clock"];
-    case "reading":
-    case "tiebreaker-reading":
-      return [...round, "auto-arm"];
-    case "armed":
-    case "tiebreaker-armed":
-      return [...round, "buzz-window"];
-    case "answering":
-    case "tiebreaker-answering":
-    case "wager-answering":
-      return [...round, "answer-window"];
-    case "wagering":
-      return [...round, "wager-entry"];
-    case "all-answering":
-      return [...round, "everyone-answers-window"];
-    case "final-wagers":
-      return ["final-wager"];
-    case "final-writing":
-      return ["final-writing"];
-    case "all-judging":
-    case "final-reveal":
-    case "round-break":
-    case "game-over":
-    case "lobby":
-      return [];
-  }
-}
-
 let localSeatCounter = 0;
 
 export class LocalSimRoomStore implements RoomStore {
@@ -123,6 +101,7 @@ export class LocalSimRoomStore implements RoomStore {
   private readonly setup: GameSetup;
   private readonly content: ReturnType<typeof fixtureContentView>;
   private readonly onEvent: ((event: GameEvent) => void) | undefined;
+  private readonly onBuzzWon: ((buzz: RoomBuzz) => void) | undefined;
   private readonly timerAutopilot: boolean;
   private readonly timerHandles = new Map<TimerKind, ReturnType<typeof setTimeout>>();
 
@@ -155,6 +134,7 @@ export class LocalSimRoomStore implements RoomStore {
     // reproduced here so mirror mode and phones are honest even in mock play.
     this.content = fixtureContentView(options.role === "host");
     this.onEvent = options.onEvent;
+    this.onBuzzWon = options.onBuzzWon;
     this.roomSettings = { ...this.roomSettings, ...options.settings };
     this.timerAutopilot = options.timerAutopilot ?? false;
     if ((options.seedRoster ?? "fixture") === "fixture") {
@@ -170,18 +150,34 @@ export class LocalSimRoomStore implements RoomStore {
       role: this.role,
       connection: "connected",
       phase: this.roomPhase,
-      roster: { players: this.rosterPlayers, teams: this.rosterTeams },
+      roster: {
+        players: this.rosterPlayers,
+        teams: this.rosterTeams,
+        // NULL, not 0. A mock room is one tab (docs/design/surfaces.md "Known gaps"): a
+        // spectator would be a separate simulation in another tab, so this store genuinely
+        // cannot know whether anyone is watching, and saying "0 watching" would be the console
+        // inventing a number about a room it cannot see. Only the DO counts spectators.
+        spectatorCount: null,
+      },
       teamsMode: this.setup.settings.teams.playerMode === "teams",
       myPlayerId: this.myPlayerId,
       game: this.engineState,
       content: this.content,
       myBuzz: this.myBuzz,
       pendingTimers: this.pendingTimers,
+      // No arming window: this store IS the adjudicator and it crowns a winner in the same tick
+      // as the press, so there is nothing to hold and no round trip to measure (contrast the ws
+      // store, where the room holds the race briefly to rank it by reaction time).
+      arming: null,
       lastJudged: this.lastJudged,
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
       paused: this.pausedState,
       settings: this.roomSettings,
+      // This store IS the room it describes: its settings are the ones in force, whether they
+      // came from the constructor or from a host edit. Nothing is pending arrival, so nothing
+      // needs to be reported as unknown (contrast ws-room-store.ts, which starts blind).
+      settingsKnown: true,
       refusal: this.refusalState,
     };
   }
@@ -192,130 +188,71 @@ export class LocalSimRoomStore implements RoomStore {
     const state = this.engineState ?? createInitialState(this.setup);
     const result = transition(state, action, this.setup);
     this.engineState = result.state;
-    for (const event of result.events) this.applyEvent(event, action.at);
-    this.prunePendingTimers(result.state.phase);
-    for (const event of result.events) this.onEvent?.(event);
+    this.applyEvents(result.events, action.at, result.state.phase);
+    for (const event of result.events) {
+      this.onEvent?.(event);
+      // Resolved TEAM-first, exactly as the DO resolves it before putting it on the wire.
+      if (event.type === "buzz-won") {
+        const team = this.rosterTeams.find((entry) => entry.teamId === event.entityId);
+        const player = this.rosterPlayers.find((entry) => entry.playerId === event.playerId);
+        this.onBuzzWon?.({
+          playerId: event.playerId,
+          entityId: event.entityId,
+          buzzSoundId: team !== undefined ? team.buzzSoundId : (player?.buzzSoundId ?? null),
+        });
+      }
+    }
     if (result.state.phase === "game-over") this.roomPhase = "ended";
   }
 
   /**
-   * Drop timer hints the new phase cannot be waiting on.
-   *
-   * The engine emits `timer-set` when a window OPENS and says nothing when one stops mattering
-   * - it does not have to, because the DO that owns the alarms cancels them on the phase change.
-   * This store was keeping them all, so `pendingTimers` accumulated: an answer window still
-   * "pending" through the rebound after a wrong answer, a wager-entry window still pending while
-   * the wagerer was already answering. Nothing rendered them, so nothing noticed - until the
-   * console grew a countdown at the 2026-08-16 host pass and started showing the host the wrong
-   * clock. One place, keyed on the phase, so a new phase has to say what it waits for.
+   * Fold a batch through the SHARED reducer (room-fold.ts) and reconcile the client-side
+   * clock with the result: this store owns real setTimeout handles (it plays the DO's alarm
+   * book), so every timer the fold added needs one and every timer the fold dropped needs its
+   * handle cleared. The fold itself is identical to the ws store's - one implementation of
+   * "what does this event mean", two ways of knowing what time it is.
    */
-  private prunePendingTimers(phase: GameState["phase"]): void {
-    const allowed = timerKindsFor(phase);
-    const kept = this.pendingTimers.filter((timer) => allowed.includes(timer.kind));
-    if (kept.length === this.pendingTimers.length) return;
-    for (const timer of this.pendingTimers) {
-      if (allowed.includes(timer.kind)) continue;
+  private applyEvents(events: readonly GameEvent[], at: number, phase: GameState["phase"]): void {
+    const before = this.foldState();
+    let folded = before;
+    for (const event of events) {
+      folded = foldEvent(folded, event, { myPlayerId: this.myPlayerId, at });
+    }
+    const pruned = prunePendingTimers(folded.pendingTimers, phase);
+    for (const timer of before.pendingTimers) {
+      if (pruned.some((entry) => entry.kind === timer.kind)) continue;
       const handle = this.timerHandles.get(timer.kind);
       if (handle !== undefined) clearTimeout(handle);
       this.timerHandles.delete(timer.kind);
     }
-    this.pendingTimers = kept;
+    this.myBuzz = folded.myBuzz;
+    this.lastJudged = folded.lastJudged;
+    this.wagerRange = folded.wagerRange;
+    this.finalWagerRanges = folded.finalWagerRanges;
+    this.pendingTimers = pruned;
+    for (const timer of pruned) {
+      // firesAt, not kind: a rebound re-sets the buzz window while one is already pending, and
+      // keeping the first handle would fire the new window on the old deadline.
+      const unchanged = before.pendingTimers.some(
+        (entry) => entry.kind === timer.kind && entry.firesAt === timer.firesAt,
+      );
+      if (!unchanged) this.scheduleTimer(timer);
+    }
   }
 
-  private applyEvent(event: GameEvent, at: number): void {
-    switch (event.type) {
-      case "timer-set":
-        this.trackTimer({
-          kind: event.kind,
-          durationMs: event.durationMs,
-          firesAt: at + event.durationMs,
-        });
-        break;
-      case "buzzers-armed":
-        // A fresh arming resets everyone's per-phone verdict; my early lockout may persist
-        // via the stage derivation (earlyLockedUntil outlives re-arms on purpose).
-        if (this.myBuzz.status !== "rejected" || this.myBuzz.reason !== "early-lockout") {
-          this.myBuzz = { status: "idle" };
-        }
-        break;
-      case "early-buzz":
-        if (event.playerId === this.myPlayerId) {
-          this.myBuzz = {
-            status: "rejected",
-            reason: "early-lockout",
-            lockedUntil: event.lockedUntil,
-          };
-        }
-        break;
-      case "buzz-won":
-        if (event.playerId === this.myPlayerId) this.myBuzz = { status: "won", at: event.at };
-        break;
-      case "buzz-rejected":
-        if (event.playerId === this.myPlayerId && event.reason !== "unknown-player") {
-          this.myBuzz = {
-            status: "rejected",
-            reason: event.reason,
-            lockedUntil: null,
-          };
-        }
-        break;
-      case "judged":
-        this.lastJudged = {
-          entityId: event.entityId,
-          verdict: event.verdict,
-          delta: event.delta,
-          at,
-        };
-        break;
-      case "final-judged":
-        this.lastJudged = {
-          entityId: event.entityId,
-          verdict: event.verdict,
-          delta: event.delta,
-          at,
-        };
-        break;
-      case "wager-cell-hit":
-        this.wagerRange = {
-          entityId: event.entityId,
-          minimum: event.minimum,
-          maximum: event.maximum,
-          label: event.label,
-        };
-        break;
-      case "wager-committed":
-        this.wagerRange = null;
-        break;
-      case "final-wagers-open":
-        this.finalWagerRanges = event.ranges.map((range) => ({
-          ...range,
-          label: "Final wager",
-        }));
-        break;
-      case "cell-selected":
-        this.myBuzz = { status: "idle" };
-        this.lastJudged = null;
-        break;
-      case "clue-finished":
-        this.wagerRange = null;
-        this.clearTimers();
-        break;
-      case "round-break":
-      case "game-over":
-        this.clearTimers();
-        break;
-      default:
-        break;
-    }
+  private foldState(): RoomFoldState {
+    return {
+      myBuzz: this.myBuzz,
+      pendingTimers: this.pendingTimers,
+      lastJudged: this.lastJudged,
+      wagerRange: this.wagerRange,
+      finalWagerRanges: this.finalWagerRanges,
+    };
   }
 
   // --- client-side timers (the DO-alarm stand-in) ----------------------------------------
 
-  private trackTimer(timer: PendingTimerView): void {
-    this.pendingTimers = [
-      ...this.pendingTimers.filter((entry) => entry.kind !== timer.kind),
-      timer,
-    ];
+  private scheduleTimer(timer: PendingTimerView): void {
     if (!this.timerAutopilot || this.pausedState) return;
     const existing = this.timerHandles.get(timer.kind);
     if (existing !== undefined) clearTimeout(existing);
@@ -592,6 +529,27 @@ export class LocalSimRoomStore implements RoomStore {
     );
   }
 
+  /**
+   * The host seating somebody else (console roster panel). Deliberately ignores the team's
+   * lock - the lock refuses JOINERS, and the host out-ranks every team decision - but keeps
+   * the lobby-only rule, because after start-game the engine's seats are truth.
+   */
+  assignPlayerToTeam(playerId: string, teamId: string): void {
+    if (this.roomPhase !== "lobby") return;
+    const team = this.rosterTeams.find((entry) => entry.teamId === teamId);
+    if (team === undefined) return this.refuse("unknown-team");
+    if (this.rosterPlayers.every((entry) => entry.playerId !== playerId)) return;
+    this.refusalState = null;
+    this.assignTeam(playerId, teamId);
+    // An empty team the host has just filled gets its first member as leader, exactly as a
+    // self-join would (the DO does the same in handleTeamJoin).
+    if (team.leaderPlayerId === null) {
+      this.rosterTeams = this.rosterTeams.map((entry) =>
+        entry.teamId === teamId ? { ...entry, leaderPlayerId: playerId } : entry,
+      );
+    }
+  }
+
   renamePlayer(playerId: string, nickname: string): void {
     this.rosterPlayers = this.rosterPlayers.map((player) =>
       player.playerId === playerId ? { ...player, nickname } : player,
@@ -606,6 +564,15 @@ export class LocalSimRoomStore implements RoomStore {
   }
 
   // --- play actions ----------------------------------------------------------------------
+
+  markArmedPainted(armId: number): void {
+    // Nothing to record: a simulated room has no arming window and no network to compensate
+    // for. Its buzz is adjudicated in the same tick as the press, so there is no ranking to
+    // influence and no round trip to measure - which is why `view.arming` is null here and a
+    // surface's paint report lands nowhere. Present so the seam has one shape, not two
+    // (docs/decisions/2026-08-17-buzz-latency-compensation.md is about real rooms only).
+    void armId;
+  }
 
   buzz(): void {
     if (this.myPlayerId === null) return;

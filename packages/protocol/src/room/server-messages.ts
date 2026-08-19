@@ -5,8 +5,12 @@
 // | welcome      | to the joining/resuming connection only, before anything else               |
 // | refused      | to the refused connection; room-level reasons then close (codes below),     |
 // |              | team-level reasons keep the socket for a retry with another team            |
-// | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note)       |
-// | event        | broadcast after every accepted engine transition; role-redacted             |
+// | snapshot     | to one connection (join/resume/sync); role-redacted (see `game` note);      |
+// |              | carries the room's static facts too (teamsMode, board material, timers)     |
+// | event        | broadcast after every accepted engine transition; role-redacted, and it     |
+// |              | carries the state those events produced (see the `game` note on it)         |
+// | arm-window   | broadcast the instant buzzers arm (and to a connection that joins while     |
+// |              | an arming is open); carries the id a client acks and stamps its buzz with   |
 // | buzz-won     | broadcast, EXACTLY ONCE per arming - the room-audio driver (owner           |
 // |              | directive "Only the winning buzz is heard"; sound resolution note below)    |
 // | buzz-rejected| to the losing/early phone only - silent local feedback, never room audio    |
@@ -113,6 +117,31 @@ const gameViewSchema = z.unknown();
 export const roomPhaseSchema = z.enum(["lobby", "active", "ended"]);
 export type RoomPhase = z.infer<typeof roomPhaseSchema>;
 
+// THE BOARD'S PUBLIC MATERIAL: category titles and face values, per round.
+//
+// Added at the M4 reconcile (2026-08-17), when wiring the real surfaces found the gap: the
+// engine deals in coordinates and carries no titles or values in its state (GameSetup is not
+// part of GameState, by design - packages/engine/src/setup.ts), and `clue-content` answers
+// only for the clue that is OPEN. A display therefore had nothing to paint a board with. This
+// is the missing half of the content channel, and it is deliberately its own shape rather
+// than a second content message: it is STATIC for a room's whole life, it contains no answers
+// and no prompts, and it is exactly what a projector already shows the room. Redaction does
+// not apply - a face value is public the moment the board is on a wall.
+//
+// It rides the snapshot rather than a message of its own so that `sync` recovers everything a
+// client needs in one round trip; a client that missed a standalone message would have had no
+// way back to a board short of reconnecting.
+export const boardMaterialSchema = z.strictObject({
+  rounds: z.array(
+    z.strictObject({
+      categoryTitles: z.array(z.string().max(80)),
+      /** cellValues[categoryIndex][rowIndex] - resolved face values, multipliers applied. */
+      cellValues: z.array(z.array(z.int())),
+    }),
+  ),
+});
+export type BoardMaterial = z.infer<typeof boardMaterialSchema>;
+
 // CLUE CONTENT - the one channel carrying authored prompt/answer text to clients. The engine
 // deals in board coordinates and never sees a word of content (guiding principle 6), so this
 // rides beside the event stream rather than inside it, resolved by the DO from the room's
@@ -158,6 +187,38 @@ export const clueContentSchema = z.strictObject({
 });
 export type ClueContent = z.infer<typeof clueContentSchema>;
 
+// What a client owes the room when buzzers arm (docs/decisions/2026-08-17-buzz-latency-
+// compensation.md), in one shape so no surface has to infer it:
+//
+// 1. Note the local time this message was RENDERED - that is the phone's own t0, no clock
+//    synchronization involved.
+// 2. Send `arm-ack` with this armId immediately, before painting anything. The reply time is
+//    how the server measures this connection's round trip, and a client that skips it is
+//    ranked by raw arrival (never penalized below that, never compensated either).
+// 3. Attach `timing: { armId, elapsedMs }` to the buzz action, elapsed measured from step 1.
+//
+// `compensationMs` is how long the room may hold buzzes before crowning a winner (0 = the
+// setting is off and arrival order decides), so a phone can size its own optimistic feedback
+// against the real wait instead of guessing.
+export const armWindowSchema = z.strictObject({
+  armId: z.int().nonnegative(),
+  at: z.number().int().nonnegative(),
+  compensationMs: z.int().nonnegative(),
+  /** True for a re-arm after a wrong answer (the rebound), so a client can word it. */
+  rebound: z.boolean(),
+});
+export type ArmWindow = z.infer<typeof armWindowSchema>;
+
+// A timer the room is currently running, as remaining milliseconds. Present on every snapshot
+// so a console or display that reconnects mid-clue can paint the countdown it missed
+// (user-flows C6: "reopen console URL on any device -> full resume"). Remaining time rather
+// than a deadline: the two clocks are not synchronized, and the client needs a duration anyway.
+export const runningTimerSchema = z.strictObject({
+  kind: z.string().min(1).max(40),
+  remainingMs: z.number().int().nonnegative(),
+});
+export type RunningTimer = z.infer<typeof runningTimerSchema>;
+
 export const roomServerMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelopeFields,
@@ -184,13 +245,24 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // Engine state (see gameViewSchema note); null until start-game creates it.
     game: gameViewSchema.nullable(),
     roster: rosterPayloadSchema,
+    // How this room seats people (rules row 34, frozen at creation). A room fact rather than a
+    // room SETTING - it belongs to the game's rule set, not to the host's live controls - and
+    // a client cannot derive it: in the lobby the engine has met nobody, so an empty `teams`
+    // record says nothing. Without it a teams room's join screen offers no teams at all.
+    teamsMode: z.boolean(),
+    board: boardMaterialSchema,
     // Host-held freeze (the console's pause button). Room-level, not engine-level: the
     // engine has no pause concept, so the room parks its timers and says so.
     paused: z.boolean(),
     // Present while a clue is open, so a phone that reconnects mid-clue renders the same
     // screen it left; null otherwise. Redacted exactly like the standalone message.
     clueContent: clueContentSchema.nullable(),
+    // Every timer the room is still running, with the time it has LEFT (empty while paused or
+    // idle). Without this a reconnecting console shows a clue with no countdown and a host
+    // has to guess how long the room has been waiting - user-flows C6, hardened in M6.
+    timers: z.array(runningTimerSchema),
   }),
+  z.strictObject({ ...envelopeFields, type: z.literal("arm-window"), arm: armWindowSchema }),
   z.strictObject({
     ...envelopeFields,
     type: z.literal("event"),
@@ -199,6 +271,17 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // `game`), role-redacted: everyone-answers submission text is stripped for everyone but
     // the host and the submitting phone.
     events: z.array(z.unknown()),
+    // The state those events produced, redacted exactly like `snapshot.game`.
+    //
+    // Added at the M4 reconcile (2026-08-17). Events are NARRATION, not a diff: replaying the
+    // action log regenerates them, but no client holds the log, the setup, or the engine's
+    // seeded rng, so nothing on the wire let a display or a console rebuild GameState from an
+    // event batch. The alternatives were both worse: asking every client to send `sync` after
+    // every action turns one broadcast into N round trips that each wake the DO, and shipping
+    // the action log would hand phones the wager positions redaction exists to hide. The state
+    // is a few KB with the log and rng stripped, and it is computed once per ROLE per batch,
+    // not once per connection.
+    game: gameViewSchema.nullable(),
   }),
   z.strictObject({
     ...envelopeFields,

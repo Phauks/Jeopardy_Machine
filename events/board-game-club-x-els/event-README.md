@@ -9,10 +9,11 @@
 | ---------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `event-pack.pack.json` | `content-pack`    | Every clue for the night: 60 board cells, the final plus 2 alternates, 25 bench swaps, 4 drop-in alternate categories (21 more items), 8 picture-round media refs |
 | `event-game.game.json` | `game-definition` | The playable game: both boards in draft order, 3 authored Double-Down cells, Final A, inline house rules (casual base + event overrides), Terra Verde theme       |
+| `media/img-0N.webp`    | WebP images       | The eight picture-round images themselves, acquired and downscaled by `tools/event-media-bake` - the pack's media refs point here                                 |
 
-Both documents open through `parsePortableDocument` (the `@jeopardy/protocol` public entry point) and are gate-tested by `packages/protocol/src/event-documents.test.ts`: every cell resolves to a pack item, bench/alternate items are present-but-unreferenced, media refs resolve, and the external pack link's sha256 matches this directory's exact `event-pack.pack.json` bytes.
+Both documents open through `parsePortableDocument` (the `@jeopardy/protocol` public entry point) and are gate-tested by `packages/protocol/src/event-documents.test.ts`: every cell resolves to a pack item, bench/alternate items are present-but-unreferenced, every media ref resolves to a committed file whose sha256 and dimensions still check out, and the external pack link's sha256 matches this directory's exact `event-pack.pack.json` bytes.
 
-**After ANY edit to `event-pack.pack.json`** recompute the hash and paste it into `event-game.game.json` -> `body.content.sha256`, or the gate test will fail (by design): `node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('events/board-game-club-x-els/event-pack.pack.json')).digest('hex'))"` - and run `pnpm fmt` BEFORE hashing, since the hash covers the formatted bytes.
+**After ANY edit to `event-pack.pack.json`** recompute the hash and paste it into `event-game.game.json` -> `body.content.sha256`, or the gate test will fail (by design): `node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('events/board-game-club-x-els/event-pack.pack.json')).digest('hex'))"` - and run `pnpm fmt` BEFORE hashing, since the hash covers the formatted bytes. (`pnpm -F @jeopardy/event-media-bake bake` does that whole chain itself when it rewrites the media refs.)
 
 ## How swapping works (the one-line-edit contract)
 
@@ -69,41 +70,69 @@ Backup Double-Down cells if an authored DD's category is cut: j-58 (move to a de
 
 Volatile facts (all carry the `recheck` tag in the pack - grep `"recheck"` to enumerate them mechanically):
 
-| Item (pool id)     | What to re-check                                                | Why                                                         |
-| ------------------ | --------------------------------------------------------------- | ----------------------------------------------------------- |
-| g-41 (R1 $400)     | Most-visited park + 12.2M figure                                | NPS publishes new visitation data annually; 2025 likely out |
-| g-43 (R1 $800)     | Mammoth Cave mapped miles (426)                                 | Survey teams add miles every year                           |
-| g-44 (R1 $1000)    | Old Faithful interval / prediction accuracy                     | NPS occasionally revises                                    |
-| a-4 (R1 $1000)     | eBird origin phrasing                                           | Confirm exact interview wording                             |
-| b-12 (R1 $1000)    | Terraforming Mars "ocean tiles" wording                         | Confirm against rulebook                                    |
-| f-35 / f-36 (R2)   | Hyperion height (381.3 ft?) and closure/fine still in force     | Measurement + policy both changeable                        |
-| i-55 (R2 $800)     | Minecraft blue axolotl odds (1/1200) if cited aloud             | Game updates change spawn logic                             |
-| i-52 (R2 $1200)    | Vaquita count (~7-10 in 2025 survey)                            | Annual survey; most volatile number on the board            |
-| i-53 (R2 $1600)    | Kakapo population (200+ / ~230-240)                             | NZ DOC updates after breeding seasons                       |
-| g-45 (bench)       | Death Valley wording - must say "officially recorded"           | 2026 BAMS dispute                                           |
-| p-91 / p-93 / p-94 | Minecraft 300M "single game", Catan total, GDQ $60M + charities | All sales/fundraising totals move (ALT-4 only)              |
-| img-01..05         | Image files still live + licenses unchanged                     | Checklist section 5 of docs/content/media-and-sounds.md     |
+| Item (pool id)     | What to re-check                                                | Why                                                                                                                                      |
+| ------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| g-41 (R1 $400)     | Most-visited park + 12.2M figure                                | NPS publishes new visitation data annually; 2025 likely out                                                                              |
+| g-43 (R1 $800)     | Mammoth Cave mapped miles (426)                                 | Survey teams add miles every year                                                                                                        |
+| g-44 (R1 $1000)    | Old Faithful interval / prediction accuracy                     | NPS occasionally revises                                                                                                                 |
+| a-4 (R1 $1000)     | eBird origin phrasing                                           | Confirm exact interview wording                                                                                                          |
+| b-12 (R1 $1000)    | Terraforming Mars "ocean tiles" wording                         | Confirm against rulebook                                                                                                                 |
+| f-35 / f-36 (R2)   | Hyperion height (381.3 ft?) and closure/fine still in force     | Measurement + policy both changeable                                                                                                     |
+| i-55 (R2 $800)     | Minecraft blue axolotl odds (1/1200) if cited aloud             | Game updates change spawn logic                                                                                                          |
+| i-52 (R2 $1200)    | Vaquita count (~7-10 in 2025 survey)                            | Annual survey; most volatile number on the board                                                                                         |
+| i-53 (R2 $1600)    | Kakapo population (200+ / ~230-240)                             | NZ DOC updates after breeding seasons                                                                                                    |
+| g-45 (bench)       | Death Valley wording - must say "officially recorded"           | 2026 BAMS dispute                                                                                                                        |
+| p-91 / p-93 / p-94 | Minecraft 300M "single game", Catan total, GDQ $60M + charities | All sales/fundraising totals move (ALT-4 only)                                                                                           |
+| img-01..05         | Image files still live + licenses unchanged                     | Run `pnpm -F @jeopardy/event-media-bake bake` - it re-verifies each Commons file page's license and sha1 and fails naming whatever moved |
 
-Also before the night: download the five board originals (and any bench image being swapped in), fill the real `sha256` values (see schema friction note 2), and run the full license checklist (screenshot license sections into docs/content/licenses/, credits rows, downscale img-01 - see the media table's notes).
+The images themselves are already acquired and committed (see the next section), so nothing needs downloading before the night. What is still open there is the human look-at-the-picture checks listed at the end of that section.
 
-## Media acquisition status (verified 2026-08-14)
+## Media: acquired, downscaled, committed (2026-08-17)
 
-License classes: **PD** = public domain (no attribution legally required; credit NPS/USGS as courtesy). **BY-SA** = CC BY-SA (attribution + ShareAlike; credits slide mandatory if shipped).
+The eight picture-round images are **in this directory** under `media/`, not remote URLs. They were fetched, license-re-verified, downscaled and encoded by `tools/event-media-bake` (that package's README covers verification, sizing, format choice, and re-running); the pack's media refs carry their real `sha256` and byte counts, `storage.state` is `bundled`, and `packages/protocol/src/event-documents.test.ts` re-hashes every file on every test run, so those numbers cannot quietly stop being true.
 
-Verification method this session: every file's metadata (existence, byte size, mime, Commons sha1, license, author) was pulled live from the Commons API, and every direct-original URL was HEAD-checked to HTTP 200 (status only - no originals downloaded). The upload.wikimedia.org CDN rate-limits this session's shared egress IP (HTTP 429, retry-after 600s), so several HEADs needed spaced retries before returning 200; all eight eventually did, zero 404s, and every returned content-length matched the API byte count exactly.
+License classes: **PD** = public domain (no attribution legally required; credit NPS/USFWS/USGS as courtesy). **BY-SA** = CC BY-SA (attribution + ShareAlike; credits slide mandatory if shipped).
 
-| ID     | Subject -> answer                    | License class | Bytes    | URL status                                | Acquisition status                                                                                                  |
-| ------ | ------------------------------------ | ------------- | -------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| img-01 | Old Faithful eruption -> Yellowstone | PD (NPS)      | 37209547 | File page + API verified; direct HEAD 200 | Needs download + MANDATORY downscale: original is 37.2 MB, over the 10 MiB image cap in `@jeopardy/protocol/limits` |
-| img-02 | Half Dome -> Yosemite                | PD (USFWS)    | 659961   | File page + API verified; direct HEAD 200 | Needs download; portrait crop check on 16:9                                                                         |
-| img-03 | Delicate Arch -> Arches              | PD (NPS)      | 1539033  | File page + API verified; direct HEAD 200 | Needs download                                                                                                      |
-| img-04 | Wizard Island caldera -> Crater Lake | PD (USGS)     | 1157505  | File page + API verified; direct HEAD 200 | Needs download; confirm Wizard Island prominent in frame                                                            |
-| img-05 | Gypsum dunefield -> White Sands      | PD (NPS)      | 3492675  | File page + API verified; direct HEAD 200 | Needs download; confirm dunes dominate the frame                                                                    |
-| img-06 | Grand Prismatic -> Yellowstone       | BY-SA 4.0     | 5422003  | File page + API verified; direct HEAD 200 | Bench only; credits slide if swapped in                                                                             |
-| img-07 | Denali massif -> Denali              | PD (NPS)      | 9657176  | File page + API verified; direct HEAD 200 | Bench only; just under the 10 MiB cap - recompress anyway                                                           |
-| img-08 | Bryce hoodoos -> Bryce Canyon        | BY-SA 3.0     | 5371554  | File page + API verified; direct HEAD 200 | Bench only; credits slide if swapped in                                                                             |
+**Verification method:** each file page was re-read live through the Commons API at acquisition time, and both its license short name and its **Commons sha1** had to match what the curation pass recorded - the sha1 is the strong check, because an uploader replacing the bytes behind the same file name would change it and invalidate everything else in the record. The downloaded bytes' sha1 was then checked against the API's, so a rate-limited or truncated download could not pass as a valid image. All eight passed unchanged.
 
-Full per-file records (canonical file page, author, license, Commons sha1, verification date) ride in the pack's `ext["com.jeopardy-machine.event.media-verification"]`, keyed by media id.
+### Credits table (checklist section 5.5 - a row per file, PD included)
+
+| ID     | File                | Subject -> answer                    | License   | Author                                        | Commons file page                                                                                                   |
+| ------ | ------------------- | ------------------------------------ | --------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| img-01 | `media/img-01.webp` | Old Faithful eruption -> Yellowstone | PD        | Yellowstone National Park (NPS)               | <https://commons.wikimedia.org/wiki/File:Spring_Old_Faithful_eruption_from_Observation_Point.jpg>                   |
+| img-02 | `media/img-02.webp` | Half Dome -> Yosemite                | PD        | Gentry George, U.S. Fish and Wildlife Service | <https://commons.wikimedia.org/wiki/File:Half_dome_in_Yosemite_national_park.jpg>                                   |
+| img-03 | `media/img-03.webp` | Delicate Arch -> Arches              | PD        | NPS / Damon Joyce                             | <https://commons.wikimedia.org/wiki/File:Delicate_Arch_in_Arches_National_Park._NPS-Damon_Joyce_(18686376391).jpg>  |
+| img-04 | `media/img-04.webp` | Wizard Island caldera -> Crater Lake | PD        | USGS / Lyn Topinka                            | <https://commons.wikimedia.org/wiki/File:Crater_Lake_from_rim-USGS.jpg>                                             |
+| img-05 | `media/img-05.webp` | Gypsum dunefield -> White Sands      | PD        | NPS Photo                                     | <https://commons.wikimedia.org/wiki/File:Sunset_over_an_interdunal_area_(fc947575-155d-451f-67bd-cd7fbd10c9ce).JPG> |
+| img-06 | `media/img-06.webp` | Grand Prismatic -> Yellowstone       | BY-SA 4.0 | Carsten Steger                                | <https://commons.wikimedia.org/wiki/File:Aerial_image_of_Grand_Prismatic_Spring_(view_from_the_south).jpg>          |
+| img-07 | `media/img-07.webp` | Denali massif -> Denali              | PD        | NPS Photo / Emily Mesner                      | <https://commons.wikimedia.org/wiki/File:Denali,_Denali_National_Park_and_Preserve.jpg>                             |
+| img-08 | `media/img-08.webp` | Bryce hoodoos -> Bryce Canyon        | BY-SA 3.0 | Jon Zander (Digon3)                           | <https://commons.wikimedia.org/wiki/File:Bryce_Canyon_Amphitheater_Hoodoos_Panorama.jpg>                            |
+
+### What changed from the originals
+
+Every file is the Commons original downscaled to at most 2560 px on the long edge (never upscaled) and re-encoded to WebP at quality 82, metadata stripped. No cropping, no color adjustment. Format rationale and the byte-cap arithmetic live in `tools/event-media-bake/README.md`.
+
+| ID     | Commons original        | Committed      | Bytes                                                        |
+| ------ | ----------------------- | -------------- | ------------------------------------------------------------ |
+| img-01 | 8688x5792, 37,209,547 B | 2560x1707 webp | 1,144,730 B (32x smaller)                                    |
+| img-02 | 3380x5048, 659,961 B    | 1714x2560 webp | 321,804 B                                                    |
+| img-03 | 2000x1500, 1,539,033 B  | 2000x1500 webp | 142,062 B (already under the size cap - kept at native size) |
+| img-04 | 3275x2160, 1,157,505 B  | 2560x1688 webp | 269,290 B                                                    |
+| img-05 | 3648x2736, 3,492,675 B  | 2560x1920 webp | 147,662 B                                                    |
+| img-06 | 4800x3400, 5,422,003 B  | 2560x1813 webp | 714,746 B                                                    |
+| img-07 | 7222x4820, 9,657,176 B  | 2560x1709 webp | 178,248 B                                                    |
+| img-08 | 3827x1570, 5,371,554 B  | 2560x1050 webp | 637,896 B                                                    |
+
+**Total committed: 3,556,438 B (3,473 KiB)** across eight images, against a 10 MiB per-image cap and a 200 MiB per-game total (`@jeopardy/protocol/limits`). img-01 was the only file over a cap; it is now 3% of it.
+
+### Still open on the images
+
+- **img-04**: the worklist wanted a visual confirmation that Wizard Island is prominent in frame. Not done - nobody has looked at the picture.
+- **img-05**: same, that dunes rather than sky dominate the frame.
+- **img-02** is portrait (1714x2560 committed); the 16:9 crop check on a projector has not been done.
+- These are taste checks a person has to make; the pipeline can only guarantee the file is the one that was vetted, the right size, and legally clear.
+
+Full per-file records (file page, author, license, Commons sha1, source sha256 and pixels, committed pixels, verification date) ride in the pack ext, keyed by media id.
 
 ## Credits slide
 
@@ -134,8 +163,8 @@ The game embeds an inline `rule-set` document: `casual-party` base + four overri
 ## Schema friction (found while authoring; same pattern as the fixtures agent's pack-id workaround)
 
 1. **A content pack has no intrinsic id, so `content.kind: "external"` has nothing in the pack file to point at.** `packId` is a required UUIDv7, but the pack document's envelope carries only format/version/meta. Workaround: the pack declares its own library id in `ext["com.jeopardy-machine.library-id"]` and the game's `packId` matches it; `content.sha256` is computed over the exact committed file bytes (post-formatter), so the pairing is verifiable offline. The gate test enforces both. Real fix candidate: an optional `id` field in the document envelope (minor bump).
-2. **`mediaAssetSchema` requires `sha256` and `bytes`, which cannot be honestly filled in a verify-remote-but-do-not-download workflow - and the asset row has no `ext` bag to say so.** `bytes` came live from the Commons API; `sha256` is a zero-filled placeholder (unmistakably not a real digest - Commons only publishes sha1). The honest verification record (author, license, file page, Commons sha1, date) rides at pack level in `ext["com.jeopardy-machine.event.media-verification"]` keyed by media id, because `mediaAssetSchema` is a strictObject without `ext`. Fill the real sha256 values at download time. Real fix candidates: optional `ext` on media assets, or an explicit `pending-remote` verification state.
+2. **`mediaAssetSchema` requires `sha256` and `bytes`, which could not be honestly filled in the verify-remote-but-do-not-download workflow the curation pass used - and the asset row has no `ext` bag to say so.** RESOLVED for this event on 2026-08-17 by doing the download: the assets are `bundled` with real digests over committed bytes, and the gate test re-hashes them. The friction itself stands for the next verify-before-acquire pass, and it is why those records spent three days carrying zero-filled placeholders. The provenance record still rides at pack level in `ext["com.jeopardy-machine.event.media-verification"]` keyed by media id, because `mediaAssetSchema` is a strictObject without `ext`. Real fix candidates unchanged: optional `ext` on media assets, or an explicit `pending-remote` verification state.
 3. **No structured home for curation constraints between cells.** Ordering dependencies (b-7 must stay below b-6), answer-collision conflicts (g-42 vs img-04, j-63 vs i-53), and story-arc caps (at most two of l-73/l-74/q-102) are prose in each item's free-text `source` plus this README - nothing machine-checkable. Acceptable for a hand-curated event; an editor-lint vocabulary would need schema support.
 4. **A game referencing an external pack cannot say where the pack file lives.** For this repository the two files are siblings; the game hints it in `ext["com.jeopardy-machine.event.pack-path"]`. The in-app library resolves by id, so this is repo-layout friction only.
-5. **Not friction but a limits flag:** img-01's original is 37.2 MB, over `limits.media.imageMaxBytes` (10 MiB). The schema deliberately does not enforce byte caps (lint/upload do), so the document validates; acquisition must downscale before bundling.
+5. **Not friction but a limits flag, now closed:** img-01's original was 37.2 MB, nearly four times over `limits.media.imageMaxBytes` (10 MiB). The schema deliberately does not enforce byte caps (lint/upload do), so the document validated anyway - which is exactly how an over-cap asset could sit in a valid document for three days. Acquisition downscaled it to 1.1 MiB, and the gate test now checks every asset against the cap so the next one cannot.
 6. **Category lane labels have no slot.** The draft's crossover/environment/gaming mix per column exists only as item tags (category slugs) - `categorySchema` is title + cells. Harmless for play; noted for the editor's category metadata thinking.

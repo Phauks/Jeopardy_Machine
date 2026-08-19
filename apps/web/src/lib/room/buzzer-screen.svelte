@@ -39,6 +39,27 @@
   let pressed = $state(false);
   let finalAnswerDraft = $state("");
 
+  // The armed button is on screen: tell the store, because that paint is t0 for this phone's
+  // reaction time (docs/decisions/2026-08-17-buzz-latency-compensation.md - the room ranks
+  // presses by the thumb, and the thumb cannot start before the button is visible). An $effect
+  // runs after the DOM is updated, which is as close to "the player can see it" as a component
+  // can honestly get. Derived to a BOOLEAN so the coarse clock's ticks, which rebuild `stage`
+  // five times a second, do not re-run this; the store's own guard makes the first call win
+  // anyway, and a store with no arming (the local simulation) ignores it entirely.
+  const armedOnScreen = $derived(stage.kind === "armed");
+  $effect(() => {
+    const arming = view.arming;
+    if (!armedOnScreen || arming === null || arming.paintedAt !== null) return;
+    store.markArmedPainted(arming.armId);
+  });
+
+  // The press is CONFIRMED to the presser immediately and stays confirmed until the room
+  // answers. The room may hold the announcement for up to `arming.compensationMs` while it
+  // ranks the field, and this is the half of that beat the player must never feel: the button
+  // reports "buzzed" the instant it is let go, rather than snapping back to hot and inviting a
+  // second press at a room that has already heard the first.
+  const buzzSent = $derived(view.myBuzz.status === "pending");
+
   function onBuzzPointerDown(event: PointerEvent): void {
     // Instant local feedback BEFORE any store work - never wait for a verdict visually.
     event.preventDefault();
@@ -122,17 +143,18 @@
         type="button"
         class="buzz-button"
         class:cold={stage.kind === "reading"}
-        class:hot={stage.kind === "armed"}
+        class:hot={stage.kind === "armed" && !buzzSent}
+        class:sent={stage.kind === "armed" && buzzSent}
         class:locked={stage.kind === "locked-out"}
         class:pressed
-        class:pulse={stage.kind === "armed" && pulseAllowed}
+        class:pulse={stage.kind === "armed" && !buzzSent && pulseAllowed}
         disabled={stage.kind === "locked-out"}
         onpointerdown={onBuzzPointerDown}
       >
         {#if stage.kind === "reading"}
           <span class="buzz-label">wait for it...</span>
         {:else if stage.kind === "armed"}
-          <span class="buzz-label">BUZZ</span>
+          <span class="buzz-label">{buzzSent ? "BUZZED" : "BUZZ"}</span>
         {:else}
           <span class="buzz-label">Too soon</span>
           <span class="lockout-ring" aria-hidden="true"></span>
@@ -342,6 +364,14 @@
 
   .buzz-button.pressed {
     transform: scale(0.97);
+  }
+
+  /* Sent, waiting on the room's verdict. Still the accent (this phone DID buzz and must not
+   * be told otherwise), held back so it no longer reads as an invitation to press again. */
+  .buzz-button.sent {
+    background: color-mix(in srgb, var(--accent) 55%, var(--surface-raised));
+    border-color: var(--accent);
+    color: var(--surface-page);
   }
 
   .buzz-button.pulse {

@@ -2,11 +2,13 @@
 // is for.
 //
 // OWNER RULE, still in force: every new meaningful surface gets a card here, in the same PR
-// that ships it. It used to BE the front page; on 2026-08-15 it moved into a closed drawer,
-// and the 2026-08-16 front-door rebuild kept it there - demoted, never deleted, at the bottom
-// of the page behind one tap. (The creator Library, user-flows B1, is what eventually replaces
-// it.) It lives in a data module rather than inside the page so that adding a surface is a
-// one-line edit in an obvious file.
+// that ships it. Only its PLACE has moved. It used to BE the front page; on 2026-08-15 it
+// became a closed drawer at the foot of it; on 2026-08-17 it moved again, into the dev menu in
+// the front door's header (#lib/landing/dev-menu.svelte) - because the last thing a visitor
+// scrolled past should not be a list of engineering routes, and the owner's own shortcut to
+// those routes should not be the furthest thing on the page from where they arrive. (The
+// creator Library, user-flows B1, is what eventually replaces it.) It lives in a data module
+// rather than inside the page so that adding a surface is a one-line edit in an obvious file.
 export type SurfaceCard = { href: string; title: string; note: string };
 
 export const devSurfaces: readonly SurfaceCard[] = [
@@ -33,7 +35,7 @@ export const devSurfaces: readonly SurfaceCard[] = [
   {
     href: "/room/DUMYX",
     title: "Player room",
-    note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (M4 mock room; ?theme=modern-flat previews presets).",
+    note: "The pre-game journey on a phone: character selector (A2), team joining, A3 lobby with the staged view, then the A4 buzzer (the DUMYX demo room simulates a full 30-player lobby in this tab alone; ?theme=modern-flat previews presets).",
   },
   {
     href: "/room/DUMYX/display",

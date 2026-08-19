@@ -9,6 +9,7 @@
   // layer (answers, wager ranges) does not render AT ALL in mirror mode. Keyboard shortcuts
   // keep working; the dock is for visibility, not the only input.
   import DisplayScreen from "#lib/room/display-screen.svelte";
+  import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
   import SettingsPanel from "#lib/host-settings/settings-panel.svelte";
   import SimPanel from "#lib/room/sim-panel.svelte";
@@ -27,8 +28,20 @@
     mirror?: boolean;
     /** Start with the settings panel open - the route's ?settings, and what tests render. */
     settingsOpen?: boolean;
+    /**
+     * Start with the roster rail open. Defaults to "open in the lobby", because before the game
+     * starts the roster IS the console's job (user-flows C2: live roster, team assignments,
+     * rename/kick, then the pre-flight checklist).
+     */
+    rosterOpen?: boolean;
   };
-  let { store, showSimPanel = false, mirror = false, settingsOpen = false }: Props = $props();
+  let {
+    store,
+    showSimPanel = false,
+    mirror = false,
+    settingsOpen = false,
+    rosterOpen,
+  }: Props = $props();
 
   const view = $derived(store.view);
   const game = $derived(view.game);
@@ -42,9 +55,24 @@
   // component state, because it is not a preference - it is where you are looking.
   // svelte-ignore state_referenced_locally - deliberately the INITIAL value only.
   let panelOpen = $state(settingsOpen);
+  // svelte-ignore state_referenced_locally - the INITIAL value: open in the lobby, where the
+  // roster is the console's whole job, closed once a game is running.
+  let rosterPanelOpen = $state(rosterOpen ?? store.view.phase === "lobby");
   const device = $derived(devicePreferences.current);
-  const mirrorMode = $derived(device.mirror || mirror);
+  // MIRROR: the device preference is the truth, and `mirror` (the route's ?mirror) only seeds
+  // it for this render. It used to be OR-ed with the preference, which meant a console entered
+  // through ?mirror could never leave - "Exit mirror" set the preference the OR then ignored.
+  // The override is nulled the moment anything toggles, so the header chip and the cog and the
+  // dock are all the same switch (owner, 2026-08-17: mirror must be one obvious click away).
+  // svelte-ignore state_referenced_locally - the INITIAL value only.
+  let mirrorSeed = $state(mirror ? true : null);
+  const mirrorMode = $derived(mirrorSeed ?? device.mirror);
   const manualMode = $derived(device.manualMode);
+
+  function setMirror(next: boolean): void {
+    mirrorSeed = null;
+    devicePreferences.update({ mirror: next });
+  }
   let scoreDrawerOpen = $state(false);
   let hostWagerEntry = $state<number | null>(null);
 
@@ -227,7 +255,7 @@
         type="button"
         class="dock-button subtle"
         onclick={() => {
-          devicePreferences.update({ mirror: false });
+          setMirror(false);
         }}
       >
         Exit mirror
@@ -239,9 +267,48 @@
     <header class="console-header">
       <h1>Host console <span class="room-code">{view.roomCode}</span></h1>
       <div class="header-controls">
+        {#if store.mode === "local-sim"}
+          <!-- SAY WHAT THIS IS. A local simulation renders through the same route as a real
+               room, so without this flag a host cannot tell the fixture's imaginary players
+               from their own (owner, 2026-08-17: a console reported "26/30" for an empty
+               room). Honest labelling is the half of that fix that lives on the surface; the
+               other half is the routes no longer seeding a fixture roster into a real code
+               (src/lib/room/create-room-store.ts). -->
+          <span class="sim-flag" title="Not a live room: nothing here is real">
+            Simulation
+          </span>
+        {/if}
         <span class="roster-health" title="connected / total players">
           {connectedCount}/{view.roster.players.length} connected
         </span>
+        <!-- Roster + settings are rails, not screens: they narrow the console and everything
+             the host was reading stays on screen (the persistent-layout law). -->
+        <button
+          type="button"
+          class="chip"
+          class:active={rosterPanelOpen}
+          aria-expanded={rosterPanelOpen}
+          onclick={() => {
+            rosterPanelOpen = !rosterPanelOpen;
+          }}
+        >
+          Roster
+        </button>
+        <!-- MIRROR MODE, one click, with its state on the button. It was a URL query
+             (`?mirror`) and a checkbox two levels into the cog, which is not a control a host
+             can reach when the projector turns out to be a mirrored screen (owner,
+             2026-08-17). The cog keeps its copy - this is the same device preference. -->
+        <button
+          type="button"
+          class="chip"
+          class:active={mirrorMode}
+          aria-pressed={mirrorMode}
+          onclick={() => {
+            setMirror(!mirrorMode);
+          }}
+        >
+          Mirror {mirrorMode ? "on" : "off"}
+        </button>
         {#if manualMode}
           <!-- Modes the host has switched on stay VISIBLE on the console even though they are
                set in the cog: a host must never wonder why the buzzers are dead. -->
@@ -708,6 +775,15 @@
         {/if}
       </div>
 
+      {#if rosterPanelOpen}
+        <HostRosterPanel
+          {store}
+          onClose={() => {
+            rosterPanelOpen = false;
+          }}
+        />
+      {/if}
+
       {#if panelOpen}
         <SettingsPanel
           {store}
@@ -784,6 +860,22 @@
     border: 1px solid currentColor;
     border-radius: 999px;
     padding: 0.05rem 0.5rem;
+  }
+
+  /* Fixed colors: "this is not your room" has to read the same under every theme, and it is
+     the kind of warning a theme must never be able to tone down. Its own class rather than a
+     mode-flag variant, because it is not a mode the host switched on - it is what this console
+     is connected to. */
+  .sim-flag {
+    font-family: var(--control-font);
+    font-size: 0.72em;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-radius: 999px;
+    padding: 0.05rem 0.5rem;
+    color: var(--control-accent-text);
+    background: var(--control-accent);
+    border: 1px solid var(--control-accent);
   }
 
   .console-header {

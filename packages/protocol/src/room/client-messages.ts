@@ -13,8 +13,11 @@
 // |                 | socket for a retry, rate-limited per connection (limits.room)          |
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
+// | arm-ack         | anyone joined; the reply half of the round-trip measurement that      |
+// |                 | makes buzz latency compensation safe (buzz-fairness.ts)              |
 // | team-create     | player, lobby only (creator becomes leader - user-flows A2)           |
-// | team-join       | player, lobby only, target team unlocked (also how a MOVE is sent)    |
+// | team-join       | player, lobby only, target team unlocked (also how a MOVE is sent);   |
+// |                 | the HOST may name `playerId` to seat somebody else (host supremacy)   |
 // | team-leave      | player, lobby only (back to the holding area; never refused)          |
 // | team-update     | the team's leader, or host (rename/color/buzz-sound/lock)             |
 // | team-kick       | the team's leader (own team), or host (any player, any team)          |
@@ -71,6 +74,24 @@ export type JoinTeamIntent = z.infer<typeof joinTeamIntentSchema>;
 // gameActionSchema after stamping, so nothing unvalidated ever reaches the engine.
 export const relayedActionSchema = z.looseObject({ type: z.string().min(1) });
 
+// Transport timing attached to a relayed action - today only meaningful on `buzz`. It rides
+// the ENVELOPE rather than the action because the engine has no clock and must never grow one
+// (packages/engine/README.md): `elapsedMs` is a client measurement the DO uses to ORDER buzzes
+// before the engine sees them, and the engine keeps receiving nothing but an ordered list.
+//
+// Untrusted by construction - a phone can put any number here. The DO clamps it against the
+// arrival time and the connection's measured round trip (room/buzz-fairness.ts), so the worst
+// a lie achieves is the compensation an honest phone on the same connection already gets.
+export const actionTimingSchema = z.strictObject({
+  // Which arming this timing refers to, from the `arm-window` server message. A stale id
+  // (the room re-armed while the press was in flight) makes the timing unusable, not the buzz.
+  armId: z.int().nonnegative(),
+  // Milliseconds between this client rendering the arm and the player pressing. Measured on
+  // the client's own monotonic clock, so no clock synchronization is implied or required.
+  elapsedMs: z.int().min(0).max(60_000),
+});
+export type ActionTiming = z.infer<typeof actionTimingSchema>;
+
 export const roomClientMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({
     ...envelopeFields,
@@ -98,9 +119,32 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     type: z.literal("resume"),
     sessionToken: sessionTokenSchema,
   }),
-  z.strictObject({ ...envelopeFields, type: z.literal("action"), action: relayedActionSchema }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("action"),
+    action: relayedActionSchema,
+    timing: actionTimingSchema.optional(),
+  }),
+  // The reply half of the per-connection round-trip measurement: the DO broadcasts
+  // `arm-window` with an id, every client echoes it back immediately, and arrival minus
+  // broadcast IS the round trip over exactly the path the buzz will travel, measured with the
+  // server's own clock at the only moment it matters. Clients that never ack simply get no
+  // compensation (withholding it is the losing move, which is the point).
+  z.strictObject({ ...envelopeFields, type: z.literal("arm-ack"), armId: z.int().nonnegative() }),
   z.strictObject({ ...envelopeFields, type: z.literal("team-create"), name: teamNameSchema }),
-  z.strictObject({ ...envelopeFields, type: z.literal("team-join"), teamId: teamIdSchema }),
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("team-join"),
+    teamId: teamIdSchema,
+    // WHO is being seated. Absent = the sender, which is every phone's own move between team
+    // cards. Present = the host seating somebody else from the console's roster panel, which
+    // is host supremacy over team membership (guiding principle 4, and the "drag to rebalance"
+    // of user-flows C2); a player sending it for anybody but themself is refused. It rides
+    // team-join rather than a new message because it is the same edit with a different actor -
+    // the alternative was a console that could only eject a mis-seated player and ask them to
+    // re-pick on their own phone.
+    playerId: playerIdSchema.optional(),
+  }),
   // Step out of a team back to the holding area, without picking another. Its own message
   // rather than `team-join` with a null teamId: those are different intents and the authority
   // matrix treats them differently (a locked team can refuse a join; nothing refuses a leave).

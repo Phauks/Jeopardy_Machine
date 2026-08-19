@@ -7,7 +7,9 @@ import { expect } from "vitest";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
 import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import { Bot } from "@jeopardy/bots/bot";
+import { withSimulatedLatency } from "@jeopardy/bots/latency";
 import type { BotOptions } from "@jeopardy/bots/bot";
+import type { LatencyProfile } from "@jeopardy/bots/latency";
 import type { BotSocket } from "@jeopardy/bots/socket";
 import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -22,7 +24,10 @@ export function uniqueCode(): string {
   return `T${String(codeCounter).padStart(4, "0")}`.slice(0, 5);
 }
 
-export const compactGame: CreateRoomRequestInput["game"] = {
+/** The board-only game spec, narrowed - so a test can spread it and keep the discriminant. */
+export type CompactGameSpec = Extract<CreateRoomRequestInput["game"], { kind: "compact" }>;
+
+export const compactGame: CompactGameSpec = {
   kind: "compact",
   rounds: [{ columns: 3, rows: 3 }],
   preset: "casual-party",
@@ -30,6 +35,14 @@ export const compactGame: CreateRoomRequestInput["game"] = {
   overrides: { wagers: { countRoundOne: 0, countRoundTwo: 0 } },
   hasFinalClue: false,
 };
+
+/** The same room with extra settings overrides layered on - the M6 suites tune one row. */
+export function compactGameWith(
+  overrides: CompactGameSpec["overrides"],
+  extra: Partial<CompactGameSpec> = {},
+): CompactGameSpec {
+  return { ...compactGame, overrides: { ...compactGame.overrides, ...overrides }, ...extra };
+}
 
 export function roomStub(code: string) {
   return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
@@ -184,13 +197,49 @@ export async function connectHost(code: string, hostToken: string): Promise<Test
   return client;
 }
 
-export async function connectBot(code: string, options: BotOptions): Promise<Bot> {
+export async function connectBot(
+  code: string,
+  options: BotOptions,
+  // M6: put a simulated phone network between this bot and the room. The bot and the DO are
+  // both real; only the wire is pretend (packages/bots/src/latency.ts), which is what makes a
+  // buzz race in this suite a measurement rather than a demonstration.
+  network?: { profile: LatencyProfile; seed?: string },
+): Promise<Bot> {
   const socket = await upgradeToRoom(code);
-  const bot = new Bot(socket as unknown as BotSocket, options);
+  const wire =
+    network === undefined
+      ? (socket as unknown as BotSocket)
+      : withSimulatedLatency(socket as unknown as BotSocket, {
+          profile: network.profile,
+          seed: network.seed ?? `${network.profile.id}-${options.nickname}`,
+        });
+  const bot = new Bot(wire, options);
   socket.accept();
   bot.start();
   await bot.waitFor((message) => message.type === "welcome");
   return bot;
+}
+
+/**
+ * A racer: presses `reactionMs` after ITS OWN phone renders the arm, acks like a real client,
+ * and claims its elapsed honestly unless told otherwise. Pair with `connectBot`'s network
+ * argument to give it a connection worth compensating for.
+ */
+export function racerBot(
+  nickname: string,
+  reactionMs: number,
+  behavior: Partial<BotOptions["behavior"]> = {},
+): BotOptions {
+  return {
+    nickname,
+    seed: `racer-${nickname}`,
+    behavior: {
+      buzzProbability: 1,
+      buzzLatencyMinMs: reactionMs,
+      buzzLatencyMaxMs: reactionMs,
+      ...behavior,
+    },
+  };
 }
 
 /** Deterministic bot: always buzzes, fixed latency, so ordering assertions are exact. */

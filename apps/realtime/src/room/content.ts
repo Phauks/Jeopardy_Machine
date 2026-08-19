@@ -18,7 +18,12 @@
 // there answers null, which the wire treats as "this role gets nothing" and clients render as
 // a board-only game. That is the honest answer, not a failure.
 import type { ContentItem, GameDefinitionBody } from "@jeopardy/protocol";
-import type { ClueContent, ClueContentTarget } from "@jeopardy/protocol/room/server-messages";
+import type { GameSetup } from "@jeopardy/engine/setup";
+import type {
+  BoardMaterial,
+  ClueContent,
+  ClueContentTarget,
+} from "@jeopardy/protocol/room/server-messages";
 import type { RoomRole } from "@jeopardy/protocol/room/identity";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 
@@ -65,6 +70,29 @@ export function resolveFinalContent(
   const item = itemById(definition, definition.final.itemId);
   if (item === null) return null;
   return { category: definition.final.category, item, target: { kind: "final" } };
+}
+
+/**
+ * The board a client paints before anything is open: category titles from the game definition,
+ * face values from the ENGINE SETUP (so an authored per-cell override shows the number the
+ * scoring actually uses, exactly as the mock's fixture view resolves it).
+ *
+ * Public by nature and therefore not redacted - these are the words and numbers already on the
+ * wall. A compact-spec room (bots, tests, the sim path) has no authored titles, so its
+ * categories come back as empty strings and the values alone carry the board; that is the
+ * honest answer for a game that shipped no content, not a failure.
+ */
+export function boardMaterial(spec: RoomGameSpec, setup: GameSetup): BoardMaterial {
+  const definition = definitionOf(spec);
+  return {
+    rounds: setup.rounds.map((round, roundIndex) => ({
+      categoryTitles: round.cells.map(
+        (_unusedColumn, categoryIndex) =>
+          definition?.rounds[roundIndex]?.categories[categoryIndex]?.title ?? "",
+      ),
+      cellValues: round.cells.map((column) => column.map((cell) => cell.value)),
+    })),
+  };
 }
 
 /**

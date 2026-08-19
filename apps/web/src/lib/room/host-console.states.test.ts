@@ -156,6 +156,74 @@ describe("mirror mode (C1b)", () => {
   });
 });
 
+describe("mirror mode is one click from the console chrome", () => {
+  // It used to be a URL query and a checkbox two levels into the cog, which is not a control a
+  // host can reach when the projector turns out to be mirroring their laptop (owner,
+  // 2026-08-17: "Mirror mode needs to be easier to enter").
+  it("is a labelled toggle in the header, carrying its own state", () => {
+    const store = hostStore();
+    store.startGame();
+    const body = markup(store);
+    expect(body).toContain("Mirror off");
+    expect(body).toContain('aria-pressed="false"');
+  });
+
+  it("still leaves by its dock button - the header, the cog and the dock are one switch", () => {
+    const store = hostStore();
+    store.startGame();
+    // Entered through the route's ?mirror. The seed used to be OR-ed with the device
+    // preference, which made "Exit mirror" a button that could not work.
+    expect(markup(store, true)).toContain("Exit mirror");
+  });
+});
+
+describe("the roster rail", () => {
+  it("is open by default in the lobby, where the roster IS the console's job", () => {
+    const body = markup(hostStore());
+    expect(body).toContain('aria-label="Room roster"');
+    expect(body).toContain("Players");
+  });
+
+  it("closes once a game is running, and stays one click away in the header", () => {
+    const store = hostStore();
+    store.startGame();
+    const body = markup(store);
+    expect(body).not.toContain('aria-label="Room roster"');
+    expect(body).toContain(">Roster<");
+  });
+
+  it("opens beside the console rather than replacing it (the persistent-layout law)", () => {
+    const store = hostStore();
+    store.startGame();
+    store.selectCell(0, 0);
+    const body = render(HostConsole, { props: { store, rosterOpen: true } }).body;
+    expect(body).toContain('aria-label="Room roster"');
+    expect(body).toContain("Board minimap");
+    expect(body).toContain(fixtureAnswer);
+  });
+});
+
+describe("the console never presents fixture data as the room's", () => {
+  it("says out loud that a local simulation is not a live room", () => {
+    // The owner met a console reporting "26/30 connected" for a room nobody had joined: every
+    // route seeded the 30-player fixture roster into whatever code was in the URL.
+    expect(markup(hostStore())).toContain("Simulation");
+  });
+
+  it("and an empty room counts nobody rather than the fixture's crowd", () => {
+    const empty = new LocalSimRoomStore({
+      roomCode: "REALX",
+      role: "host",
+      seed: "empty-room",
+      seedRoster: "empty",
+    });
+    const body = markup(empty);
+    expect(body).toContain("0/0 connected");
+    expect(body).toContain("Nobody has joined yet");
+    expect(body).not.toContain("26/30");
+  });
+});
+
 describe("sim panel gating", () => {
   it("renders only when the dev flag is passed", () => {
     const store = hostStore();

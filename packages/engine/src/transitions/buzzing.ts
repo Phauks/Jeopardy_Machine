@@ -2,8 +2,14 @@
 // docs/design/expansion-and-boundaries.md). Ordering truth: actions arrive in ONE sequence
 // (the DO's arrival order in production, the array order in fixtures) and the first valid
 // buzz after arming wins - exactly one buzz-won event fires per arming (owner directive:
-// only the winning buzz is heard). Latency fairness compensation is deferred to M6 and will
-// happen UPSTREAM by reordering actions before they reach the engine.
+// only the winning buzz is heard).
+//
+// M6 landed latency fairness compensation exactly where this comment promised it: UPSTREAM.
+// The DO holds the buzzes of one arming for a few milliseconds, ranks them by credited
+// reaction time (packages/protocol/src/room/buzz-fairness.ts), and feeds THIS function the
+// ordered list with each action's `at` rewritten to the credited press time. Nothing here
+// changed and nothing here may: the state machine stays single, unbranched and clockless
+// (docs/design/expansion-and-boundaries.md boundary 2.1).
 import { closeClue } from "../flow.ts";
 import { entityForPlayer } from "../state.ts";
 import type { GameAction } from "../actions.ts";
@@ -169,7 +175,18 @@ export function handleBuzz(
   const lockedUntil = clue.earlyLockedUntil[key];
   if (lockedUntil !== undefined && action.at < lockedUntil) {
     const lockoutMs = setup.settings.buzzing.earlyBuzzLockoutMs;
-    clue.earlyLockedUntil[key] = action.at + lockoutMs;
+    const extended = action.at + lockoutMs;
+    clue.earlyLockedUntil[key] = extended;
+    // Both events, because they say different things to different listeners: early-buzz
+    // carries the NEW deadline (the presser's phone draws the penalty ring from it - without
+    // this the re-trigger was invisible to the person mashing, M6 finding), buzz-rejected is
+    // the per-phone "that did not count" the wire contract already promises.
+    events.push({
+      type: "early-buzz",
+      playerId: action.playerId,
+      entityId,
+      lockedUntil: extended,
+    });
     events.push({ type: "buzz-rejected", playerId: action.playerId, reason: "early-lockout" });
     return null;
   }

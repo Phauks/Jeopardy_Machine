@@ -358,3 +358,69 @@ incompetech bench (same license/verification, listed for completeness, off-vibe 
 **Medley alternative (presented honestly, owner's choice):** if no single long track lands, the lobby player can sequence a 3+ minute lap client-side from the round-3 CC0 loops whose vibe already survived review — e.g. Funky Groove (code_box, 0:49) → FunkaRock168 (1:09) → Rockin Rhythm B7 (1:17) → Southside Funk (1:19) ≈ **4:34 effective lap**, Web Audio sample-accurate scheduling in the M4 player (same machinery as the buzz-in path). Pro: keeps CC0 purity, reuses approved-vibe material, arbitrarily extensible. Con: the four loops differ in BPM/key, so transitions need musical curation (reorder, trim to bar boundaries, short crossfades) or they'll feel like a playlist, not a track — engineering + taste cost that a single 4:05 CC0 track (F1) avoids entirely.
 
 Searches run this pass — Pixabay: "funk rock", "quirky funk", "funky groove", "quirky rock" (+ Sonican profile read); Freesound (CC0 + duration 2:00–4:30 filters): "funk", "funky", "funk groove", "funk guitar bass", "funk jam" (zero results); FMA: funk genre shelf, "funk upbeat" search; incompetech: direct-file probe of the funk/rock catalog. Dead-ends: FMA all-NC (above); Freesound "funk jam" empty; multi-minute CC0 full-band funk remains scarce (F1 is the exception that matters). Re-verify everything per checklist §5 before bundling; K-rows additionally trigger checklist §8 (attribution audit).
+
+---
+
+## 10. Bundled - what actually shipped (M5 asset pass, 2026-08-17)
+
+This section is the record of what came out of the worklist above and into the repository. Sounds are produced by the committed pipeline in `tools/audio-bake/`, images by `tools/event-media-bake/` (its README documents re-baking, determinism, and the honest caveats); the credits table per file is `apps/web/static/sounds/LICENSES.md`; the machine-readable index is `apps/web/src/lib/room/sound-manifest.json`.
+
+### Sounds - 21 files, 5,129 KiB
+
+| Group       | Files | Bytes     | Notes                                                                                    |
+| ----------- | ----- | --------- | ---------------------------------------------------------------------------------------- |
+| Buzz-ins    | 14    | 259 KiB   | The finalized section 9 pack, ids matching `apps/web/src/lib/room/buzz-sound-catalog.ts` |
+| Cues        | 3     | 48 KiB    | board-ready (Countdown Start), wrong-answer (-Andreas), wager-sting (Ba Dum Bum, take 1) |
+| Music       | 4     | 4,822 KiB | 3 think beds at their natural loop length + the lobby track                              |
+| Synthesized | 1     | 0         | time-up, built in `room-audio.ts` from parameters carried in the manifest                |
+
+Every file is CC0 1.0, verified by re-reading each Freesound page's license line at fetch time - not by trusting this document. The fetch step also asserts the uploader is unchanged, so a replaced upload fails the bake instead of shipping.
+
+**Processing, per checklist 7 and 7b:** trimmed to a hand-picked window; loudness-normalized by linear gain only (buzz/cue to -16 LUFS **maximum-momentary**, music to -20 LUFS **integrated** - the split and its reasoning are in the pipeline README), capped at a -1.5 dBFS peak ceiling; onset standardized; exported as MP3 at 44.1 kHz, mono for one-shots and stereo for music.
+
+**Onset verification (the fairness invariant):** all 21 files land inside the 8-15 ms window, measured on the ENCODED file decoded back - 19 at 10.0 ms, one at 10.6 ms, one (ding) at 8.2 ms. This is checked three ways: the bake refuses to emit a file outside the window, `pnpm -F @jeopardy/audio-bake verify` re-measures the committed bytes with ffmpeg, and `apps/web/src/lib/room/sound-manifest.gate.test.ts` re-hashes every file so a recorded measurement can only describe the bytes in git.
+
+**Duration windows:** buzz-ins 0.559-1.460 s (all inside the owner's 0.5-1.5 s window); cues 0.289-1.343 s (all under 3 s).
+
+### Images - 8 files, 3,473 KiB
+
+The picture round's eight Commons files are acquired and committed at `events/board-game-club-x-els/media/img-0N.webp`, produced by `tools/event-media-bake`. The credits table (a row per file, public-domain files included, per checklist 5.5) is in that event's README; the per-file provenance record lives in the pack's own `ext` bag.
+
+| ID     | Commons original        | Committed      | Bytes       |
+| ------ | ----------------------- | -------------- | ----------- |
+| img-01 | 8688x5792, 37,209,547 B | 2560x1707 webp | 1,144,730 B |
+| img-02 | 3380x5048, 659,961 B    | 1714x2560 webp | 321,804 B   |
+| img-03 | 2000x1500, 1,539,033 B  | 2000x1500 webp | 142,062 B   |
+| img-04 | 3275x2160, 1,157,505 B  | 2560x1688 webp | 269,290 B   |
+| img-05 | 3648x2736, 3,492,675 B  | 2560x1920 webp | 147,662 B   |
+| img-06 | 4800x3400, 5,422,003 B  | 2560x1813 webp | 714,746 B   |
+| img-07 | 7222x4820, 9,657,176 B  | 2560x1709 webp | 178,248 B   |
+| img-08 | 3827x1570, 5,371,554 B  | 2560x1050 webp | 637,896 B   |
+
+**Sizing:** at most 2560 px on the long edge, never upscaled (img-03 was already under and kept its native 2000 px), never under 1920 px - the projection floor from section 1. img-01, flagged here since 2026-08-14 as 37.2 MB against a 10 MiB cap, is now 3% of that cap.
+
+**Format: WebP at quality 82**, chosen over JPEG because the repository already commits WebP for all 243 avatar sprites (one asset story, not two), it is 25-35% smaller than visually equivalent JPEG against a hard per-image cap and an export-zip budget, and every browser that can run this app decodes it (Safari 14+ is a lower bar than the Web Audio the buzzers already need). No cropping or color adjustment - just a downscale and a re-encode with metadata stripped.
+
+**Verification at acquisition:** each file page was re-read live via the Commons API, and both its license short name and its **Commons sha1** had to match what the 2026-08-14 pass recorded before anything downloaded; the downloaded bytes' sha1 was then checked against the API's. All eight passed unchanged. Re-running the bake before event night is exactly the "files still live + licenses unchanged" row of that event's pre-event checklist.
+
+**Still needs a human:** the visual confirmations this worklist flagged - Wizard Island prominent in img-04, dunes rather than sky dominating img-05, and the 16:9 crop on the portrait img-02 - have not been done. A pipeline can prove a file is the vetted one, correctly sized and legally clear; it cannot tell you the picture reads from the back of the room.
+
+### Honest caveats
+
+- **Source quality is Freesound's HQ preview** (128 kbps MP3), not the full-quality original - originals need an account and this pipeline has no credentials. For 0.3-1.5 s one-shots that is inaudible; for the 4-minute lobby track it is a real if mild ceiling. Upgrade path in the pipeline README: drop originals into `downloads/` and re-bake offline.
+- **`ding` is the pack's shortest** at 0.559 s, and roughly its last 0.25 s is decay below -40 dBFS. It clears the window on file duration; if it reads as "too short" in a room, it needs a different source, not a different trim.
+- **`ding` and `wager-sting` are peak-limited**, not target-limited: both are transient-heavy and hit the -1.5 dBFS ceiling before reaching -16 LUFS. The manifest flags them (`peakLimited`). They ship a few LU quiet rather than squashed by a limiter.
+- **Only one of the two approved wrong-answer cues was bundled** (-Andreas 650842). KevinVG207's stays approved-but-unbundled; adding it is one row in the source table if a sound-set ever wants the alternative.
+- **Think beds keep their natural loop length** (27.1 / 12.0 / 26.3 s) rather than being cut to 30 s. Cutting a loop mid-phrase to hit a round number would break the seam; the 30-second bed is a playback behavior (loop and fade), not a file length.
+
+### Lobby track: PLACEHOLDER, still needs the owner
+
+The lobby slot is built and wired, but **the owner has not picked the signature track**. What ships today is round-4's **F1, "Funk Rock, 135 BPM" (carloseton, CC0, 4:05)** - the only CC0 candidate in that round clearing the owner's 2-3 minute lap floor. It is the current default because it is the only option this pipeline can legally and mechanically bundle unattended, not because it won the review.
+
+Still open for the owner:
+
+- The Pixabay candidates (P1-P6, including the Sonican benchmark family) cannot be fetched without a browser, so they can only enter the pack by hand-download.
+- The incompetech candidates (K1-K4) are CC-BY: bundling one makes an in-app credits screen mandatory (checklist 8) and requires widening the CC0-only assertion in `tools/audio-bake/src/fetch.mjs`.
+- The seam has not been judged by ear. F1 has an arranged ending (the last ~2.6 s of the source are silence, trimmed here), so it is not loop-engineered; looping it will have an audible seam until someone edits a loop point.
+
+Swapping the winner in is one row in `tools/audio-bake/src/sources.mjs` plus a re-bake. The manifest slot (`lobbyTrack`), the id, and every consumer stay exactly where they are.

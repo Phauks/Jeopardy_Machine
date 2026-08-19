@@ -15,6 +15,17 @@ export type BotBehavior = {
   wagerFraction: number;
   // Typed-answer text (everyone-answers mode and the final round).
   answerText: string;
+  // M6 latency compensation, client half (docs/decisions/2026-08-17-buzz-latency-
+  // compensation.md). A real phone always does both of these; a bot can refuse either, which
+  // is how the race harness plays the adversary against the real server:
+  //
+  // - acknowledgeArming: answer the arm-window message, which is what lets the server measure
+  //   this connection's round trip. Off = the phone that will not be measured (and is
+  //   therefore compensated for nothing).
+  // - elapsedClaim: what the buzz says about its own reaction time. "honest" is the truth,
+  //   "zero" is the liar claiming an instant thumb, "none" sends no claim at all.
+  acknowledgeArming: boolean;
+  elapsedClaim: "honest" | "zero" | "none";
 };
 
 export const defaultBehavior: BotBehavior = {
@@ -23,6 +34,8 @@ export const defaultBehavior: BotBehavior = {
   buzzLatencyMaxMs: 900,
   wagerFraction: 0.5,
   answerText: "what is a bot answer",
+  acknowledgeArming: true,
+  elapsedClaim: "honest",
 };
 
 // A mutable seeded stream: same seed, same draw sequence. Kept separate from the engine's

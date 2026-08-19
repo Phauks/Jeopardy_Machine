@@ -53,6 +53,16 @@
 
   const view = $derived(store.view);
   const regions = $derived(preGameRegionsFor(view));
+  // WHICH ROOM IS THIS, REALLY. A simulated room looks exactly like a real one - that is the
+  // point of the seam - so the one screen where somebody is about to invite their friends says
+  // out loud which one they are standing in, and a real room says when it has lost the thread.
+  // `store.mode` is the programmatic answer any surface can ask for (#lib/room/room-store.ts).
+  const roomNote = $derived.by(() => {
+    if (store.mode === "local-sim") return "Demo room - this tab only";
+    if (view.connection === "reconnecting") return "Reconnecting...";
+    if (view.connection === "closed") return "Disconnected";
+    return null;
+  });
   const me = $derived(myPlayer(view));
   // A courtesy check, never the gate: the room refuses on join regardless. It exists so nobody
   // fills in a name and picks a creature only to be turned away by a fact that was true all
@@ -138,7 +148,10 @@
 
 <div class="pre-game" data-seated={regions.seated} data-teams-mode={regions.teams.shown}>
   <header class="room-bar">
-    <p class="room-line">Room <strong>{roomCode}</strong></p>
+    <p class="room-line">
+      Room <strong>{roomCode}</strong>
+      {#if roomNote !== null}<span class="room-note" role="status">{roomNote}</span>{/if}
+    </p>
     <HomeButton variant="inline" />
   </header>
 
@@ -240,6 +253,12 @@
 
   .room-line strong {
     color: var(--board-value-color);
+  }
+
+  .room-note {
+    margin-left: 0.6rem;
+    color: var(--surface-text-muted);
+    letter-spacing: 0.08em;
   }
 
   /* PHONE: one column, character first (it is the thing you came to do), then teams, then who

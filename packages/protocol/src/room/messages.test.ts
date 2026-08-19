@@ -80,6 +80,28 @@ describe("room client messages", () => {
     );
   });
 
+  it("lets team-join name WHO is being seated - the host's move, nobody else's", () => {
+    // A phone moving itself sends no playerId; the host's roster panel names the player it is
+    // rebalancing (apps/realtime enforces that only a host may). One message, two actors,
+    // because it is the same edit.
+    expect(
+      parseRoomClientMessage(JSON.stringify({ version: v, type: "team-join", teamId: "t1" })).ok,
+    ).toBe(true);
+    const seated = parseRoomClientMessage(
+      JSON.stringify({ version: v, type: "team-join", teamId: "t1", playerId: "p-abc" }),
+    );
+    expect(seated.ok).toBe(true);
+    // Still strict: a stray field is a bug, not an extension point (ext exists for those).
+    expect(
+      roomClientMessageSchema.safeParse({
+        version: v,
+        type: "team-join",
+        teamId: "t1",
+        who: "p-abc",
+      }).success,
+    ).toBe(false);
+  });
+
   it("bounds nickname and team-name lengths by the limits module", () => {
     const tooLong = "x".repeat(limits.player.nicknameMaxLength + 1);
     expect(
@@ -216,10 +238,19 @@ describe("room server messages", () => {
         phase: "active",
         game: { phase: "armed" },
         roster: { players: [], teams: [] },
+        teamsMode: false,
+        board: { rounds: [{ categoryTitles: ["Firsts"], cellValues: [[100, 200]] }] },
         paused: false,
         clueContent: null,
+        timers: [{ kind: "answer-window", remainingMs: 3200 }],
       },
-      { version: v, type: "event", stateVersion: 13, events: [{ type: "buzzers-armed" }] },
+      {
+        version: v,
+        type: "event",
+        stateVersion: 13,
+        events: [{ type: "buzzers-armed" }],
+        game: { phase: "armed" },
+      },
       {
         version: v,
         type: "buzz-won",
@@ -234,6 +265,44 @@ describe("room server messages", () => {
       const result = parseRoomServerMessage(JSON.stringify(raw));
       expect(result.ok, JSON.stringify(raw)).toBe(true);
     }
+  });
+
+  it("carries the audience as a count on the roster, and keeps ABSENT distinct from zero", () => {
+    // Spectators hold no seat and give no identity, so a number is the only honest thing a
+    // roster can say about them. The field is optional because "this producer cannot count its
+    // audience" is a real state - and it is NOT zero, exactly as the lobby row's spectator
+    // fields work (registry.test.ts). A console that renders the two the same invents a fact.
+    const rosterMessage = (roster: Record<string, unknown>) => ({
+      version: v,
+      type: "roster",
+      roster,
+    });
+    const counted = parseRoomServerMessage(
+      JSON.stringify(rosterMessage({ players: [], teams: [], spectatorCount: 4 })),
+    );
+    expect(
+      counted.ok && counted.message.type === "roster" && counted.message.roster.spectatorCount,
+    ).toBe(4);
+    const unreported = parseRoomServerMessage(
+      JSON.stringify(rosterMessage({ players: [], teams: [] })),
+    );
+    expect(
+      unreported.ok &&
+        unreported.message.type === "roster" &&
+        unreported.message.roster.spectatorCount,
+    ).toBeUndefined();
+    // Bounded by the same hard cap the room admits people under - hosts tune down, never up.
+    expect(
+      parseRoomServerMessage(
+        JSON.stringify(
+          rosterMessage({
+            players: [],
+            teams: [],
+            spectatorCount: limits.room.spectatorHardCap + 1,
+          }),
+        ),
+      ).ok,
+    ).toBe(false);
   });
 
   it("keeps refusal reasons and close codes in agreement about the no-such-room path", () => {
@@ -306,6 +375,35 @@ describe("room server messages", () => {
         game: null,
         roster: { players: [], teams: [] },
       }).success,
+    ).toBe(false);
+  });
+
+  it("makes a stateful client's needs mandatory, not optional", () => {
+    // The M4 reconcile's findings plus M6's, held as schema: a snapshot without the board or
+    // the seating rule leaves a display with nothing to paint and a teams room with no teams, a
+    // snapshot without `timers` leaves a console reopening mid-clue with a frozen countdown,
+    // and an event batch without its state leaves every client guessing (see those fields).
+    const snapshot = {
+      version: v,
+      type: "snapshot",
+      stateVersion: 1,
+      phase: "lobby",
+      game: null,
+      roster: { players: [], teams: [] },
+      teamsMode: true,
+      board: { rounds: [] },
+      paused: false,
+      clueContent: null,
+      timers: [],
+    };
+    expect(roomServerMessageSchema.safeParse(snapshot).success).toBe(true);
+    for (const missing of ["teamsMode", "board", "timers"]) {
+      const { [missing]: _dropped, ...rest } = snapshot as Record<string, unknown>;
+      expect(roomServerMessageSchema.safeParse(rest).success, missing).toBe(false);
+    }
+    expect(
+      roomServerMessageSchema.safeParse({ version: v, type: "event", stateVersion: 2, events: [] })
+        .success,
     ).toBe(false);
   });
 

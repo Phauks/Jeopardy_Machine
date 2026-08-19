@@ -1,14 +1,14 @@
 // The room-store seam: ONE typed interface between the play surfaces (join/lobby/buzzer,
 // display, host console) and wherever room state actually lives. Two implementations:
 //
-// - local-sim-store.svelte.ts - complete; wraps @jeopardy/engine's transition() plus the
-//   fixtures/ dummy dataset, timers driven client-side. The default while M3 lands.
-// - ws-room-store.ts - the same interface with every method documented as its M3 room
-//   protocol message; bodies are stubs wired at reconcile (docs/design/surfaces.md holds
-//   the message-to-store mapping table).
+// - local-sim-store.svelte.ts - wraps @jeopardy/engine's transition() plus the fixtures/ dummy
+//   dataset, timers driven client-side. What the demo room and the dev surfaces get.
+// - ws-room-store.svelte.ts - the same interface over a real socket to the room's GameRoomDO.
+//   What every real room code gets (docs/design/surfaces.md holds the message-to-store table).
 //
-// Surfaces consume ONLY this interface, so swapping mock for WebSocket is a factory change
-// (create-room-store.ts), never a component change.
+// Surfaces consume ONLY this interface, so which room you are in is a factory decision
+// (create-room-store.ts), never a component one - and the event fold both implementations use
+// is one module (room-fold.ts), so they cannot drift into two answers about the same event.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
@@ -46,6 +46,19 @@ export type TeamPatch = {
 export type RoomStoreMode = "local-sim" | "ws";
 
 /**
+ * The room-audible buzz, resolved: the TEAM's sound in teams mode, the winner's own otherwise
+ * (the owner's double-confirmation directive - the room hears the team while the display shows
+ * its name and colour). A real room resolves this server-side and ships it on the buzz-won
+ * message; the mock applies the same rule to its own roster. Surfaces that make noise take it
+ * from here rather than resolving it a third time.
+ */
+export type RoomBuzz = {
+  playerId: string;
+  entityId: string;
+  buzzSoundId: string | null;
+};
+
+/**
  * All surfaces' actions in one interface. Grouping mirrors who may call what (the M3
  * authority matrix): player actions are also always available to the host on a player's
  * behalf (guiding principle 4), host actions are refused for phones by the server - the mock
@@ -75,11 +88,33 @@ export type RoomStore = {
   updateTeam(patch: TeamPatch, teamId?: string): void;
   kickFromTeam(playerId: string): void;
   handOffLeadership(playerId: string): void;
-  // Host supremacy over the roster.
+  // Host supremacy over the roster (guiding principle 4; the console's roster panel is the one
+  // surface that calls these - src/lib/room/host-roster-panel.svelte).
   renamePlayer(playerId: string, nickname: string): void;
   kickFromRoom(playerId: string): void;
+  /**
+   * Seat ANOTHER player on a team - the host rebalancing from the console (user-flows C2's
+   * "drag to rebalance"). `joinTeam` is the same edit for the sender themself; this one names
+   * its target, rides `team-join` with a host-only `playerId`, and ignores the team's lock,
+   * because a lock is the leader's anti-nuisance tool and the host out-ranks it.
+   */
+  assignPlayerToTeam(playerId: string, teamId: string): void;
 
   // Play (phone side).
+  /**
+   * Report that the armed buzzer has actually been PAINTED - the frame on which the player
+   * could first see the button go hot.
+   *
+   * This is the client's half of buzz latency compensation
+   * (docs/decisions/2026-08-17-buzz-latency-compensation.md "What clients owe"): the room ranks
+   * presses by reaction time, and reaction time is measured from the paint, never from the
+   * moment the message arrived. Only the surface knows when that happened, so only the surface
+   * can say. Idempotent per arming, and cheap enough to call from an effect on every frame.
+   *
+   * A surface that never calls it is ranked by arrival - never worse than the pre-M6 behavior,
+   * never compensated either. Nothing here is required for a buzz to WORK.
+   */
+  markArmedPainted(armId: number): void;
   buzz(): void;
   commitWager(amount: number): void;
   commitFinalWager(amount: number): void;

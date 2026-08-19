@@ -5,10 +5,12 @@ import { describe, expect, it } from "vitest";
 import { limits } from "@jeopardy/protocol/limits";
 import {
   blankCreateForm,
+  clampPlayerCap,
   createFormProblems,
   createRoomBody,
   describeCreateFailure,
   handOffAfterCreate,
+  playerCapBounds,
 } from "#lib/landing/create-room-request.ts";
 import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
@@ -17,39 +19,107 @@ function formOf(overrides: Partial<CreateRoomForm> = {}): CreateRoomForm {
   return { ...blankCreateForm(), ...overrides };
 }
 
+const named = { title: "Pub quiz", hostLabel: "Board Game Club" };
+
 describe("create form validation", () => {
-  it("opens on the safe default: a private, open room nobody has to name", () => {
+  it("opens private and open, with the two required fields empty and the button off", () => {
     const form = blankCreateForm();
     expect(form.listing).toBe("private");
     expect(form.password).toBe("");
-    expect(createFormProblems(form)).toEqual([]);
+    expect(createFormProblems(form).map((problem) => problem.field)).toEqual([
+      "title",
+      "hostLabel",
+    ]);
+    expect(createFormProblems(formOf(named))).toEqual([]);
   });
 
-  it("requires a name only for a public room - a private one is nobody else's business", () => {
-    expect(createFormProblems(formOf({ listing: "private", title: "" }))).toEqual([]);
-    const problems = createFormProblems(formOf({ listing: "public", title: "  " }));
+  // Owner call 2026-08-17: the requirement used to be public-only. It is now unconditional -
+  // there is no listing-dependent branch for the name left in the module at all.
+  it("requires a name whatever the listing, private included", () => {
+    for (const listing of ["private", "public"] as const) {
+      const problems = createFormProblems(formOf({ ...named, listing, title: "  " }));
+      expect(problems).toHaveLength(1);
+      expect(problems[0]?.field).toBe("title");
+    }
+  });
+
+  it("refuses a PRIVATE room with a blank host label, same as a public one", () => {
+    const problems = createFormProblems(formOf({ ...named, listing: "private", hostLabel: " " }));
     expect(problems).toHaveLength(1);
-    expect(problems[0]?.field).toBe("title");
-    expect(problems[0]?.message).toContain("public room needs a name");
-    expect(createFormProblems(formOf({ listing: "public", title: "Pub quiz" }))).toEqual([]);
+    expect(problems[0]?.field).toBe("hostLabel");
+    expect(createFormProblems(formOf({ ...named, listing: "public", hostLabel: "" }))).toHaveLength(
+      1,
+    );
+  });
+
+  it("holds the caps on both listing strings, so a paste cannot outgrow the lobby row", () => {
+    expect(
+      createFormProblems(
+        formOf({ ...named, title: "x".repeat(limits.room.roomTitleMaxLength + 1) }),
+      ).length,
+    ).toBe(1);
+    expect(
+      createFormProblems(
+        formOf({ ...named, hostLabel: "x".repeat(limits.room.hostLabelMaxLength + 1) }),
+      ).length,
+    ).toBe(1);
   });
 
   it("holds the password floor, and treats empty as 'no password' rather than as too short", () => {
-    expect(createFormProblems(formOf({ password: "" }))).toEqual([]);
-    const tooShort = createFormProblems(formOf({ password: "ab" }));
+    expect(createFormProblems(formOf({ ...named, password: "" }))).toEqual([]);
+    const tooShort = createFormProblems(formOf({ ...named, password: "ab" }));
     expect(tooShort[0]?.field).toBe("password");
     expect(tooShort[0]?.message).toContain(String(limits.room.roomPasswordMinLength));
-    expect(createFormProblems(formOf({ password: "quizzy" }))).toEqual([]);
+    expect(createFormProblems(formOf({ ...named, password: "quizzy" }))).toEqual([]);
   });
 
-  it("keeps the player cap inside the limits hosts cannot lift", () => {
-    expect(createFormProblems(formOf({ maxPlayers: 0 }))[0]?.field).toBe("maxPlayers");
+  // Owner report 2026-08-17: "the player-cap field accepts values over 100". The ceiling the
+  // form offers is the SOFT cap - the product promise - never the hard cap, which is refusal
+  // headroom and was never a number a host is invited to type.
+  it("bounds the player cap by the soft cap, not by the refusal headroom", () => {
+    expect(playerCapBounds).toEqual({ min: 2, max: limits.room.playerSoftCap });
+    expect(playerCapBounds.max).toBeLessThan(limits.room.playerHardCap);
+    expect(createFormProblems(formOf({ ...named, maxPlayers: 1 }))[0]?.field).toBe("maxPlayers");
+    expect(createFormProblems(formOf({ ...named, maxPlayers: 101 }))[0]?.field).toBe("maxPlayers");
     expect(
-      createFormProblems(formOf({ maxPlayers: limits.room.playerHardCap + 1 }))[0]?.field,
+      createFormProblems(formOf({ ...named, maxPlayers: limits.room.playerHardCap }))[0]?.field,
     ).toBe("maxPlayers");
     // A number input handed back a non-integer (or an empty box) must not sail through.
-    expect(createFormProblems(formOf({ maxPlayers: Number.NaN }))[0]?.field).toBe("maxPlayers");
-    expect(createFormProblems(formOf({ maxPlayers: limits.room.playerHardCap }))).toEqual([]);
+    expect(createFormProblems(formOf({ ...named, maxPlayers: Number.NaN }))[0]?.field).toBe(
+      "maxPlayers",
+    );
+    expect(createFormProblems(formOf({ ...named, maxPlayers: 100 }))).toEqual([]);
+    expect(createFormProblems(formOf({ ...named, maxPlayers: 2 }))).toEqual([]);
+  });
+
+  it("names the bound it enforces, so the refusal is actionable without guessing", () => {
+    const message = createFormProblems(formOf({ ...named, maxPlayers: 500 }))[0]?.message ?? "";
+    expect(message).toContain("2");
+    expect(message).toContain("100");
+    expect(message).not.toContain(String(limits.room.playerHardCap));
+  });
+});
+
+describe("clamping the player cap", () => {
+  it("pulls anything typed or pasted back inside the bounds", () => {
+    expect(clampPlayerCap(500)).toBe(playerCapBounds.max);
+    expect(clampPlayerCap(limits.room.playerHardCap)).toBe(playerCapBounds.max);
+    expect(clampPlayerCap(0)).toBe(playerCapBounds.min);
+    expect(clampPlayerCap(-12)).toBe(playerCapBounds.min);
+  });
+
+  it("rounds a fractional spinner value instead of carrying it into the payload", () => {
+    expect(clampPlayerCap(12.4)).toBe(12);
+    expect(clampPlayerCap(12.6)).toBe(13);
+  });
+
+  it("treats an emptied box as the full house rather than as zero players", () => {
+    expect(clampPlayerCap(Number.NaN)).toBe(playerCapBounds.max);
+    expect(clampPlayerCap(Number.POSITIVE_INFINITY)).toBe(playerCapBounds.max);
+  });
+
+  it("leaves a legal value exactly as typed", () => {
+    expect(clampPlayerCap(24)).toBe(24);
   });
 });
 
@@ -73,6 +143,27 @@ describe("the request body", () => {
       title: "Pub quiz",
       hostLabel: "Board Game Club",
       password: "quizzy",
+    });
+  });
+
+  // The owner report behind the round-trip test in routes/api/rooms/rooms-endpoint.test.ts:
+  // "I made a public room but settings said it was private. Also didn't carry title or host
+  // name." This is the first link of that chain - what the form actually puts on the wire.
+  it("carries listing, title and host label together for a public room", () => {
+    const body = createRoomBody(
+      formOf({ listing: "public", title: "Pub quiz", hostLabel: "Board Game Club" }),
+      game,
+    );
+    expect(body).toMatchObject({
+      listing: "public",
+      title: "Pub quiz",
+      hostLabel: "Board Game Club",
+    });
+  });
+
+  it("sends a cap the protocol will accept, whatever the field was left holding", () => {
+    expect(createRoomBody(formOf({ ...named, maxPlayers: 42 }), game)).toMatchObject({
+      maxPlayers: 42,
     });
   });
 });
