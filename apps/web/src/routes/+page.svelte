@@ -31,7 +31,7 @@
   import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
   import type { CreateState } from "#lib/landing/create-room-panel.svelte";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
-  import type { RejoinCandidate } from "#lib/landing/rejoin-panel.svelte";
+  import type { RejoinCandidate } from "#lib/lobby/room-liveness.ts";
 
   // ---- the public listing --------------------------------------------------------------
 

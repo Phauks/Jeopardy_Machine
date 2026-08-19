@@ -1,4 +1,4 @@
-// The room browser's four states, server-rendered (the repo's component-test pattern:
+// The room browser's five states, server-rendered (the repo's component-test pattern:
 // svelte/server render, no browser mode - docs/DEVELOPMENT.md).
 //
 // The states are the point. "Rooms listed", "genuinely nobody hosting", and "the registry
@@ -6,7 +6,9 @@
 // the failure this region was rebuilt around - so each one is asserted to say something
 // different. The browser is now a REGION of the front door rather than the /lobby page
 // (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md); the code box that used
-// to be repeated above it is the front door's own, tested in front-door.states.test.ts.
+// to be repeated above it is the front door's own counter, which also does this region's
+// searching (docs/decisions/2026-08-18-front-door-architecture.md) - so the fifth state is
+// "the filter left nothing", which is a different sentence from "nobody is hosting".
 import { describe, expect, it } from "vitest";
 import { render } from "svelte/server";
 import RoomBrowser from "#lib/lobby/room-browser.svelte";
@@ -85,6 +87,33 @@ describe("room browser: rooms listed", () => {
   });
 });
 
+describe("room browser: the head row", () => {
+  const { body } = render(RoomBrowser, {
+    props: { listing: listingOf([lobbyRoom, playingRoom]), now: fetchedAt, ...noopHandlers },
+  });
+
+  it("carries the count, the one filter, and the real fetch timestamp on one line", () => {
+    expect(body).toContain("2 live");
+    expect(body).toContain("Open rooms only");
+    expect(body).toContain("Updated just now");
+  });
+
+  it("counts against the whole listing while a filter is narrowing it", () => {
+    const filtered = render(RoomBrowser, {
+      props: {
+        listing: listingOf([lobbyRoom, playingRoom]),
+        visibleRooms: [playingRoom],
+        filterActive: true,
+        now: fetchedAt,
+        ...noopHandlers,
+      },
+    });
+    expect(filtered.body).toContain("1 of 2");
+    expect(filtered.body).toContain("Environment trivia");
+    expect(filtered.body).not.toContain("Pub quiz night");
+  });
+});
+
 describe("room browser: the empty and unavailable states differ", () => {
   it("an empty lobby explains that unlisted is the default", () => {
     const { body } = render(RoomBrowser, {
@@ -110,6 +139,20 @@ describe("room browser: the empty and unavailable states differ", () => {
     expect(body).toContain("Registry table missing");
     expect(body).toContain("wrangler d1 migrations apply");
     expect(body).toContain("joined by code");
+    expect(body).not.toContain("Nobody is hosting publicly");
+  });
+
+  it("says 'nothing matches' rather than 'nobody is hosting' when a filter emptied it", () => {
+    const { body } = render(RoomBrowser, {
+      props: {
+        listing: listingOf([lobbyRoom, playingRoom]),
+        visibleRooms: [],
+        filterActive: true,
+        now: fetchedAt,
+        ...noopHandlers,
+      },
+    });
+    expect(body).toContain("Nothing here matches");
     expect(body).not.toContain("Nobody is hosting publicly");
   });
 

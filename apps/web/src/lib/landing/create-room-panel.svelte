@@ -43,13 +43,10 @@
 </script>
 
 <section class="create" aria-labelledby="create-heading">
-  <h2 class="panel-heading" id="create-heading">
-    <span class="marker">02</span>
-    <span class="heading-text">Create a room</span>
-  </h2>
+  <h2 class="panel-heading" id="create-heading">Create a room</h2>
   <p class="panel-lede">
-    You host, everyone else scans. The room opens with the built-in sample game until the
-    editor lands - every setting below is editable afterwards from the console.
+    You host, everyone else scans. It opens with the built-in sample game until the editor
+    lands, and every setting here is editable afterwards from the console.
   </p>
 
   <form
@@ -163,45 +160,32 @@
 
 <style>
   /* Board materials (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md, art
-     direction): a category-colored panel with fields sunk into it as wells. Derived from
-     --board-* rather than the chrome tokens so it stays legible under every preset, including
-     the light paper one where --surface-page and --surface-text converge. */
+     direction): fields sunk into the surrounding cell as wells. It carries no fill of its own
+     since 2026-08-18 - it opens INSIDE the counter band rather than standing beside it as a
+     slab of its own, and a second colored panel inside a cell reads as a page within a page.
+     Derived from --board-* rather than the chrome tokens so it stays legible under every
+     preset, including the light paper one where --surface-page and --surface-text converge. */
   .create {
     --create-ink: var(--clue-text-color);
     --create-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
     --create-rule: color-mix(in srgb, var(--clue-text-color) 24%, transparent);
-    --create-well: color-mix(in srgb, var(--board-category-bg) 58%, #000000);
+    --create-well: color-mix(in srgb, var(--board-cell-bg) 55%, #000000);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: clamp(1rem, 2.2vw, 1.5rem);
-    background: var(--board-category-bg);
     color: var(--create-ink);
   }
 
+  /* No section number any more: the numbered headings ("01 Join", "02 Create", "03 Public
+     rooms") belonged to a page of four equal panels, and this panel is now a disclosure the
+     Host button opens (docs/decisions/2026-08-18-front-door-architecture.md). */
   .panel-heading {
-    display: flex;
-    align-items: baseline;
-    gap: 0.7rem;
     margin: 0;
     font-family: var(--font-chrome);
-    font-size: 0.95rem;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-  }
-
-  /* Chrome face, not the value face: the latter is an ultra-condensed projector face that
-     reads as noise below about 2rem. The value COLOR carries the resemblance. */
-  .marker {
-    font-family: var(--font-chrome);
-    font-size: 1.05rem;
-    line-height: 1;
-    letter-spacing: 0.18em;
-    color: var(--board-value-color);
-  }
-
-  .heading-text {
     font-weight: 400;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
   }
 
   .panel-lede {
@@ -212,11 +196,15 @@
     color: var(--create-muted);
   }
 
+  /* A form column, not a page width: name and password fields stretched across a 1440px laptop
+     look like a database admin screen, and the eye has to travel the whole window to read a
+     label and reach its input. */
   .create-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.6rem 0.7rem;
     align-items: end;
+    max-width: 46rem;
   }
 
   .field {
@@ -368,7 +356,7 @@
     background: var(--board-value-color);
     /* Near-black derived from the panel's own hue, so the slab reads as ink on gold in every
        preset instead of borrowing a chrome token that may be the same color as the panel. */
-    color: color-mix(in srgb, var(--board-category-bg) 26%, #000000);
+    color: color-mix(in srgb, var(--board-cell-bg) 26%, #000000);
     cursor: pointer;
   }
 

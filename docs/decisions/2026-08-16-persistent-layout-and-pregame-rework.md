@@ -54,6 +54,8 @@ The principle first (it changes the shape of the pre-game), then the front door,
 
 ## Landed 2026-08-16: the front door, rebuilt
 
+> **The LAYOUT below was superseded on 2026-08-18** (docs/decisions/2026-08-18-front-door-architecture.md): the owner's verdict on this version was that four near-equal panels under a tall masthead is not the consolidation the batch asked for. Everything this section describes about BEHAVIOR still holds - one screen, rejoin memory, create ending in the host console, the code box winning, board materials. What changed is the arrangement: one counter (code + search in one field), the list as its results, hosting behind a button, and a wordmark strip instead of a hero.
+
 The first item of the batch, implemented. What it is now, and the reasoning that is not obvious from the diff:
 
 **One screen, four regions.** `/` carries the rejoin offer, the code box + password, the create form, and the live public list at once; `/lobby` and its screen component are deleted with no redirect (docs/decisions/2026-08-14-room-visibility-and-lobby.md, amended there). On a laptop it is two columns - a control column (join, create) beside a full-height list - and on a phone it is the same regions stacked in priority order. That is the layout answer to the crowding problem the 2026-08-15 split tried to solve with navigation.
