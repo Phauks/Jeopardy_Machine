@@ -14,20 +14,50 @@ import {
 import type { ContentItem, GameDefinition } from "@jeopardy/protocol";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 
-function item(prompt: string, answer: string): ContentItem {
+function item(prompt: string, answer: string, mediaId?: string): ContentItem {
   return {
     id: generateId(),
+    // A picture clue is a BASIC item carrying media, not a type of its own - the same
+    // shape the event pack uses (guiding principle 6: content knows nothing about boards).
     type: "basic",
-    prompt: { text: prompt },
+    prompt: { text: prompt, ...(mediaId !== undefined && { media: { mediaId } }) },
     answer: { canonical: answer, accepted: [`${answer} (also accepted)`] },
     tags: [],
     provenance: "human",
   };
 }
 
+// One asset with FETCHABLE bytes and one whose bytes never left the authoring device: the two
+// halves of what a surface has to handle, and the reason the wire carries a resolved descriptor
+// rather than a bare id (@jeopardy/protocol room/server-messages.ts, resolvedMediaSchema).
+export const pictureAsset = {
+  id: generateId(),
+  kind: "image" as const,
+  mime: "image/webp",
+  bytes: 4096,
+  sha256: "a".repeat(64),
+  alt: "A stand of very large trees",
+  storage: { state: "remote" as const, url: "https://media.test/trees.webp" },
+};
+export const bytelessAsset = {
+  id: generateId(),
+  kind: "audio" as const,
+  mime: "audio/mpeg",
+  bytes: 2048,
+  sha256: "b".repeat(64),
+  alt: "A birdsong recording",
+  storage: { state: "pending-local" as const },
+};
+
 // 3x3 board: the smallest legal round, one item per cell, plus an authored final.
 const items = Array.from({ length: 9 }, (_unused, index) =>
-  item(`Prompt for cell ${String(index)}`, `Answer for cell ${String(index)}`),
+  // Cell 1 is a picture clue and cell 2 points at an asset with no bytes anywhere - both are
+  // ordinary authored content, and both must reach a screen as something.
+  item(
+    `Prompt for cell ${String(index)}`,
+    `Answer for cell ${String(index)}`,
+    index === 1 ? pictureAsset.id : index === 2 ? bytelessAsset.id : undefined,
+  ),
 );
 const finalItem = item("The final prompt", "The final answer");
 const created = new Date().toISOString();
@@ -61,7 +91,7 @@ export const authoredGameDefinition: GameDefinition = gameDefinitionSchema.parse
         format: "content-pack",
         schemaVersion: contentPackSchemaVersion,
         meta: { title: "Realtime content suite pack", created, modified: created },
-        body: { items: [...items, finalItem] },
+        body: { items: [...items, finalItem], media: [pictureAsset, bytelessAsset] },
       },
     },
     rules: { kind: "preset", preset: "casual-party", overrides: {} },

@@ -35,10 +35,18 @@ describe("mediaAssetSchema", () => {
     ).toBe(false);
   });
 
-  it("rejects bad hashes, kinds, and non-positive sizes", () => {
+  it("rejects bad hashes, unknown kinds, and non-positive sizes", () => {
     expect(mediaAssetSchema.safeParse({ ...validAsset, sha256: "ABC" }).success).toBe(false);
-    expect(mediaAssetSchema.safeParse({ ...validAsset, kind: "video" }).success).toBe(false);
+    expect(mediaAssetSchema.safeParse({ ...validAsset, kind: "hologram" }).success).toBe(false);
     expect(mediaAssetSchema.safeParse({ ...validAsset, bytes: 0 }).success).toBe(false);
+  });
+
+  it("accepts all four kinds, video included", () => {
+    // Video was "deliberately absent until a mode needs it" until 2026-08-19, when the mode
+    // needed it; `file` is the open end for anything a clue hands the room that is not played.
+    for (const kind of ["image", "audio", "video", "file"] as const) {
+      expect(mediaAssetSchema.safeParse({ ...validAsset, kind }).success, kind).toBe(true);
+    }
   });
 });
 

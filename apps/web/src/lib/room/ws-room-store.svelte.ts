@@ -159,7 +159,11 @@ function toClueContentView(content: ClueContent): ClueContentView {
     // Null prompt = this role does not get the text (players, unless clueTextOnPhones is on).
     // It arrives anyway so the layout can be drawn without guessing whether more is coming.
     prompt: content.prompt?.text ?? "",
+    // Already resolved by the room - kind, type, alt and (when the bytes are fetchable) a url.
+    // The store does no lookup of its own because a client holds no document to look in.
+    media: content.prompt?.media ?? null,
     response: content.answer?.canonical ?? null,
+    responseMedia: content.answer?.media ?? null,
   };
 }
 

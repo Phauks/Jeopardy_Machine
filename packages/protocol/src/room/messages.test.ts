@@ -333,9 +333,17 @@ describe("room server messages", () => {
       {
         target: { kind: "final" },
         category: "The final category",
+        // RESOLVED media, not a bare ref: a client holds no document, so the room sends what a
+        // surface can actually paint (resolvedMediaSchema, 2026-08-19).
         prompt: {
           text: "The final prompt",
-          media: { mediaId: "0192f0a0-0000-7000-8000-000000000000" },
+          media: {
+            mediaId: "0192f0a0-0000-7000-8000-000000000000",
+            kind: "image",
+            mime: "image/webp",
+            alt: "A wind turbine at dusk",
+            url: "https://media.example.com/turbine.webp",
+          },
         },
         answer: null,
       },

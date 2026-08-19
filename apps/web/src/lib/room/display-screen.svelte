@@ -5,6 +5,7 @@
   // touches the game (C1); reopening the route restores everything from the store.
   // Never shows answers, wagers in progress, or wager-cell positions: its store role is
   // "display", so that data does not even reach this component (C1b's rule, data-level).
+  import ClueMedia from "#lib/room/clue-media.svelte";
   import { teamsAreOffered } from "@jeopardy/protocol/settings/player-mode";
   import { fade, scale } from "svelte/transition";
   import { prefersReducedMotion } from "svelte/motion";
@@ -349,6 +350,9 @@
       <p class="final-kicker">Final round</p>
       <h2 class="interstitial-title">{view.content?.final?.categoryTitle ?? ""}</h2>
       {#if game.phase === "final-writing" && view.content?.final}
+        {#if view.content.final.media !== null}
+          <ClueMedia media={view.content.final.media} variant="stage" autoplay />
+        {/if}
         <p class="final-clue">{view.content.final.prompt}</p>
       {/if}
       {#if game.phase === "final-wagers"}
@@ -386,6 +390,13 @@
                 · ${game.clue.value}
               {/if}
             </p>
+            <!-- The picture, sound or video comes BEFORE the words on a projector: a picture
+                 round's clue IS the image, and a room reads the prompt as its caption. Audio
+                 autoplays here and only here - the display owns room audio, so this is the one
+                 surface entitled to make noise (clue-media.svelte explains the rule). -->
+            {#if clueContent.media !== null}
+              <ClueMedia media={clueContent.media} variant="stage" autoplay />
+            {/if}
             <p class="clue-text">{clueContent.prompt}</p>
             {#if buzzWinnerName !== null}
               <p class="winner-line" role="status">

@@ -36,6 +36,17 @@ describe("host console states (C4)", () => {
     expect(body).toContain("Captain Canopy");
   });
 
+  it("clue open: the PICTURE renders too, not just the words", () => {
+    // Cell (0,0) of the fixture is a picture clue. The wire carried a bare media id until
+    // 2026-08-19, so every picture clue in this room came out as text (owner report).
+    const store = hostStore();
+    store.startGame();
+    store.selectCell(0, 0);
+    const body = markup(store);
+    expect(body).toContain("<img");
+    expect(body).toContain("upside-down waterfall");
+  });
+
   it("board up: minimap with values, who-has-control, hidden-wager dot (host-only layer)", () => {
     const store = hostStore();
     store.startGame();

@@ -48,6 +48,7 @@ import {
 import {
   boardMaterial,
   clueContentFor,
+  packOf,
   resolveCellContent,
   resolveFinalContent,
 } from "./room/content.ts";
@@ -352,6 +353,9 @@ export class GameRoomDO extends Server {
     if (resolved === null) return null;
     return clueContentFor(role, resolved, {
       clueTextOnPhones: room.setup.settings.join.clueTextOnPhones,
+      // The pack is what turns a media id into something a surface can paint. Without it every
+      // picture clue reached the room as words only (owner, 2026-08-19).
+      pack: packOf(room.spec),
     });
   }
 

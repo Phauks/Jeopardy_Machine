@@ -7,6 +7,7 @@
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
 import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
+import type { ResolvedMedia } from "@jeopardy/protocol/room/server-messages";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
 import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -135,8 +136,20 @@ export type WagerRangeView = {
 export type ClueContentView = {
   categoryTitle: string;
   prompt: string;
+  /**
+   * The clue's picture, sound, video or attachment, already resolved by the room into
+   * something a surface can paint - kind, type, alt text and a URL when the bytes are
+   * fetchable (@jeopardy/protocol room/server-messages.ts, resolvedMediaSchema). Null when the
+   * clue is words only, which is most of them.
+   */
+  media: ResolvedMedia | null;
   /** Host consoles only; null everywhere else (mirror-mode safety starts at the data layer). */
   response: string | null;
+  /**
+   * The ANSWER's media, host-only for the same reason the answer text is: a picture that gives
+   * the answer away must never reach a display or a phone.
+   */
+  responseMedia: ResolvedMedia | null;
 };
 
 export type RoomContentView = {

@@ -34,6 +34,7 @@
 import { contentPackSchema } from "../../content/content-pack.ts";
 import { gameDefinitionSchema } from "./game-definition.ts";
 import type { ContentPack } from "../../content/content-pack.ts";
+import type { MediaAsset } from "../../content/media-ref.ts";
 import type { GameDefinition, GameDefinitionBody } from "./game-definition.ts";
 
 /**
@@ -129,4 +130,45 @@ export function embedContentPack(
     },
   };
   return { ok: true, definition: gameDefinitionSchema.parse(definitionValue), embedded: true };
+}
+
+/**
+ * Rewrite a pack's `bundled` media to `remote` URLs against the location the document was
+ * loaded from - the step that has to happen before a game with pictures is HOSTED.
+ *
+ * `bundled` means "bytes at a media/-relative path beside this document" (content/media-ref.ts).
+ * That is a statement about the authoring device's disk, and it stops being true the moment the
+ * game travels: a phone in the room holds no document, so it has nothing to resolve the path
+ * against. Only the client that loaded the document knows where it came from, so it is the one
+ * that must turn those paths into URLs everybody can fetch - which is the same rewrite the
+ * documented flow already describes for an upload, with "served by this origin" standing in for
+ * "uploaded to R2".
+ *
+ * `baseUrl` is the document's own URL. Paths resolve against it exactly as a browser resolves a
+ * relative link, so a game at `/games/night.game.json` finds `media/img-01.webp` at
+ * `/games/media/img-01.webp`.
+ *
+ * Everything else is left alone: a `remote` asset already has a URL, and `pending-local` has no
+ * bytes to point at - the room will send it with no `url` and surfaces fall back to alt text
+ * rather than showing a broken image.
+ */
+export function resolveBundledMedia(pack: ContentPack, baseUrl: string): ContentPack {
+  const media = pack.body.media.map((asset) => {
+    if (asset.storage.state !== "bundled") return asset;
+    return {
+      ...asset,
+      storage: { state: "remote" as const, url: new URL(asset.storage.path, baseUrl).href },
+    };
+  });
+  return { ...pack, body: { ...pack.body, media } };
+}
+
+/**
+ * The media a clue cell points at, looked up in the pack that travels with the game.
+ *
+ * Returns null for an id the pack does not hold, which is the same honest answer the item
+ * lookup gives: the surface shows the clue's words and no picture, rather than a broken frame.
+ */
+export function mediaAssetById(pack: ContentPack, mediaId: string): MediaAsset | null {
+  return pack.body.media.find((asset) => asset.id === mediaId) ?? null;
 }

@@ -17,12 +17,14 @@
 // A compact-spec room (the bots/tests/sim path) has no authored content at all; every lookup
 // there answers null, which the wire treats as "this role gets nothing" and clients render as
 // a board-only game. That is the honest answer, not a failure.
-import type { ContentItem, GameDefinitionBody } from "@jeopardy/protocol";
+import { mediaAssetById } from "@jeopardy/protocol";
+import type { ContentItem, ContentPack, GameDefinitionBody, MediaRef } from "@jeopardy/protocol";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type {
   BoardMaterial,
   ClueContent,
   ClueContentTarget,
+  ResolvedMedia,
 } from "@jeopardy/protocol/room/server-messages";
 import type { RoomRole } from "@jeopardy/protocol/room/identity";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
@@ -102,17 +104,21 @@ export function boardMaterial(spec: RoomGameSpec, setup: GameSetup): BoardMateri
 export function clueContentFor(
   role: RoomRole,
   resolved: { category: string; item: ContentItem; target: ClueContentTarget },
-  options: { clueTextOnPhones: boolean },
+  options: { clueTextOnPhones: boolean; pack?: ContentPack | null },
 ): ClueContent {
   const promptAllowed =
     role === "host" || role === "display" || role === "spectator" ? true : options.clueTextOnPhones;
+  const media = (ref: MediaRef | undefined): ResolvedMedia | undefined =>
+    ref === undefined ? undefined : resolveMedia(options.pack ?? null, ref);
+  const promptMedia = media(resolved.item.prompt.media);
+  const answerMedia = media(resolved.item.answer.media);
   return {
     target: resolved.target,
     category: resolved.category,
     prompt: promptAllowed
       ? {
           text: resolved.item.prompt.text,
-          ...(resolved.item.prompt.media !== undefined && { media: resolved.item.prompt.media }),
+          ...(promptMedia !== undefined && { media: promptMedia }),
         }
       : null,
     answer:
@@ -120,8 +126,47 @@ export function clueContentFor(
         ? {
             canonical: resolved.item.answer.canonical,
             accepted: resolved.item.answer.accepted,
-            ...(resolved.item.answer.media !== undefined && { media: resolved.item.answer.media }),
+            ...(answerMedia !== undefined && { media: answerMedia }),
           }
         : null,
   };
+}
+
+/**
+ * A content item's media REFERENCE (an id) becomes what a surface can paint: kind, type, alt
+ * text, and a URL when the bytes are somewhere a client can fetch them.
+ *
+ * The room is the only participant that can do this. A document maps ids to bytes through its
+ * own `media` table, and a phone holds no document - so sending the bare id, which is what the
+ * wire did until 2026-08-19, told every client there WAS a picture and gave it nothing to do
+ * about it. The lookup happens once here, per clue, on the pack the room was created with.
+ *
+ * An id the pack does not hold, or an asset whose bytes never left the authoring device
+ * (`pending-local`), still produces a descriptor - without a `url`. That is deliberate: the
+ * surface knows a picture was intended and shows its alt text, which is better than silence and
+ * much better than a broken frame. `bundled` is the same case by the time it reaches a room:
+ * the path was relative to a document nobody here has, and the client that DID have it was
+ * supposed to resolve it before hosting (@jeopardy/protocol, resolveBundledMedia).
+ */
+function resolveMedia(pack: ContentPack | null, ref: MediaRef): ResolvedMedia {
+  const asset = pack === null ? null : mediaAssetById(pack, ref.mediaId);
+  if (asset === null) {
+    // Nothing known but the id. `file` is the honest kind for "something was here": it is the
+    // one kind no surface tries to play, so it degrades to a label rather than an empty player.
+    return { mediaId: ref.mediaId, kind: "file", mime: "application/octet-stream" };
+  }
+  return {
+    mediaId: asset.id,
+    kind: asset.kind,
+    mime: asset.mime,
+    ...(asset.alt !== undefined && { alt: asset.alt }),
+    ...(asset.storage.state === "remote" && { url: asset.storage.url }),
+  };
+}
+
+/** The pack a room's game travels with, or null for a compact-spec room that shipped none. */
+export function packOf(spec: RoomGameSpec): ContentPack | null {
+  const definition = definitionOf(spec);
+  if (definition === null || definition.content.kind !== "embedded") return null;
+  return definition.content.pack;
 }

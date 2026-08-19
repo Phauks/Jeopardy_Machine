@@ -14,6 +14,7 @@
   //                  render AT ALL. Keyboard shortcuts keep working; the dock is for visibility,
   //                  not the only input.
   import { onDestroy } from "svelte";
+  import ClueMedia from "#lib/room/clue-media.svelte";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
   import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
@@ -545,10 +546,22 @@
                   {clueContent.categoryTitle} ·
                   {clue.isWagerClue ? (clue.wager === null ? "wagering..." : `$${clue.wager}`) : `$${clue.value}`}
                 </h2>
+                <!-- The host sees the same media the room does, small: they are judging against
+                     it, and "what is on the projector right now" must never be a question. No
+                     autoplay here - the display owns room audio, and a console playing the clip
+                     a second time out of a laptop speaker is the failure mode. -->
+                {#if clueContent.media !== null}
+                  <ClueMedia media={clueContent.media} />
+                {/if}
                 <p class="clue-prompt">{clueContent.prompt}</p>
                 <p class="host-answer">
                   Answer: <strong>{clueContent.response ?? "(hidden for this role)"}</strong>
                 </p>
+                <!-- An answer can carry its own media (the reveal photo, the recording). Host
+                     only, exactly like the answer text - it never reaches a display or a phone. -->
+                {#if clueContent.responseMedia !== null}
+                  <ClueMedia media={clueContent.responseMedia} />
+                {/if}
 
                 {#if phase === "wagering"}
                   <div class="wizard">
@@ -705,10 +718,16 @@
                 <!-- The C5 Final wizard: linear, cannot be done wrong. -->
                 <h2>Final: {view.content?.final?.categoryTitle ?? ""}</h2>
                 {#if view.content?.final}
+                  {#if view.content.final.media !== null}
+                    <ClueMedia media={view.content.final.media} />
+                  {/if}
                   <p class="clue-prompt">{view.content.final.prompt}</p>
                   <p class="host-answer">
                     Answer: <strong>{view.content.final.response ?? "(hidden for this role)"}</strong>
                   </p>
+                  {#if view.content.final.responseMedia !== null}
+                    <ClueMedia media={view.content.final.responseMedia} />
+                  {/if}
                 {/if}
                 {#if phase === "final-wagers"}
                   <p class="wizard-line">

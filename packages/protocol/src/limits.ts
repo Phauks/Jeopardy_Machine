@@ -17,6 +17,11 @@ export const limits = {
     // compressed audio. Enforced client-side in the editor AND server-side at upload.
     imageMaxBytes: 10 * mebibyte,
     audioMaxBytes: 20 * mebibyte,
+    // Video is the expensive kind and the cap says so: ~60 MB is a couple of minutes of
+    // compressed 720p, which is already longer than any clue should hold a room. Anything
+    // else ("file") is small by definition - it is handed over, not played.
+    videoMaxBytes: 60 * mebibyte,
+    fileMaxBytes: 10 * mebibyte,
     // Per-game total across all clue media, so one game cannot silently become a media dump.
     gameTotalMaxBytes: 200 * mebibyte,
   },
