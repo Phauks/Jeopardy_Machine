@@ -38,7 +38,7 @@ Progress 2026-08-13 - everything agent-verifiable is done; what remains is owner
 - [x] `apps/web`: SvelteKit 3 shell + Tailwind v4 + PWA manifest/service-worker skeleton + the `/dev/echo` proof page (since grown into `/dev/rooms`, the room instrument panel)
 - [x] Local dev loop proven end to end (`pnpm dev`; cross-script DO binding `[connected]` under multi-config `wrangler dev`) - docs/DEVELOPMENT.md
 - [x] CI gate (PR-only: fmt, lint, typecheck, test, build), deploy denies, CLAUDE.md, STATUS.md, per-package READMEs
-- [ ] Owner: first manual hello-world deploy of both Workers (docs/cloudflare-setup.md) - closes M0
+- [ ] Owner: first manual deploy of both Workers (docs/cloudflare-setup.md) - closes M0. Everything verifiable without credentials is verified: both dry-run deploys pass in the build gate, and `worker-config.gate.test.ts` holds the two configs to one system (same D1 id, same DO class, the cross-script binding pointed at the realtime Worker by name) - a mismatch there is invisible to a dry run and shows up only on the deployed site. The runbook gained a five-minute smoke walk (§3a) covering the paths a dry run cannot: registry health, a room end to end from a phone on another network, console recovery after a closed tab, a picture clue rendering from static assets, and a password room entered by URL alone
 
 ### M1 - Content model + board format + editor core
 

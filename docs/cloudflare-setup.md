@@ -114,6 +114,37 @@ pnpm -F web run deploy             # 2nd: ...before web's cross-script DO bindin
 
 Verify: the deploy output prints both `*.workers.dev` URLs; open the web URL, and the M0 scaffold's dev page should complete its WebSocket echo against the deployed DO. Deploys stay **manual and owner-run** (per the repo's deploy-deny convention in .claude/settings.json) until we deliberately add CI deploys with a scoped token.
 
+### 3a. Smoke test the deployed suite (5 minutes, do it before the event)
+
+The dry-run deploy and the test suite both pass without a network, so the first deploy is the
+first time some of this is real. Walk it once, in this order - each step is the cheapest check
+for a different failure:
+
+1. **`/api/version`** - reports the commit, the wire protocol version and the registry's own
+   health. `registry.status` must be `ok`. `no-table` means §2a has not been applied to this
+   environment; `no-binding` means the D1 binding did not reach the deployed Worker.
+2. **The front door** lists rooms (or says nobody is hosting - both are fine; an error line is
+   not). Make a room: pick **Sample game**, name it, host label, **Public**.
+3. **The console opens** with the room's code and QR. That proves the cross-script DO binding:
+   creation went through the web Worker and the socket reached the realtime Worker's DO.
+4. **Open the game screen** from the console, then scan the QR with a phone on a DIFFERENT
+   network (mobile data, not the venue Wi-Fi). The phone should reach the pre-game screen and
+   appear on the console's roster within a second or two.
+5. **Close the console tab and reopen `/room/<CODE>/host`.** The console must come back with the
+   room intact - that is the host-token recovery (M6), and the one failure you cannot recover
+   from mid-event if it does not work.
+6. **Make a second room with the club night's game** (Which game -> Board Game Club x
+   Environmental Law Society). Start it and open a picture clue: the image must render on the
+   game screen, not just its caption. That exercises the static-asset path - the event's
+   documents and its eight images ship in the web Worker's assets directory
+   (`static/games/board-game-club-x-els/`), and the media URLs are built from the origin the
+   host loaded, so a custom domain change is worth re-checking here.
+7. **Make a third room with a password** and open `/room/<CODE>` in a fresh private window - no
+   front door, no stashed password. It must ask for the password and let you in.
+
+Anything that fails here fails the same way at the event, and every one of them is a
+five-minute fix beforehand.
+
 ## 3b. Continuous deploys via Workers Builds (dashboard-managed - recommended steady state)
 
 Workers Builds connects the GitHub repo to Cloudflare so **every push to the production branch auto-builds and deploys** - no CLI in the loop after setup. Two Workers = connect the same repo twice, one project per Worker:
@@ -183,5 +214,6 @@ Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate
 - [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-16**: `0001_create_rooms.sql` was rewritten twice (listing axis renamed to public/private, then the spectator columns added) and drops the table it recreates - one re-apply covers both
 - [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
 - [ ] realtime deployed, then web; echo page verified
+- [ ] §3a smoke test walked end to end (version -> room -> phone -> console recovery -> picture clue -> password room)
 - [ ] (optional) scoped API token added to agent environment
 - [ ] (later) custom domain after the name lands
