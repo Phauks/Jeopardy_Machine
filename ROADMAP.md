@@ -237,7 +237,7 @@ Phase 2 auth: Cloudflare Access in front of editor/host, boards in D1 keyed by A
 **Later**
 
 - M4 -> M5 in order (M5 is date-driven by the event; pull it earlier if the event date demands)
-- M6 fairness + resilience: buzz compensation landed 2026-08-17, server and client; what remains in the milestone is host "resume crashed game" beyond the C6 snapshot recovery already proven
+- M6 fairness + resilience: buzz compensation landed 2026-08-17 (server and client), and host "resume a crashed game" landed 2026-08-19 - it turned out to be one storage call wide. The host token rode sessionStorage, so a host whose TAB died lost not their console but the ROOM: nobody could ever host it again, and the players stayed connected to a game with no driver. It now survives the tab in localStorage with an expiry stamped on it, scoped to one room code and swept on the next read after the room is gone
 - M7 -> M8 as appetite allows
 
 ## Open decisions (owner input needed)
