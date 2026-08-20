@@ -87,6 +87,24 @@ export function refusalCopy(reason: RefusalReason): RefusalCopy {
  * Its job is to disable a button with an explanation instead of letting a player fill in a
  * name, tap join, and be turned away by the same fact that was visible all along.
  */
+/**
+ * Is this connection standing outside a password door?
+ *
+ * Both password refusals KEEP the socket open (packages/protocol/src/room/server-messages.ts)
+ * precisely so a phone can prompt and retry on it. This is the predicate that turns that
+ * allowance into a screen: `needsPassword` means "ask", and `wasWrong` is the difference
+ * between the first ask and a retry, which have to read differently or a second wrong attempt
+ * looks like a screen that ignored you.
+ */
+export function passwordPrompt(
+  view: RoomView,
+): { needsPassword: true; wasWrong: boolean } | { needsPassword: false } {
+  const reason = view.refusal?.reason;
+  if (reason === "password-required") return { needsPassword: true, wasWrong: false };
+  if (reason === "bad-password") return { needsPassword: true, wasWrong: true };
+  return { needsPassword: false };
+}
+
 export function joinBlock(view: RoomView): RefusalCopy | null {
   if (view.role === "spectator") {
     return view.settings.spectatorsAllowed ? null : refusalCopy("spectators-not-allowed");

@@ -386,6 +386,15 @@ export class LocalSimRoomStore implements RoomStore {
     this.refusalState = { reason, at: Date.now() };
   }
 
+  /**
+   * Put this mock connection in a refused state on purpose - the sim panel's refusal probes and
+   * the surface tests both need to SEE the screens a real room's refusals produce, and a mock
+   * room never produces them on its own (it has no password, no cap it enforces, no door).
+   */
+  simRefuse(reason: RoomRefusalView["reason"]): void {
+    this.refuse(reason);
+  }
+
   join(request: JoinRequest): void {
     const settings = this.roomSettings;
     if (this.role === "spectator") {
@@ -799,6 +808,15 @@ export class LocalSimRoomStore implements RoomStore {
     if (patch.spectators !== undefined) {
       this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
     }
+  }
+
+  /**
+   * A mock room has no door to knock on: it is one tab, it holds no password, and it has never
+   * refused anybody for one. Accepting the password and doing nothing is the honest mock -
+   * clearing a refusal that cannot exist would be theatre.
+   */
+  submitRoomPassword(): void {
+    this.refusalState = null;
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

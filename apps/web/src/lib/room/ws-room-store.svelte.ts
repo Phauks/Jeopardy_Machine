@@ -181,6 +181,12 @@ export class WsRoomStore implements RoomStore {
   private socketOpen = false;
   /** The player's join intent, kept so a reconnect that lost its token can offer it again. */
   private pendingJoin: JoinRequest | null = null;
+  /**
+   * The room's password, as this connection currently believes it. Seeded from the front door's
+   * hand-off and replaceable at runtime (`submitRoomPassword`), because a phone that arrived by
+   * the URL alone starts with none and has to be able to type one.
+   */
+  private roomPassword: string | null;
   private sessionToken: string | null;
   private reconnectAttempt = 0;
   private reconnectHandle: ReturnType<typeof setTimeout> | null = null;
@@ -238,6 +244,7 @@ export class WsRoomStore implements RoomStore {
     // browser-walk found this store politely resuming with an empty string and being told the
     // frame was malformed, after which the phone's join never went out at all.
     this.sessionToken = options.sessionToken === "" ? null : (options.sessionToken ?? null);
+    this.roomPassword = options.password ?? null;
     if (options.autoConnect !== false) this.connect();
   }
 
@@ -371,7 +378,7 @@ export class WsRoomStore implements RoomStore {
   }
 
   private sendJoin(request: JoinRequest | null): void {
-    const password = this.options.password ?? null;
+    const password = this.roomPassword;
     const hostToken = this.options.hostToken ?? null;
     this.sendMessage({
       type: "join",
@@ -612,6 +619,20 @@ export class WsRoomStore implements RoomStore {
     this.pendingJoin = request;
     this.refusalState = null;
     this.sendJoin(request);
+  }
+
+  submitRoomPassword(password: string): void {
+    this.roomPassword = password;
+    // Clearing the refusal FIRST is what makes the retry visible: the screen goes from "that
+    // password did not work" back to waiting, so a second wrong try reads as a new answer
+    // rather than as a screen that never changed.
+    this.refusalState = null;
+    // The same socket, deliberately - both password refusals keep it open (server-messages.ts),
+    // so retrying costs no round trip and no new connection. `pendingJoin` is null for a phone
+    // that was stopped at the door before it ever named itself, and `sendJoin(null)` is the
+    // right message then: it asks whether this connection may be here at all, and the phone
+    // goes on to pick a character once the room says yes.
+    this.sendJoin(this.pendingJoin);
   }
 
   leave(): void {
