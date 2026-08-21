@@ -211,13 +211,20 @@
      sized like a board value - and DRAWN like a board cell, on the cell background rather than
      on the panel's. `--board-cell-bg` + `--board-value-color` is a pair the theme contract
      guarantees legible (docs/design/theming.md); the same gold on a raised chrome surface is
-     the pair that is only legible on the dark presets, which would have failed on paper. */
+     the pair that is only legible on the dark presets, which would have failed on paper.
+
+     NOT --font-values (owner, 2026-08-20). It was set in the board's value face, which on the
+     default preset is Six Caps - a condensed poster face where 0/O and 1/I are nearly the same
+     shape. That is fine for "$400", which nobody retypes, and wrong for five characters whose
+     entire job is to survive being copied across a room into a phone. --font-legible is
+     Atkinson Hyperlegible Next and is outside the theme contract on purpose (tokens.css), so
+     the code reads the same under every preset, including ones nobody has authored yet. */
   .room-code {
     margin: 0;
     padding: 0.1em 0.35em 0.16em;
     background: var(--board-cell-bg);
     border-radius: var(--board-radius);
-    font-family: var(--font-values);
+    font-family: var(--font-legible);
     font-size: 3.4em;
     line-height: 1;
     letter-spacing: 0.12em;

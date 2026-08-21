@@ -66,3 +66,26 @@
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
     U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* THE APP'S OWN FACE, and the one entry that is NOT a theme slot (owner, 2026-08-20: "use
+ * atkinsons hyperlegible next"). Atkinson Hyperlegible Next is the Braille Institute's
+ * legibility face: it is drawn to make characters that normally collapse into each other stay
+ * apart - 0/O, 1/l/I, 5/S, 8/B, rn/m - which is the exact failure mode of a room code read off
+ * a projector by somebody typing it into a phone. It is bound to --font-legible (tokens.css),
+ * never to a fontSlot, because a theme must not be able to restyle the string a person is
+ * transcribing.
+ *
+ * ONE FILE, both weights: this is a variable build covering 400-700, which is why the weight
+ * range is declared rather than a single number and why there is no second @font-face here.
+ * Google serves the identical URL for the 400 and 700 declarations, which is the tell. At 34 KB
+ * it is the largest file in this directory and still cheap next to what it is for. */
+@font-face {
+  font-family: "Atkinson Hyperlegible Next";
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url("/fonts/atkinson-hyperlegible-next-latin-variable.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

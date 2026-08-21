@@ -586,8 +586,10 @@
     margin: 0;
   }
 
+  /* The projector's copy of the code, and the one people are actually reading from across a
+     room: the legibility face, never the theme's value face (tokens.css --font-legible). */
   .room-code {
-    font-family: var(--font-values);
+    font-family: var(--font-legible);
     font-size: calc(clamp(2rem, 8vh, 5rem) * var(--type-scale));
     letter-spacing: 0.14em;
     color: var(--board-value-color);

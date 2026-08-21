@@ -1077,9 +1077,11 @@
     margin: 0;
   }
 
+  /* Read aloud by the host to whoever is holding a phone, so it takes the legibility face the
+     display and the join panel take (tokens.css --font-legible). */
   .room-code {
     color: var(--board-value-color);
-    font-family: var(--font-values);
+    font-family: var(--font-legible);
     letter-spacing: 0.12em;
     margin-left: 0.4rem;
   }

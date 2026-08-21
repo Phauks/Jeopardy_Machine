@@ -12,4 +12,12 @@ Files are the **latin-subset woff2** builds served by the Google Fonts css2 API 
 | `six-caps-latin-400.woff2`      | Six Caps      | 400    | Vernon Adams                        | OFL 1.1 | <https://fonts.google.com/specimen/Six+Caps>      |
 | `alfa-slab-one-latin-400.woff2` | Alfa Slab One | 400    | JM Sole                             | OFL 1.1 | <https://fonts.google.com/specimen/Alfa+Slab+One> |
 
+**The app's own face, which is not a theme slot** (added 2026-08-20):
+
+| File                                              | Family                     | Weight             | Designer / Foundry                       | License | Source                                                         |
+| ------------------------------------------------- | -------------------------- | ------------------ | ---------------------------------------- | ------- | -------------------------------------------------------------- |
+| `atkinson-hyperlegible-next-latin-variable.woff2` | Atkinson Hyperlegible Next | 400-700 (variable) | Applied Design Works / Braille Institute | OFL 1.1 | <https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next> |
+
+This one is bound to `--font-legible` rather than to a `fontSlot`, and no theme can override it: it renders the strings a person has to TRANSCRIBE - the room code on the front door, the console's join panel and the display, plus the field they type it into. It is a **variable** build covering 400-700 in one file (Google serves the identical URL for its 400 and 700 declarations), which is why `fonts.css` declares a weight range and there is no second file. At 34 KB it is the largest file here.
+
 Growth path: the theme document's `fontFace` enum (docs/proposals/m1-protocol.md section 5) grows toward ~10-12 faces; each addition lands here (file + license row) and in `fonts.css` in the same commit as the enum bump.

@@ -25,6 +25,8 @@
  * --font-values            <- body.fontSlots.values     map in theme-to-css.ts;
  * --font-clue              <- body.fontSlots.clue       faces in fonts.css)
  * --font-chrome            <- body.fontSlots.chrome
+ * --font-legible           <- NOTHING. The app's legibility face, outside the theme contract
+ *                             on purpose (see the token's own note below).
  * data-effects attribute   <- body.effectsLevel        (flat | dimensional - drives the
  *                                                       --effect-* tokens below, NOT per-preset
  *                                                       CSS forks)
@@ -62,6 +64,17 @@
   --font-values: "Six Caps", "Arial Narrow", "Helvetica Neue", sans-serif;
   --font-clue: "Bitter", Georgia, serif;
   --font-chrome: "Oswald", "Arial Narrow", "Helvetica Neue", sans-serif;
+
+  /* --- NOT a font slot, and deliberately not overridable by a theme (owner, 2026-08-20).
+   * Atkinson Hyperlegible Next for anything a person has to TRANSCRIBE or type rather than
+   * read: the room code on the front door, on the console's join panel and on the display, and
+   * the field they type it into. A theme may restyle the board's whole voice; it may not
+   * restyle the five characters somebody is copying off a projector across a room, because
+   * that string's only job is to survive the copy (src/lib/theme/fonts.css says why this face
+   * in particular). Everything else on a themed surface still takes --font-chrome. */
+  --font-legible:
+    "Atkinson Hyperlegible Next", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
 
   /* --- Derived chrome surfaces (see SYNC BLOCK: computed from document fields per preset;
    * these defaults match retro-tv). --surface-page is always a plain color (the background
