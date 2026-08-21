@@ -58,6 +58,7 @@ import { defaultLiveRules } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
+import { detectDeviceKind } from "#lib/room/device-kind.ts";
 import { browserRoomSocket } from "#lib/room/room-socket.ts";
 import {
   emptyFold,
@@ -93,6 +94,7 @@ import type {
   RoomConnectionState,
   RoomContentView,
   RoomPlayerView,
+  RoomSpectatorView,
   RoomRefusalView,
   RoomRoleView,
   RoomTeamView,
@@ -150,6 +152,9 @@ function toPlayerView(entry: RosterPayload["players"][number]): RoomPlayerView {
     teamId: entry.teamId,
     connected: entry.connected,
     joinedAt: entry.joinedAt,
+    // Absent stays null rather than becoming a default: "did not say" is a real answer and
+    // the roster renders it as nothing (room-view.ts).
+    deviceKind: entry.deviceKind ?? null,
   };
 }
 
@@ -198,6 +203,8 @@ export class WsRoomStore implements RoomStore {
    * printed that as "0 watching" would be inventing a number (room-view.ts).
    */
   private spectatorCountState = $state<number | null>(null);
+  /** The audience by name, for the host console. Null until a roster carrying one lands. */
+  private spectatorsState = $state.raw<RoomSpectatorView[] | null>(null);
   private roomPhase = $state<"lobby" | "active" | "ended">("lobby");
   private playerModeState = $state<PlayerMode>("individuals");
   private myPlayerIdState = $state<string | null>(null);
@@ -255,6 +262,7 @@ export class WsRoomStore implements RoomStore {
         players: this.rosterPlayers,
         teams: this.rosterTeams,
         spectatorCount: this.spectatorCountState,
+        spectators: this.spectatorsState,
       },
       playerMode: this.playerModeState,
       // Null until the wire carries a census: the DO counts connections, and a store that
@@ -335,7 +343,14 @@ export class WsRoomStore implements RoomStore {
     // The room says nothing first: our opening move is resume (this tab already had a seat),
     // or join. A player with neither waits on the pre-game screen until they press Join.
     if (this.sessionToken !== null) {
-      this.sendMessage({ type: "resume", sessionToken: this.sessionToken });
+      // The device is reported again on a resume, not remembered: somebody whose phone died
+      // and who is now on a laptop resumes the same seat, and the roster's answer has to
+      // follow them (device-kind.ts).
+      this.sendMessage({
+        type: "resume",
+        sessionToken: this.sessionToken,
+        ...(detectDeviceKind() !== undefined && { deviceKind: detectDeviceKind() }),
+      });
       return;
     }
     if (this.role === "player") {
@@ -377,6 +392,7 @@ export class WsRoomStore implements RoomStore {
 
   private sendJoin(request: JoinRequest | null): void {
     const hostToken = this.options.hostToken ?? null;
+    const deviceKind = detectDeviceKind();
     this.sendMessage({
       type: "join",
       role: this.role,
@@ -389,6 +405,10 @@ export class WsRoomStore implements RoomStore {
       ...(request?.skinToneId != null && { skinToneId: request.skinToneId }),
       ...(request?.team !== undefined && { team: request.team }),
       ...(hostToken !== null && hostToken !== "" && { hostToken }),
+      // What this client is running on, so the host's roster can say phone or computer
+      // (#lib/room/device-kind.ts explains why the CLIENT answers this). Omitted when nothing
+      // can be known - "did not say" is a real answer and the roster renders it as nothing.
+      ...(deviceKind !== undefined && { deviceKind }),
     });
   }
 
@@ -591,6 +611,15 @@ export class WsRoomStore implements RoomStore {
     // cannot count an audience is distinguishable from a room nobody is watching (roster.ts).
     // The DO always counts, so in practice this is null only before the first roster lands.
     this.spectatorCountState = roster.spectatorCount ?? null;
+    // Same rule for the named audience: absent means this producer does not report one, which
+    // is not the same as reporting that nobody is watching.
+    this.spectatorsState =
+      roster.spectators?.map((entry) => ({
+        spectatorId: entry.spectatorId,
+        name: entry.name,
+        deviceKind: entry.deviceKind ?? null,
+        joinedAt: entry.joinedAt,
+      })) ?? null;
     this.rosterPlayers = roster.players.map(toPlayerView);
     this.rosterTeams = roster.teams.map((team) => ({
       teamId: team.teamId,

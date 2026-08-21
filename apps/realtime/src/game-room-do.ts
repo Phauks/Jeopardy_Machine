@@ -82,8 +82,8 @@ import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 import type { ActionTiming, RoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
-import type { RoomRole } from "@jeopardy/protocol/room/identity";
-import type { RosterPayload, TeamDoc } from "@jeopardy/protocol/room/roster";
+import type { DeviceKind, RoomRole } from "@jeopardy/protocol/room/identity";
+import type { RosterPayload, SpectatorEntry, TeamDoc } from "@jeopardy/protocol/room/roster";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { ArmWindow } from "./room/arm-window.ts";
 import type { RegistryListing, RegistrySnapshot } from "./room/registry-writer.ts";
@@ -97,7 +97,25 @@ import type {
 } from "./room/storage.ts";
 
 // What a connection remembers about itself across hibernation (WebSocket attachment).
-type Attachment = { role: RoomRole; playerId: string | null };
+/**
+ * What the DO remembers about a live socket, beyond the room state it is attached to.
+ *
+ * `deviceKind` and `spectatorName` are CONNECTION facts rather than room state, and they are
+ * here rather than in storage on purpose: both describe the socket, both die with it, and
+ * neither survives a reconnect any more than the socket does. A spectator holds no seat, so
+ * there is nowhere in the persisted roster for their name to live - and a phone that comes
+ * back reports its own device again on the next join.
+ */
+type Attachment = {
+  role: RoomRole;
+  playerId: string | null;
+  /** Phone or computer, as this client reported it on join (@jeopardy/protocol identity.ts). */
+  deviceKind?: DeviceKind;
+  /** A watcher's chosen name; null when they gave none (owner, 2026-08-20). */
+  spectatorName?: string | null;
+  /** Unix ms this socket joined - the audience list is ordered by arrival like the roster. */
+  joinedAt?: number;
+};
 
 // Floor between throttled registry writes. A lobby refreshes every
 // limits.lobby.listingRefreshMs, so reporting faster than this could never be seen anyway -
@@ -278,15 +296,66 @@ export class GameRoomDO extends Server {
 
   private wireRoster(): RosterPayload {
     const room = this.room;
-    if (room === null || room === undefined) return { players: [], teams: [], spectatorCount: 0 };
+    if (room === null || room === undefined) {
+      return { players: [], teams: [], spectatorCount: 0, spectators: [] };
+    }
+    // Devices are attached to the SOCKET, not the seat (see Attachment): a seat outlives a
+    // dropped phone, but "what device is this" is only true while a device is connected. A
+    // player who is away therefore reports no device, which is honest - nobody knows what they
+    // will come back on. Collected in ONE pass over the connections rather than per player,
+    // because the two loops are each the size of the room and nesting them makes a 100-phone
+    // roster broadcast quadratic.
+    const devices = this.deviceKindsBySeat();
     const players = Object.values(room.roster)
       .toSorted((a, b) => a.joinedAt - b.joinedAt)
-      .map(toWireRosterEntry);
-    // The audience travels as a COUNT, from live connections - spectators hold no roster seat
-    // and no identity, so this is the only fact about them that exists. Always sent by this
-    // server (the field is optional on the wire so "not reported" stays expressible for a
-    // producer that cannot count, never so that a real room can go quiet about its audience).
-    return { players, teams: Object.values(room.teams), spectatorCount: this.spectatorCount() };
+      .map((entry) => {
+        const wire = toWireRosterEntry(entry);
+        const deviceKind = devices.get(entry.playerId);
+        if (deviceKind !== undefined) wire.deviceKind = deviceKind;
+        return wire;
+      });
+    // The audience travels as a COUNT counted from live connections - and, since 2026-08-20,
+    // also BY NAME for the ones who gave one (owner: "spectators still should have a name").
+    // The count stays the authority on how many, because it includes the watchers who did
+    // not name themselves. Always sent by this server: the fields are optional on the wire so
+    // "not reported" stays expressible for a producer that cannot count, never so a real room
+    // can go quiet about its audience.
+    return {
+      players,
+      teams: Object.values(room.teams),
+      spectatorCount: this.spectatorCount(),
+      spectators: this.wireSpectators(),
+    };
+  }
+
+  /** Seat -> the device its live socket reported. Seats with nothing connected are absent. */
+  private deviceKindsBySeat(): Map<string, DeviceKind> {
+    const devices = new Map<string, DeviceKind>();
+    for (const connection of this.getConnections<Attachment>()) {
+      const attachment = connection.state;
+      if (attachment?.playerId == null || attachment.deviceKind === undefined) continue;
+      devices.set(attachment.playerId, attachment.deviceKind);
+    }
+    return devices;
+  }
+
+  /** The audience as people rather than as a number, in arrival order like the roster. */
+  private wireSpectators(): SpectatorEntry[] {
+    const watching: SpectatorEntry[] = [];
+    for (const connection of this.getConnections<Attachment>()) {
+      const attachment = connection.state;
+      if (attachment?.role !== "spectator") continue;
+      watching.push({
+        // The connection id IS the identity here: a spectator holds no seat and mints no
+        // session token, so there is no other stable handle - and none is needed, because
+        // nothing addresses a spectator individually.
+        spectatorId: connection.id,
+        name: attachment.spectatorName ?? null,
+        ...(attachment.deviceKind !== undefined && { deviceKind: attachment.deviceKind }),
+        joinedAt: attachment.joinedAt ?? 0,
+      });
+    }
+    return watching.toSorted((left, right) => left.joinedAt - right.joinedAt);
   }
 
   private broadcastRoster(): void {
@@ -968,6 +1037,16 @@ export class GameRoomDO extends Server {
     // tab empties a room exactly as thoroughly as the last phone leaving.
     await this.noteDeparture(connection.id);
     const attachment = connection.state;
+    // A WATCHER LEAVING changes the roster too, and until 2026-08-20 nothing said so: the
+    // audience was a count derived at broadcast time, and a spectator holds no seat, so this
+    // method returned here and no broadcast ever went out. The count on the host's console
+    // therefore only corrected itself the next time a PLAYER did something. Now that the
+    // audience has names in it (@jeopardy/protocol room/roster.ts) a stale list is a list of
+    // people who have gone home, which is worse than a stale number.
+    if (attachment?.role === "spectator") {
+      this.broadcastRoster();
+      return;
+    }
     if (attachment === null || attachment.playerId === null) return;
     const entry = room.roster[attachment.playerId];
     if (entry === undefined) return;
@@ -1069,7 +1148,16 @@ export class GameRoomDO extends Server {
           return;
         }
       }
-      connection.setState({ role: message.role, playerId: null });
+      connection.setState({
+        role: message.role,
+        playerId: null,
+        ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+        // A watcher's name, when they gave one. Only spectators carry it: a display is the
+        // host's own projector rather than a member of the audience, and naming it would put
+        // a piece of furniture in the list of people.
+        ...(message.role === "spectator" && { spectatorName: message.nickname ?? null }),
+        joinedAt: Date.now(),
+      });
       this.send(connection, {
         type: "welcome",
         roomCode: room.meta.code,
@@ -1080,6 +1168,9 @@ export class GameRoomDO extends Server {
       this.sendSnapshot(connection, { role: message.role, playerId: null });
       this.sendRoomSettings(connection);
       this.sendGameRules(connection);
+      // A watcher arriving changes what the host's roster shows, which a snapshot to this one
+      // connection does not tell anybody else.
+      if (message.role === "spectator") this.broadcastRoster();
       return;
     }
 
@@ -1205,7 +1296,12 @@ export class GameRoomDO extends Server {
       room.roster[playerId] = entry;
       if (createdTeam !== null) room.teams[createdTeam.teamId] = createdTeam;
       await this.persist("state", "meta", "roster", "teams");
-      connection.setState({ role: "player", playerId });
+      connection.setState({
+        role: "player",
+        playerId,
+        ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+        joinedAt: Date.now(),
+      });
       this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
       this.broadcastEngineEvents(result.events);
       this.broadcastRoster();
@@ -1216,7 +1312,12 @@ export class GameRoomDO extends Server {
     room.roster[playerId] = entry;
     if (createdTeam !== null) room.teams[createdTeam.teamId] = createdTeam;
     await this.persist("meta", "roster", "teams");
-    connection.setState({ role: "player", playerId });
+    connection.setState({
+      role: "player",
+      playerId,
+      ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+      joinedAt: Date.now(),
+    });
     this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
     this.broadcastRoster();
     // The lobby's "7/100" is the one number a browser judges a room by, so a roster change
@@ -1276,7 +1377,15 @@ export class GameRoomDO extends Server {
       }
     }
     await this.persist("roster", "schedule");
-    connection.setState({ role: "player", playerId: entry.playerId });
+    connection.setState({
+      role: "player",
+      playerId: entry.playerId,
+      // A resume is a NEW socket, possibly on a new device: somebody whose phone died and who
+      // is now on a laptop resumes the same seat. Taking the device from this message rather
+      // than remembering the old one is what keeps the roster's answer true.
+      ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+      joinedAt: Date.now(),
+    });
     this.welcomePlayer(connection, room.meta.code, entry.playerId, entry.sessionToken);
     this.broadcastRoster();
   }

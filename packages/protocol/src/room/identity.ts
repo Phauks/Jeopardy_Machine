@@ -14,6 +14,24 @@ import { z } from "zod";
 import { limits } from "../limits.ts";
 
 export const roomRoleSchema = z.enum(["host", "display", "player", "spectator"]);
+
+/**
+ * What a connection is running on, coarsely - the only question a host actually asks about a
+ * device (owner, 2026-08-20: "show in roster whether users are on mobile or computers").
+ *
+ * TWO VALUES, deliberately, and neither of them is a model or an operating system. A host
+ * scanning a roster before starting wants to know who is holding a buzzer they can hit with a
+ * thumb and who is at a keyboard - because that is what predicts a slow buzz, a shared
+ * screen, or a person who wandered off with the tab open. Anything finer would be a
+ * fingerprint: this room needs no accounts, and a roster that recorded browsers and platforms
+ * would be collecting data the product has no use for.
+ *
+ * Reported by the CLIENT, from the browser's own coarse-pointer query rather than from a
+ * user-agent string (client-messages.ts `deviceKind` explains why). Absent means "did not
+ * say" and is rendered as nothing, never guessed at.
+ */
+export const deviceKindSchema = z.enum(["phone", "computer"]);
+export type DeviceKind = z.infer<typeof deviceKindSchema>;
 export type RoomRole = z.infer<typeof roomRoleSchema>;
 
 // Same shape as the engine's participantIdSchema (packages/engine/src/actions.ts) - the

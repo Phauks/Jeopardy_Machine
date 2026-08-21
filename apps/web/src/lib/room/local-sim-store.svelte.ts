@@ -14,6 +14,7 @@ import { transition } from "@jeopardy/engine/transition";
 import { defaultLiveRules, liveRulesOfSettings } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { limits } from "@jeopardy/protocol/limits";
+import { detectDeviceKind } from "#lib/room/device-kind.ts";
 import { foldEvent, prunePendingTimers } from "#lib/room/room-fold.ts";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
@@ -36,6 +37,7 @@ import type {
   RoomConnectionState,
   PendingTimerView,
   RoomPlayerView,
+  RoomSpectatorView,
   RoomRefusalView,
   RoomRoleView,
   RoomTeamView,
@@ -141,6 +143,24 @@ export class LocalSimRoomStore implements RoomStore {
   // counts the sockets this simulated room actually has, and the roster reports only what the
   // room has been told to claim.
   private simSpectators = $state<number | null>(null);
+  /**
+   * The mock audience BY NAME (owner, 2026-08-20). Derived from the count rather than stored
+   * separately, so the sim can never show four names beside "3 watching": a real room's list
+   * is shorter than its count when somebody watches anonymously, and the mock reproduces that
+   * by naming all but the last one.
+   */
+  private simSpectatorList = $derived.by<RoomSpectatorView[] | null>(() => {
+    const watching = this.simSpectators;
+    if (watching === null) return null;
+    return Array.from({ length: watching }, (_unused, index) => ({
+      spectatorId: `sim-spectator-${String(index + 1)}`,
+      // The last watcher is anonymous, so every surface that renders this list has to handle
+      // the null case rather than only meeting it in production.
+      name: index === watching - 1 ? null : `Watcher ${String(index + 1)}`,
+      deviceKind: index % 2 === 0 ? ("phone" as const) : ("computer" as const),
+      joinedAt: 1_760_000_000_000 + index,
+    }));
+  });
   // A mock room has no socket, so "connected" is a claim rather than an observation - and it
   // is the right claim until something closes the room. `closeRoom` moves it, so the console's
   // close control demonstrates the state a real close leaves behind instead of being a dead
@@ -189,6 +209,11 @@ export class LocalSimRoomStore implements RoomStore {
         // panel's "audience" control is the one thing that can tell it, and then the roster and
         // the census below report the SAME number rather than disagreeing on one screen.
         spectatorCount: this.simSpectators,
+        // The mock names its watchers too, so the console's audience list is exercised by the
+        // sim rather than only by a real room (simSetSpectators below is how a review drives
+        // it). Null when nothing has plugged an audience in - the same absent-is-not-zero rule
+        // the count follows.
+        spectators: this.simSpectatorList,
       },
       playerMode: this.setup.settings.teams.playerMode,
       myPlayerId: this.myPlayerId,
@@ -462,6 +487,9 @@ export class LocalSimRoomStore implements RoomStore {
         teamId,
         connected: true,
         joinedAt: Date.now(),
+        // The sim is one tab, and this is the seat it belongs to, so it reports whatever this
+        // browser actually is - the same answer a real client sends on join.
+        deviceKind: detectDeviceKind() ?? null,
       },
     ];
     this.myPlayerId = playerId;

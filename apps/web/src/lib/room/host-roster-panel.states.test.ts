@@ -45,8 +45,13 @@ describe("the roster panel through the room's states", () => {
     const first = store.view.roster.players[0];
     expect(first).toBeDefined();
     expect(body).toContain(first?.nickname ?? "");
-    // Connection state is a word, never a colour alone.
-    expect(body).toContain(">here<");
+    // Connection state is a SYMBOL since 2026-08-20 (owner: "instead of 'here', show an active
+    // connection symbol") - but never a colour ALONE, which is the rule that outlived the
+    // word. The dot carries it visually; the title and the screen-reader text carry the
+    // sentence, and both of those are what this asserts.
+    expect(body).toContain('title="Connected"');
+    expect(body).toContain(">connected<");
+    expect(body).not.toContain(">here<");
     expect(body).toContain(`data-player-id="${first?.playerId ?? ""}"`);
     // Their team's name rides the row (this fixture room plays in teams), and so does the
     // personal buzz sound the C3 sound check walks through.

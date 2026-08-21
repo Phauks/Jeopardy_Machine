@@ -150,12 +150,27 @@
     >
       Join as player
     </button>
+    <!-- Two spectator buttons since 2026-08-20, because there are now two KINDS of watcher and
+         a harness that could only produce one would leave the other untested: a spectator may
+         give a name (owner: "spectators still should have a name") and may equally choose not
+         to, and the console's audience list has to render both. -->
     <button
       class="border px-3 py-1 text-sm"
       disabled={!open}
-      onclick={() => onSend({ type: "join", role: "spectator" }, "join spectator")}
+      onclick={() =>
+        onSend(
+          { type: "join", role: "spectator", nickname: "Harness Watcher" },
+          "join spectator (named)",
+        )}
     >
-      Join as spectator
+      Watch, named
+    </button>
+    <button
+      class="border px-3 py-1 text-sm"
+      disabled={!open}
+      onclick={() => onSend({ type: "join", role: "spectator" }, "join spectator (anonymous)")}
+    >
+      Watch, anonymous
     </button>
     <button
       class="border px-3 py-1 text-sm"

@@ -18,6 +18,7 @@
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
   import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
+  import AppBar from "#lib/chrome/app-bar.svelte";
   import DockSection from "#lib/room/dock-section.svelte";
   import JoinPanel from "#lib/room/join-panel.svelte";
   import RulesPanel from "#lib/host-settings/rules-panel.svelte";
@@ -397,8 +398,27 @@
   </div>
 {:else}
   <div class="console-layout" style={surfaceScale} class:compact={device.rosterDensity === "compact"}>
+    <!-- THE SAME BAR THE FRONT DOOR AND THE JOIN SCREEN WEAR (owner, 2026-08-20: "the header
+         bar should be similar to use in the other pages"). The console had a header of its
+         own shape with its own title, so a host moving between the front door, a phone's join
+         screen and this one met three different kinds of top-of-page - and the console was
+         the only surface with no way home at all.
+
+         Everything this console needs beside the wordmark rides the bar's `trailing` snippet,
+         which is how the shell stays free of any one surface's furniture
+         (#lib/chrome/app-bar.svelte).
+
+         The DISPLAY deliberately does NOT get this bar. It is projector output rather than a
+         page anybody navigates: nobody is going to click "home" on a wall, the room is not
+         reading a wordmark, and every pixel it took would come out of the board. -->
+    <AppBar>
+      {#snippet trailing()}
+        <p class="console-line">
+          Host console <strong class="room-code">{view.roomCode}</strong>
+        </p>
+      {/snippet}
+    </AppBar>
     <header class="console-header">
-      <h1>Host console <span class="room-code">{view.roomCode}</span></h1>
       <div class="header-controls">
         {#if store.mode === "local-sim"}
           <!-- SAY WHAT THIS IS. A local simulation renders through the same route as a real
@@ -633,19 +653,15 @@
 
       <div class="console-main">
         {#if view.phase === "lobby"}
-          <!-- The lobby is two questions, each answered by the thing that can act on it: how does
-               the room see this game (here), and who is in it (the roster rail, open by default in
-               the lobby). The old "Pre-flight" panel restated the roster's own counts as a second
-               list and printed the display URL as a hint - deleted 2026-08-19 (owner: "they should
-               be combined or not exist separately"). -->
-          <div class="lobby-grid">
-            <GameScreenPanel
-              {view}
-              gameScreen={gameScreenWindow}
-              preferences={devicePreferences}
-              {themeId}
-            />
-          </div>
+          <!-- The lobby's own column is deliberately EMPTY of panels since 2026-08-20. Both
+               questions it used to answer - how the room sees this game, and who is in it - are
+               dock sections now, open by default in the lobby, and a second copy of the
+               game-screen panel here would be two controls for one window.
+
+               Which also closed the owner's report that you could "not open the second screen
+               when you haven't started the game with it": the panel used to render ONLY in this
+               branch, so once a game was running the header kept a readout and there was no way
+               left to open a display. The dock carries it in every phase. -->
         {:else}
           <div class="console-grid">
             <section class="panel minimap-panel">
@@ -1083,7 +1099,10 @@
     flex-direction: column;
     gap: 0.8rem;
     min-height: 100dvh;
-    padding: 0.8rem 1rem 2rem;
+    /* No inline padding at the top level: the bar is the page's own top edge and has to reach
+       both sides of the window, exactly as it does on the front door and the join screen. The
+       inset moves onto the children below. */
+    padding: 0 0 2rem;
     font-size: calc(1rem * var(--type-scale, 1));
     background: var(--surface-page);
     color: var(--surface-text);
@@ -1121,15 +1140,6 @@
     /* ONE box, and this is it. Everything inside is a band separated by a hairline, never a
        card inside a card inside a card (owner: "settings are boxes in boxes... looks AI
        made"). The panels drop their own chrome through their `embedded` prop. */
-  }
-
-  /* The lobby's two questions, side by side on a laptop and stacked on a narrow window: how the
-     room sees this game, and who is in it. */
-  .lobby-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
-    gap: 0.8rem;
-    align-items: start;
   }
 
   /* Start lives in the console's own chrome with its state beside it. The note slot is reserved
@@ -1275,20 +1285,32 @@
     border: 1px solid var(--control-accent);
   }
 
+  /* What is left of the console's own header once the bar above it carries the identity: the
+     actions, and nothing else. */
+  .console-header,
+  .console-body,
+  .start-row,
+  .ending-row {
+    margin-inline: 1rem;
+  }
+
   .console-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: flex-end;
     align-items: center;
     flex-wrap: wrap;
     gap: 0.6rem;
   }
 
-  .console-header h1 {
+  /* The console's identity, in the shared bar rather than in a header of its own shape.
+     Pushed to the far end beside the wordmark, exactly as the join screen's room line is. */
+  .console-line {
+    margin-left: auto;
     font-family: var(--font-chrome);
     text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 1.2em;
-    margin: 0;
+    letter-spacing: 0.08em;
+    font-size: 0.8rem;
+    color: var(--surface-text-muted);
   }
 
   /* Read aloud by the host to whoever is holding a phone, so it takes the legibility face the

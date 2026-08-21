@@ -61,6 +61,20 @@
   // Join order, which is the order the room happened in - and the order the teams' succession
   // rule uses, so a host reading this list can see who inherits a team next.
   const players = $derived(roster.players.toSorted((left, right) => left.joinedAt - right.joinedAt));
+  // The audience by name, arrival order, NAMED ONES FIRST: a list whose top half is "someone
+  // watching" repeated four times tells a host nothing, and the names are the reason the list
+  // exists at all (owner, 2026-08-20).
+  const spectators = $derived(
+    roster.spectators === null
+      ? null
+      : roster.spectators.toSorted((left, right) => {
+          if ((left.name === null) !== (right.name === null)) return left.name === null ? 1 : -1;
+          return left.joinedAt - right.joinedAt;
+        }),
+  );
+  const anonymousWatchers = $derived(
+    (spectators ?? []).filter((watcher) => watcher.name === null).length,
+  );
   const connectedCount = $derived(players.filter((player) => player.connected).length);
   const scoreByEntity = $derived(
     new Map(standingsFor(view).map((row) => [row.entityId, row.score])),
@@ -151,10 +165,44 @@
       {/if}
     </dd>
   </dl>
-  <p class="note">
-    Spectators watch anonymously - they take no seat and give no name, so there is no list of
-    them to show.
-  </p>
+  <!-- THE AUDIENCE, BY NAME (owner, 2026-08-20: "spectators still should have a name").
+       Watching used to be strictly anonymous, and the reasoning behind that was about the
+       LOBBY, where a browsable list must never become a directory of people. Inside a room the
+       calculus is different: these are colleagues who chose to watch, the host is the only one
+       who sees this, and "12 watching" cannot answer the question a host actually has, which is
+       whether the person they are waiting for has arrived.
+
+       The COUNT stays the authority on how many, because a name is optional and somebody
+       watching anonymously is still watching. That is why the list can be shorter than the
+       number above it and both are right. -->
+  {#if spectators !== null && spectators.length > 0}
+    <ul class="watchers">
+      {#each spectators as watcher (watcher.spectatorId)}
+        <li>
+          <span class="row-name" class:muted={watcher.name === null}>
+            {watcher.name ?? "someone watching"}
+          </span>
+          {#if watcher.deviceKind !== null}
+            <span class="badge device">
+              {watcher.deviceKind === "phone" ? "phone" : "computer"}
+            </span>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+    {#if anonymousWatchers > 0}
+      <p class="note">
+        {anonymousWatchers === 1
+          ? "One of them is watching without a name."
+          : `${String(anonymousWatchers)} of them are watching without a name.`}
+      </p>
+    {/if}
+  {:else if roster.spectatorCount !== null && roster.spectatorCount > 0}
+    <p class="note">
+      Nobody watching has given a name, so there is nothing to list - the count above is all
+      this room knows about them.
+    </p>
+  {/if}
 
   <section class="group">
     <h3>Players</h3>
@@ -204,9 +252,30 @@
           {#if score !== null}
             <span class="score">{score}</span>
           {/if}
-          <span class="state" class:connected={player.connected}>
-            {player.connected ? "here" : "away"}
+          <!-- A SYMBOL, not the word "here" (owner, 2026-08-20: "instead of 'here', show an
+               active connection symbol"). "here" read as a label for the row rather than as a
+               state, and it took the width of a word to say one bit. The dot is the state; the
+               title and the screen-reader text carry the sentence, because a colour alone is
+               never the whole answer for the person reading it. -->
+          <span
+            class="state"
+            class:connected={player.connected}
+            title={player.connected ? "Connected" : "Not connected right now"}
+          >
+            <span class="dot" aria-hidden="true"></span>
+            <span class="visually-hidden">{player.connected ? "connected" : "away"}</span>
           </span>
+          <!-- Phone or computer, and NOTHING when the client did not say - a guessed device
+               beside a real name would be worse than a blank (#lib/room/device-kind.ts). A
+               disconnected seat reports none, because nobody knows what they will return on. -->
+          {#if player.deviceKind !== null}
+            <span
+              class="badge device"
+              title={player.deviceKind === "phone" ? "On a phone" : "On a computer"}
+            >
+              {player.deviceKind === "phone" ? "phone" : "computer"}
+            </span>
+          {/if}
           <!-- Their own buzz sound, which is what the room hears in individuals mode and what
                the C3 sound check walks through; in teams mode the TEAM's sound is the room's and
                this one plays on their phone alone (user-flows "Teams & leadership"). -->
@@ -580,14 +649,69 @@
   }
 
   /* Connection state is a WORD, never a colored dot alone (color is never the only carrier). */
+  /* A DOT, not the word "here" (owner, 2026-08-20). One bit of state does not need the width
+     of a word, and "here" sat in the row reading like a label for it. The colour is the
+     state; the title attribute and the visually-hidden text carry the sentence, because a
+     colour on its own is never the whole answer for the person reading it. */
   .state {
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--control-danger);
+    display: inline-flex;
+    align-items: center;
+    flex: none;
   }
 
-  .state.connected {
+  .dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 50%;
+    /* Hollow when away, filled when here: the shape carries the state as well as the colour,
+       so it survives being read by somebody who cannot tell the two colours apart. */
+    border: 1px solid var(--control-danger);
+    background: transparent;
+  }
+
+  .state.connected .dot {
+    border-color: var(--control-accent);
+    background: var(--control-accent);
+  }
+
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* Phone or computer, quieter than a team badge: it is context, never something a host acts
+     on directly. */
+  .badge.device {
+    font-size: 0.62rem;
+    letter-spacing: 0.05em;
+    color: var(--control-text-muted);
+  }
+
+  /* The named audience. A plain list rather than the player rows: a watcher has no seat, no
+     score and no menu, and giving them a row that looks like a player's would invite a host to
+     reach for controls that are not there. */
+  .watchers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .watchers li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  .watchers .muted {
+    font-style: italic;
     color: var(--control-text-muted);
   }
 
