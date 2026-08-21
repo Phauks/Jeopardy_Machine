@@ -48,6 +48,8 @@
     rosterOpen?: boolean;
     /** Start with the join panel open; null = open in the lobby, where doors-open lives. */
     joinOpen?: boolean | null;
+    /** Start with the two endings showing. Closed in a real session; what the tests render. */
+    endOpen?: boolean;
     /** Origin for the join link + QR; this window's own at runtime. */
     joinOrigin?: string | null;
     /** Theme id carried onto the game-screen window so the projector matches this console. */
@@ -63,6 +65,7 @@
     settingsOpen = false,
     rosterOpen,
     joinOpen = null,
+    endOpen = false,
     joinOrigin = null,
     themeId = null,
     gameScreen = null,
@@ -135,6 +138,38 @@
     }),
   );
   let startWarned = $state(false);
+
+  /**
+   * ENDING, which is two different things, and the console said neither until 2026-08-20
+   * (owner: "there is no end game button for the host").
+   *
+   *   End the game   - the GAME stops and the scores go up. The room stays open, everybody
+   *                    stays connected, and the display shows final standings. This is what a
+   *                    host who has run out of time wants, and it did not exist: the only way
+   *                    to game-over was to play the board out.
+   *   Close the room - the ROOM stops. Polite screen everywhere, lobby row delisted, code
+   *                    spent. It existed only as an API call and a button on /dev/rooms.
+   *
+   * They are deliberately in ONE control that names both, rather than two chips a tired host
+   * picks between at speed, because the wrong one is unrecoverable in opposite directions:
+   * closing mid-game loses the scores, and ending the game when everyone has gone home just
+   * leaves a room running. Each needs a second press, and the second press says what it does.
+   */
+  // svelte-ignore state_referenced_locally - the prop is the INITIAL value only.
+  let endingOpen = $state(endOpen);
+  let endingConfirm = $state<"game" | "room" | null>(null);
+
+  function askToEnd(which: "game" | "room"): void {
+    endingConfirm = endingConfirm === which ? null : which;
+  }
+
+  function confirmEnding(): void {
+    if (endingConfirm === "game") store.endGame();
+    if (endingConfirm === "room") store.closeRoom();
+    endingConfirm = null;
+    endingOpen = false;
+  }
+
   function attemptStart(): void {
     if (readiness.kind === "blocked") return;
     if (readiness.kind === "warn" && !startWarned) {
@@ -171,6 +206,10 @@
     (clue?.lockedOutEntities ?? []).map((entityId) => entityDisplayName(view, entityId)),
   );
   const phase = $derived(game?.phase ?? "lobby");
+  // The ENGINE's phase, not the room's: a room is "active" from start-game until it closes,
+  // which includes the stretch after game-over when the standings are on the screen. Ending
+  // the game is only meaningful in between.
+  const gameIsRunning = $derived(phase !== "lobby" && phase !== "game-over");
   const canArm = $derived(phase === "reading" || phase === "tiebreaker-reading");
   const canJudge = $derived(
     phase === "answering" || phase === "wager-answering" || phase === "tiebreaker-answering",
@@ -431,8 +470,68 @@
         >
           Settings
         </button>
+        <!-- Last in the row, and the only chip that is not a view toggle: everything to its
+             left changes what the host is looking at, this one changes what the room IS. -->
+        <button
+          type="button"
+          class="chip ending"
+          class:active={endingOpen}
+          aria-expanded={endingOpen}
+          onclick={() => {
+            endingOpen = !endingOpen;
+            endingConfirm = null;
+          }}
+        >
+          End
+        </button>
       </div>
     </header>
+
+    {#if endingOpen}
+      <!-- A bar under the header rather than a dialog: the roster and the board stay on screen
+           while the host decides, which is the persistent-layout law and also the thing that
+           makes the decision answerable ("is anybody still connected?" is right there). -->
+      <div class="ending-row" role="group" aria-label="End the game or close the room">
+        <div class="ending-choice">
+          <button
+            type="button"
+            class="chip"
+            class:active={endingConfirm === "game"}
+            disabled={!gameIsRunning}
+            onclick={() => askToEnd("game")}
+          >
+            End the game
+          </button>
+          <p class="ending-note">
+            {gameIsRunning
+              ? "Scores as they stand go up on the screen. The room stays open and nobody is disconnected."
+              : phase === "lobby"
+                ? "Nothing to end yet - the game has not started."
+                : "This game is already over. Its scores are on the screen."}
+          </p>
+        </div>
+        <div class="ending-choice">
+          <button
+            type="button"
+            class="chip danger"
+            class:active={endingConfirm === "room"}
+            onclick={() => askToEnd("room")}
+          >
+            Close the room
+          </button>
+          <p class="ending-note">
+            Everyone gets the polite screen and the code stops working. Nothing is saved.
+          </p>
+        </div>
+        {#if endingConfirm !== null}
+          <!-- The second press, and it says what it does rather than "Confirm" - a host reading
+               this at speed must not have to remember which button they pressed. -->
+          <button type="button" class="primary" class:danger={endingConfirm === "room"} onclick={confirmEnding}>
+            {endingConfirm === "game" ? "Yes, end the game now" : "Yes, close the room for everyone"}
+          </button>
+        {/if}
+      </div>
+    {/if}
 
     {#if view.phase === "lobby"}
       <!-- START IS AN ACTION, not the last line of a checklist (owner, 2026-08-19). It lives in
@@ -991,6 +1090,60 @@
     align-items: center;
     flex-wrap: wrap;
     gap: 0.6rem;
+  }
+
+  /* THE TWO ENDINGS, side by side with their consequences written out. They sit in one bar
+     because the mistake to prevent is picking the wrong one, and the only thing that prevents
+     it is reading them together (the script block above says why). Each choice is a column -
+     the button and the sentence that belongs to it - so no sentence can be read against the
+     wrong button. */
+  .ending-row {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem 1.6rem;
+    padding: 0.7rem 0;
+    border-block: 1px solid var(--surface-border);
+  }
+
+  .ending-choice {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+    flex: 1 1 18rem;
+    min-width: 0;
+  }
+
+  .ending-note {
+    margin: 0;
+    max-inline-size: 44ch;
+    font-size: 0.85em;
+    line-height: 1.45;
+    text-wrap: pretty;
+    color: var(--surface-text-muted);
+  }
+
+  /* Closing the room is the destructive half, and it is the one that reads as ordinary from a
+     distance ("close" is what you do to a panel), so it carries the negative colour in both
+     states rather than only while armed. */
+  .chip.danger {
+    border-color: var(--score-negative);
+    color: var(--score-negative);
+  }
+
+  .chip.danger.active {
+    background: var(--score-negative);
+    color: var(--surface-page);
+  }
+
+  .primary.danger {
+    background: var(--score-negative);
+  }
+
+  .chip:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
   }
 
   .start-note {

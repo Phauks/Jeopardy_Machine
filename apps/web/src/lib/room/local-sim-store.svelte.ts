@@ -31,6 +31,7 @@ import type {
 import type {
   LastJudgedView,
   MyBuzzView,
+  RoomConnectionState,
   PendingTimerView,
   RoomPlayerView,
   RoomRefusalView,
@@ -134,6 +135,11 @@ export class LocalSimRoomStore implements RoomStore {
   // counts the sockets this simulated room actually has, and the roster reports only what the
   // room has been told to claim.
   private simSpectators = $state<number | null>(null);
+  // A mock room has no socket, so "connected" is a claim rather than an observation - and it
+  // is the right claim until something closes the room. `closeRoom` moves it, so the console's
+  // close control demonstrates the state a real close leaves behind instead of being a dead
+  // button in the sim (room-view.ts, RoomConnectionState).
+  private simConnection = $state<RoomConnectionState>("connected");
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
@@ -157,7 +163,7 @@ export class LocalSimRoomStore implements RoomStore {
     return {
       roomCode: this.roomCode,
       role: this.role,
-      connection: "connected",
+      connection: this.simConnection,
       phase: this.roomPhase,
       roster: {
         players: this.rosterPlayers,
@@ -759,6 +765,21 @@ export class LocalSimRoomStore implements RoomStore {
 
   endRound(): void {
     this.dispatch({ type: "end-round", at: Date.now() });
+  }
+
+  endGame(): void {
+    this.dispatch({ type: "end-game", at: Date.now() });
+  }
+
+  /**
+   * A mock room is one tab with nobody else in it, so there is nothing to close FOR anyone -
+   * but the console's control must still do something visible or the sim panel would be
+   * demonstrating a dead button. The honest mock is the state a real close leaves behind:
+   * this connection reads as closed, which is exactly what a `room-closed` frame produces on
+   * the ws store (ws-room-store.svelte.ts).
+   */
+  closeRoom(): void {
+    this.simConnection = "closed";
   }
 
   tiebreakerNextClue(): void {

@@ -298,3 +298,58 @@ describe("streamer mode: the console is the host's own screen", () => {
     expect(body).not.toContain("<svg");
   });
 });
+
+// Owner report 2026-08-20: "there is no end game button for the host." There were two missing
+// controls behind that sentence, not one, and the risk in adding them is that a tired host
+// picks the wrong one - so the console shows them together, with their consequences written
+// out, and each takes a second press that names what it does.
+describe("the two endings", () => {
+  function endingMarkup(props: Record<string, unknown> = {}): string {
+    return consoleMarkup({ endOpen: true, ...props });
+  }
+
+  /** The console over a room whose game is actually under way - where ending one is possible. */
+  function runningMarkup(): string {
+    const store = hostStore();
+    store.startGame();
+    return render(HostConsole, { props: { store, endOpen: true } }).body;
+  }
+
+  it("keeps them closed until asked - an ending is never one stray tap away", () => {
+    expect(consoleMarkup({})).not.toContain("End the game");
+    expect(consoleMarkup({})).not.toContain("Close the room");
+  });
+
+  it("offers both, and says what closing costs", () => {
+    const body = endingMarkup();
+    expect(body).toContain("End the game");
+    expect(body).toContain("Close the room");
+    expect(body).toContain("the code stops working");
+    expect(body).toContain("Nothing is saved");
+  });
+
+  // The whole reason they share one bar: the difference between them is the thing a host has
+  // to understand, and it is a sentence, not a button label.
+  it("says, in a running game, that ending it KEEPS the room and the people in it", () => {
+    const body = runningMarkup();
+    expect(body).toContain("The room stays open and nobody is disconnected");
+    expect(body).toContain("Scores as they stand");
+    // ...beside the other one, which does the opposite.
+    expect(body).toContain("Everyone gets the polite screen");
+  });
+
+  it("does not offer to end a game that has not started, and says why", () => {
+    // hostStore() is a lobby room: nothing to end yet.
+    const body = endingMarkup();
+    expect(body).toContain("Nothing to end yet");
+    expect(body).toMatch(/End the game\s*<\/button>/);
+  });
+
+  it("asks a second time, and the second press names the one that was chosen", () => {
+    // The confirm line is state a click produces, so what an SSR render can hold is the
+    // absence: neither confirmation is on screen before anything is pressed.
+    const body = endingMarkup();
+    expect(body).not.toContain("Yes, end the game now");
+    expect(body).not.toContain("Yes, close the room for everyone");
+  });
+});

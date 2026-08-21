@@ -212,6 +212,13 @@ Console is keyboard-first (spacebar = arm, ←/→ = wrong/correct, U = undo) wi
 
 Winner screen (podium + per-team totals). Console: export results (JSON/CSV: final scores, per-clue log). Room expires via DO alarm (default 2h idle); code becomes reusable.
 
+**Two endings, and they are not the same one** (owner, 2026-08-20: "there is no end game button for the host"). The console's **End** control shows both together, with what each leaves behind written beside it, because the mistake to prevent is picking the wrong one:
+
+- **End the game** stops the GAME where it stands and puts the scores up. The room stays open, nobody is disconnected, and the display shows final standings. It is the ending a quiz night that has run long actually needs, and until 2026-08-20 it did not exist - the only route to `game-over` was playing the board out, since `end-round` finishes a round and leaves whatever comes after it still ahead. It does not run the tie rules: a host who is stopping is not asking for one more clue, so a tie for first stays a shared first (engine `handleEndGame`).
+- **Close the room** stops the ROOM: the polite screen everywhere, the lobby row delisted, the code spent until the expiry alarm frees it. It computes nothing and saves nothing, so taking it mid-game leaves the night with no scores on any screen. It existed as `DELETE /api/rooms/<CODE>` and a button on the developer harness; now it is where a host can reach it.
+
+Each takes a second press, and the second press names the ending it commits to rather than saying "Confirm".
+
 ---
 
 ## Teams & leadership (owner-specified 2026-08-13)

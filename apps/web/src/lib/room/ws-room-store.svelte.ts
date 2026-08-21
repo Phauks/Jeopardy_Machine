@@ -795,6 +795,17 @@ export class WsRoomStore implements RoomStore {
     this.sendAction({ type: "end-round" });
   }
 
+  endGame(): void {
+    this.sendAction({ type: "end-game" });
+  }
+
+  closeRoom(): void {
+    // A ROOM message rather than an engine action, for the same reason set-pause is one: the
+    // engine has no concept of the room existing, and closing is about the room and everybody
+    // connected to it, not about the game (client-messages.ts close-room).
+    this.sendMessage({ type: "close-room" });
+  }
+
   tiebreakerNextClue(): void {
     this.sendAction({ type: "tiebreaker-next-clue" });
   }

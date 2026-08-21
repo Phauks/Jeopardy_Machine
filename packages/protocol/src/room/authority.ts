@@ -59,6 +59,10 @@ export const actionAuthority: Record<string, ActionAuthority> = {
 
   // Round flow.
   "end-round": "host",
+  // The host's own ending, from anywhere in a running game. Host-only for the obvious reason
+  // and one less obvious: it is the single action that can take the whole room to game-over
+  // without the board being played out.
+  "end-game": "host",
   "round-timeout": "host",
   proceed: "host",
 

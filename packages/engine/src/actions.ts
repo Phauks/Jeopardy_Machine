@@ -102,6 +102,12 @@ export const gameActionSchema = z.discriminatedUnion("type", [
 
   // Round flow.
   z.strictObject({ type: z.literal("end-round"), at }), // host force-end
+  // "Stop here and show the scores" - the host's own ending, from wherever the room is
+  // (owner, 2026-08-20: "there is no end game button for the host"). Distinct from end-round,
+  // which finishes a ROUND and leaves the rest of the game ahead of it; this one is the whole
+  // game, because a quiz night that has run long stops for reasons the board knows nothing
+  // about. See transitions/rounds.ts `handleEndGame` for what it refuses.
+  z.strictObject({ type: z.literal("end-game"), at }),
   z.strictObject({ type: z.literal("round-timeout"), at }), // #6 wall-clock limit expiry
   z.strictObject({ type: z.literal("proceed"), at }), // leave a round break for whatever is next
 

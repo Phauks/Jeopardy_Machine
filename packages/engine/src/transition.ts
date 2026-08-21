@@ -26,7 +26,12 @@ import {
   handleSubmitTypedAnswer,
 } from "./transitions/judging.ts";
 import { handlePlayerJoin, handlePlayerLeave, handleStartGame } from "./transitions/lobby.ts";
-import { handleEndRound, handleProceed, handleRoundTimeout } from "./transitions/rounds.ts";
+import {
+  handleEndGame,
+  handleEndRound,
+  handleProceed,
+  handleRoundTimeout,
+} from "./transitions/rounds.ts";
 import {
   handleReopenCell,
   handleSelectCell,
@@ -97,6 +102,8 @@ function dispatch(
       return handleScoreSet(draft, action, events);
     case "end-round":
       return handleEndRound(draft, setup, events);
+    case "end-game":
+      return handleEndGame(draft, setup, events);
     case "round-timeout":
       return handleRoundTimeout(draft, setup, events);
     case "proceed":

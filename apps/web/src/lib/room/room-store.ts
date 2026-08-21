@@ -141,6 +141,27 @@ export type RoomStore = {
   undo(): void;
   proceed(): void;
   endRound(): void;
+  /**
+   * Stop the GAME here and show the scores, from wherever the room is.
+   *
+   * The distinction that matters, and the reason there are two of these (owner, 2026-08-20:
+   * "there is no end game button for the host"): this one ENDS THE GAME and the room stays
+   * open - final standings on the display, everybody still connected, nobody's phone dropped.
+   * `closeRoom` below ends the ROOM. A host who has run out of time wants this one; the other
+   * is for when everyone has gone home.
+   */
+  endGame(): void;
+  /**
+   * Close the ROOM for everyone: the polite screen on every surface, the lobby row delisted,
+   * the code spent until the expiry alarm frees it (packages/protocol client-messages.ts
+   * `close-room`).
+   *
+   * IRREVERSIBLE, which is why the console asks first. Nothing about it is an ending in the
+   * game's sense - it does not compute standings and it does not care whether a game was ever
+   * started, so closing mid-game leaves the night with no scores on any screen. That is what
+   * `endGame` is for.
+   */
+  closeRoom(): void;
   tiebreakerNextClue(): void;
   /** Freeze/unfreeze all pending timers; the display shows "one moment" (C4 pause). */
   setPaused(paused: boolean): void;

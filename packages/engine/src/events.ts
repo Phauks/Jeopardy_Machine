@@ -125,6 +125,18 @@ export type GameEvent =
       type: "game-over";
       standings: StandingsEntry[];
       winners: string[]; // empty = no winner (#38 no-winner)
-      note: "clean" | "co-champions" | "shared-placement" | "sudden-death" | "no-winner";
+      /**
+       * How the game came to an end. "ended-early" is the host's own `end-game` and is the
+       * only note that does NOT mean the board was played out: scores are whatever they were
+       * at that moment, and a tie for first stays a tie rather than opening sudden death,
+       * because a host who is stopping the game is not asking for one more clue.
+       */
+      note:
+        | "clean"
+        | "co-champions"
+        | "shared-placement"
+        | "sudden-death"
+        | "no-winner"
+        | "ended-early";
     }
   | { type: "undo-applied"; undoneAction: GameActionType };
