@@ -5,11 +5,11 @@
 
 ## 0. Account decisions (once)
 
-| Decision              | Recommendation                                             | Why                                                                                                                                                                                                                               |
-| --------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Plan                  | **Workers Paid ($5/mo)**                                   | Free plan now runs SQLite-backed Durable Objects, so free _works_ - but Paid removes every limit question (DO duration, D1 size, request caps) for less than one JeopardyLabs subscription. Decide by feel; the app runs on free. |
-| workers.dev subdomain | Claim one (Dashboard -> Workers & Pages -> your subdomain) | The app is fully usable at `*.workers.dev` URLs while the product name / custom domain is still being workshopped.                                                                                                                |
-| Custom domain         | Defer until the name lands                                 | When ready: buy through Cloudflare Registrar (at-cost) and attach - see §4.                                                                                                                                                       |
+| Decision              | Recommendation                                             | Why                                                                                                                                                                                                                                                                                                 |
+| --------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plan                  | **Workers Paid ($5/mo) - SETTLED, this account is on it**  | Chosen and active (owner, confirmed 2026-08-20). Free would have worked (it runs SQLite-backed Durable Objects), but Paid removes every limit question - DO duration, D1 size, request caps - for less than one JeopardyLabs subscription. Nothing in the repo assumes free-tier headroom any more. |
+| workers.dev subdomain | Claim one (Dashboard -> Workers & Pages -> your subdomain) | The app is fully usable at `*.workers.dev` URLs while the product name / custom domain is still being workshopped.                                                                                                                                                                                  |
+| Custom domain         | Defer until the name lands                                 | When ready: buy through Cloudflare Registrar (at-cost) and attach - see §4.                                                                                                                                                                                                                         |
 
 ## 1. Local prerequisites (your machine, not the agent's)
 
@@ -19,19 +19,40 @@ wrangler login           # opens browser OAuth; grants your CLI your account
 wrangler whoami          # verify; note the Account ID (also needed in §5)
 ```
 
-## 2. Provision resources (run from the repo root, after M0 merges)
+## 2. Resources - ALREADY PROVISIONED, do not recreate
+
+Both were created in the dashboard on 2026-08-13 and are bound in the configs by id. Nothing
+below needs running again, and recreating either would break the bindings that already work:
+
+| Resource | Name                     | Bound as | Where                                                                                       |
+| -------- | ------------------------ | -------- | ------------------------------------------------------------------------------------------- |
+| D1       | `jeopardy-machine`       | `DB`     | apps/web/wrangler.jsonc AND apps/realtime/wrangler.jsonc - the SAME id, held by a gate test |
+| R2       | `jeopardy-machine-media` | `MEDIA`  | apps/web/wrangler.jsonc                                                                     |
+
+The **id** is what the configs bind, not the name, so renaming either in the dashboard is safe
+and changing which resource they point at is not. `worker-config.gate.test.ts` fails if the two
+Workers ever bind different database ids.
+
+R2 is provisioned and **unused by code** so far. Clue media currently travels as URLs the app
+serves (the club night's pictures ship as static assets); R2 arrives when uploads do.
+
+The one D1 item still open is applying the SCHEMA to the database that already exists - §2a.
+That is SQL against `jeopardy-machine`, not a new database.
+
+Durable Objects need **no manual creation** - the `GameRoomDO` namespace is created
+automatically by the migration block in apps/realtime/wrangler.jsonc on first deploy.
+
+<details>
+<summary>Provisioning from scratch (a self-hoster on their own account, not you)</summary>
 
 ```sh
-# D1 - saved boards, content packs, results
 wrangler d1 create jeopardy-machine
-#   -> copy the printed database_id into apps/web/wrangler.jsonc [[d1_databases]]
-
-# R2 - clue media (images/audio), later theme backgrounds + sound packs
-wrangler r2 bucket create jeopardy-media
-#   -> uncomment [[r2_buckets]] in apps/web/wrangler.jsonc (binding name MEDIA)
+#   -> copy the printed database_id into BOTH wrangler.jsonc files
+wrangler r2 bucket create jeopardy-machine-media
+#   -> bind it in apps/web/wrangler.jsonc as MEDIA
 ```
 
-Durable Objects need **no manual creation** - the `GameRoomDO` namespace is created automatically by the migration block in apps/realtime/wrangler.jsonc on first deploy.
+</details>
 
 ### 2a. Apply the D1 schema (owner-run; required for the public lobby)
 
@@ -112,7 +133,9 @@ pnpm -F realtime run deploy        # 1st: the DO worker must exist...
 pnpm -F web run deploy             # 2nd: ...before web's cross-script DO binding can bind to it
 ```
 
-Verify: the deploy output prints both `*.workers.dev` URLs; open the web URL, and the M0 scaffold's dev page should complete its WebSocket echo against the deployed DO. Deploys stay **manual and owner-run** (per the repo's deploy-deny convention in .claude/settings.json) until we deliberately add CI deploys with a scoped token.
+Both Workers have already had their first deploy (2026-08-13) and now build from `main` through Workers Builds (§3b), so the CLI path above is a fallback rather than the routine. The ordering mattered once: web's cross-script binding cannot resolve until the realtime Worker exists.
+
+Verify: the deploy output prints both `*.workers.dev` URLs; open the web URL and walk §3a. Deploys stay **manual and owner-run** (per the repo's deploy-deny convention in .claude/settings.json) until we deliberately add CI deploys with a scoped token.
 
 ### 3a. Smoke test the deployed suite (5 minutes, do it before the event)
 
@@ -207,13 +230,13 @@ Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate
 
 ## Checklist
 
-- [ ] Plan decided (free is fine; $5 removes doubt)
-- [ ] `wrangler login` done locally
-- [ ] workers.dev subdomain claimed
+- [x] Plan: **Workers Paid**, active on this account (§0)
+- [ ] `wrangler login` done locally - only needed for a CLI deploy or to run §2a; Workers Builds does not use it
+- [x] workers.dev subdomain claimed (both Workers have deployed under it)
 - [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name); the same id is bound in apps/realtime/wrangler.jsonc since 2026-08-14
 - [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-16**: `0001_create_rooms.sql` was rewritten twice (listing axis renamed to public/private, then the spectator columns added) and drops the table it recreates - one re-apply covers both
 - [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
-- [ ] realtime deployed, then web; echo page verified
+- [x] Both Workers deployed and building from `main` via Workers Builds (2026-08-13; the realtime-before-web ordering mattered for the FIRST deploy only, and both exist now)
 - [ ] §3a smoke test walked end to end (version -> room -> phone -> console recovery -> picture clue -> password room)
 - [ ] (optional) scoped API token added to agent environment
 - [ ] (later) custom domain after the name lands
