@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   copyJoinLink,
   joinShareText,
+  isScannableJoinUrl,
   joinUrlFor,
   joinUrlLabel,
   shareJoinLink,
@@ -25,6 +26,35 @@ describe("the join URL", () => {
     const text = joinShareText("bqkx7", "https://play.test/room/BQKX7");
     expect(text).toContain("https://play.test/room/BQKX7");
     expect(text).toContain("BQKX7");
+  });
+});
+
+// Owner report 2026-08-20: "the qr code is inaccurate. It only shows the join code, not the
+// source url." Root cause: both surfaces fell back to the ambient `location.origin`, which
+// does not exist during SSR, so the SERVER-RENDERED markup encoded the bare path `/room/BQKX7`.
+// That QR scans perfectly and goes nowhere, which is worse than no QR at all - the picture
+// looks right, so nobody checks it until thirty people are standing there.
+//
+// Both routes now pass `page.url.origin`, which is correct in SSR and in the browser alike.
+// This predicate is the belt: no origin means no QR and a sentence saying so.
+describe("what a camera can actually act on", () => {
+  it("accepts the absolute join URL and refuses the bare path", () => {
+    expect(isScannableJoinUrl("https://play.test/room/BQKX7")).toBe(true);
+    expect(isScannableJoinUrl("http://localhost:5173/room/BQKX7")).toBe(true);
+    expect(isScannableJoinUrl(joinUrlFor(null, "BQKX7"))).toBe(false);
+    expect(isScannableJoinUrl("/room/BQKX7")).toBe(false);
+  });
+
+  it("refuses anything that is not exactly a join URL, scheme included", () => {
+    expect(isScannableJoinUrl("ws://play.test/room/BQKX7")).toBe(false);
+    expect(isScannableJoinUrl("https://play.test/room/BQKX7/host")).toBe(false);
+    expect(isScannableJoinUrl("https://play.test/")).toBe(false);
+    expect(isScannableJoinUrl("")).toBe(false);
+  });
+
+  it("is satisfied by what joinUrlFor builds from a real origin", () => {
+    expect(isScannableJoinUrl(joinUrlFor("https://play.test", "bqkx7"))).toBe(true);
+    expect(isScannableJoinUrl(joinUrlFor("https://play.test/", "BQKX7"))).toBe(true);
   });
 });
 

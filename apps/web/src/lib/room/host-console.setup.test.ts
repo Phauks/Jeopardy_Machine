@@ -13,6 +13,7 @@ import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
 import HostConsole from "#lib/room/host-console.svelte";
 import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
 import JoinPanel from "#lib/room/join-panel.svelte";
+import { renderSVG } from "uqr";
 import { DevicePreferencesStore } from "#lib/host-settings/device-preferences.svelte.ts";
 import { GameScreenWindow } from "#lib/room/game-screen.svelte.ts";
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
@@ -203,6 +204,29 @@ describe("the join panel (C2 doors open)", () => {
     expect(body).toContain("<svg");
     expect(body).toContain(`play.test/room/${roomCode}`);
     expect(body).toContain("room-code");
+  });
+
+  // Owner report 2026-08-20: "the qr code is inaccurate. It only shows the join code, not the
+  // source url." The panel fell back to the ambient `location.origin`, which does not exist
+  // during SSR - so the markup the server sent always encoded the bare path `/room/BQKX7`, a
+  // QR that scans perfectly and goes nowhere. The route passes `page.url.origin` now; this
+  // pair of assertions is what would have caught it, since an SSR render is exactly the case
+  // that was broken.
+  it("puts the ORIGIN in the QR, not a bare path - it is a camera target, not an href", () => {
+    const body = joinPanel();
+    // The URL is inside the QR's modules, not in the markup as text, so the only way to assert
+    // what a camera would read is to encode both candidates and see which one is on screen.
+    expect(body).toContain(renderSVG("https://play.test/room/BQKX7", { border: 2 }));
+    expect(body).not.toContain(renderSVG("/room/BQKX7", { border: 2 }));
+  });
+
+  it("draws NO QR when no origin reached it, and says so rather than showing a dead one", () => {
+    const body = joinPanel({ joinOrigin: null });
+    expect(body).not.toContain("<svg");
+    expect(body).toContain("read the code out instead");
+    // The code itself still gets everybody in, which is why this is a degraded panel and not
+    // an error screen.
+    expect(body).toContain(roomCode);
   });
 
   it("offers the share sheet and the clipboard as separate buttons", () => {

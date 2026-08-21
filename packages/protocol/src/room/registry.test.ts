@@ -4,6 +4,7 @@
 import { describe, expect, it } from "vitest";
 import { limits } from "../limits.ts";
 import { lobbyListingSchema, registryStatusSchema, roomSummarySchema } from "./registry.ts";
+import { roomCodeAlphabet } from "./server-messages.ts";
 
 const ok = { status: "ok" } as const;
 
@@ -74,9 +75,18 @@ describe("room summary (the lobby row)", () => {
 
 describe("lobby listing", () => {
   it("caps a listing at the operational limit (pagination is deliberately deferred)", () => {
+    // Codes are built FROM the alphabet rather than from a counter: since 2026-08-20 the
+    // schema enforces the same 32 characters the generator draws from, so `T0000` is not a
+    // room code at all (server-messages.ts explains why nothing folds onto I/O/0/1).
     const rooms = Array.from({ length: limits.lobby.listingMax }, (_unused, index) => ({
       ...summary,
-      code: `T${String(index).padStart(4, "0")}`.slice(0, limits.room.roomCodeLength),
+      code: Array.from(
+        { length: limits.room.roomCodeLength },
+        (_char, place) =>
+          roomCodeAlphabet[
+            Math.floor(index / roomCodeAlphabet.length ** place) % roomCodeAlphabet.length
+          ],
+      ).join(""),
     }));
     expect(
       lobbyListingSchema.safeParse({ rooms, fetchedAt: Date.now(), registry: ok }).success,

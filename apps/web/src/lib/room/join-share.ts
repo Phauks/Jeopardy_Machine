@@ -24,6 +24,22 @@ export function joinUrlFor(origin: string | null, roomCode: string): string {
   return `${base}/room/${roomCode.toUpperCase()}`;
 }
 
+/**
+ * Is this URL something a CAMERA can act on?
+ *
+ * The bug this exists to make impossible (owner, 2026-08-20: "the qr code is inaccurate. It
+ * only shows the join code, not the source url"): with no origin, `joinUrlFor` returns the
+ * bare path `/room/BQKX7`, which is correct for an `href` and useless in a QR - a phone
+ * scanning it gets a string of text with nowhere to go. Both surfaces fell back to the
+ * ambient `location.origin`, which does not exist during SSR, so the SERVER-RENDERED markup
+ * always encoded the path. The routes now pass `page.url.origin`, which is right in both
+ * places; this predicate is the belt, because the failure is silent - the QR renders, it
+ * scans, and it simply does not go anywhere.
+ */
+export function isScannableJoinUrl(joinUrl: string): boolean {
+  return /^https?:\/\/[^/]+\/room\/[A-Z0-9]+$/.test(joinUrl);
+}
+
 /** The URL as it is READ rather than clicked - no scheme, because nobody says "h-t-t-p-s". */
 export function joinUrlLabel(joinUrl: string): string {
   return joinUrl.replace(/^https?:\/\//, "");

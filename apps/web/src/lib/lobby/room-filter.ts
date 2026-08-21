@@ -9,6 +9,10 @@
 // Everything here is pure: reading the field, filtering the list, and the sentence the counter
 // says about the current state. The screen renders the answers and owns none of the rules.
 import { limits } from "@jeopardy/protocol/limits";
+import {
+  roomCodeAlphabet,
+  roomCodeExcludedCharacters,
+} from "@jeopardy/protocol/room/server-messages";
 import type { RoomSummary } from "@jeopardy/protocol/room/registry";
 
 /** What is in the field, once. A code reading never depends on the list - a private room is
@@ -16,12 +20,34 @@ import type { RoomSummary } from "@jeopardy/protocol/room/registry";
 export type CounterReading =
   | { kind: "empty" }
   | { kind: "search"; query: string }
-  | { kind: "code"; code: string };
+  | { kind: "code"; code: string }
+  /**
+   * The right LENGTH for a code, and a character no code can hold - so it is neither a code
+   * nor plausibly a search (added 2026-08-20). Room codes are drawn from 32 characters, I, O,
+   * 0 and 1 deliberately among the four left out, and nothing folds onto them: no member of
+   * the alphabet is confusable with any of them, which is exactly why they are excluded.
+   * Before this, such a string armed Join, navigated, dialled a socket and came back "no such
+   * room" - a room that has ENDED says the same thing, so one mistyped character read as
+   * "your quiz is over".
+   */
+  | { kind: "impossible-code"; code: string; offenders: string };
 
 /** Strip everything a room code cannot contain. Lowercase and spaces are what people type off
- * a table tent, so they are normalized away rather than refused. */
+ * a table tent, so they are normalized away rather than refused. Note this keeps I/O/0/1: they
+ * are alphanumeric, so they COUNT toward the length, and a five-character string holding one
+ * has to be recognized and named rather than quietly shortened into a search. */
 export function codeCharacters(raw: string): string {
   return raw.toUpperCase().replaceAll(/[^A-Z0-9]/g, "");
+}
+
+/** The characters in this string that no room code can contain, in the order typed, no
+ * repeats. Empty when there are none. */
+export function excludedCodeCharacters(code: string): string {
+  const seen = new Set<string>();
+  for (const character of code) {
+    if (!roomCodeAlphabet.includes(character)) seen.add(character);
+  }
+  return [...seen].join("");
 }
 
 export function readCounter(raw: string): CounterReading {
@@ -34,7 +60,8 @@ export function readCounter(raw: string): CounterReading {
   // applies to us"). Auto-submitting here would turn that collision into a navigation, which
   // is why the person still has to press Join.
   if (code.length === limits.room.roomCodeLength && code === trimmed.toUpperCase()) {
-    return { kind: "code", code };
+    const offenders = excludedCodeCharacters(code);
+    return offenders === "" ? { kind: "code", code } : { kind: "impossible-code", code, offenders };
   }
   return { kind: "search", query: trimmed };
 }
@@ -91,6 +118,9 @@ export function roomsForCounter(
     if (match !== null) return { rooms: [match], filterActive: true };
     return { rooms, filterActive: false };
   }
+  // An impossible code leaves the list ALONE rather than filtering it to nothing: the person
+  // has a typo, not a query, and an empty list would answer the wrong question.
+  if (reading.kind === "impossible-code") return { rooms, filterActive: false };
   const query = reading.kind === "search" ? reading.query : "";
   return { rooms: applyRoomFilter(rooms, { query }), filterActive: query !== "" };
 }
@@ -137,6 +167,18 @@ export function describeCounter(state: CounterState): CounterVerdict {
       line: `${reading.code} is ${match.title}.`,
       codeWins: true,
       tone: "code",
+    };
+  }
+
+  // Named, not merely refused. "That is not a room code" leaves somebody staring at five
+  // characters that look fine; naming the character is the difference between a dead end and
+  // a one-keystroke fix.
+  if (reading.kind === "impossible-code") {
+    const plural = reading.offenders.length > 1;
+    return {
+      line: `Room codes never contain ${roomCodeExcludedCharacters.split("").join(", ")} - check the ${plural ? "characters" : "character"} ${reading.offenders.split("").join(" and ")}.`,
+      codeWins: false,
+      tone: "warning",
     };
   }
 

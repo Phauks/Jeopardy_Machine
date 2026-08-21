@@ -46,9 +46,27 @@ const envelopeFields = {
   ext: extensionBagSchema.optional(),
 };
 
+/**
+ * The room-code alphabet: uppercase alphanumerics MINUS I, O, 0 and 1 - shoutable across a
+ * noisy hall, un-mistakable on a projector. 32 characters, which is also what makes the
+ * generator's modulo unbiased (create.ts `generateRoomCode`).
+ *
+ * It lives here, beside the schema, because the two must agree and for a week they did not:
+ * the generator drew from these 32 characters while the schema accepted all 36. A typed `O`
+ * therefore passed validation, dialled a socket, and came back "no such room" - the same
+ * answer a room that ENDED gives, so a person who mistyped one character was told their
+ * quiz was over. Nothing can fold a stray I/O/0/1 onto something else, either: no member of
+ * this alphabet is confusable with them, which is the entire point of leaving them out. So
+ * the only honest handling is to refuse the string early, by name.
+ */
+export const roomCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** The characters a code can never contain, for a refusal that can say which one is wrong. */
+export const roomCodeExcludedCharacters = "IO01";
+
 export const roomCodeSchema = z
   .string()
-  .regex(new RegExp(`^[A-Z0-9]{${String(limits.room.roomCodeLength)}}$`));
+  .regex(new RegExp(`^[${roomCodeAlphabet}]{${String(limits.room.roomCodeLength)}}$`));
 export type RoomCode = z.infer<typeof roomCodeSchema>;
 
 export const refusalReasonSchema = z.enum([

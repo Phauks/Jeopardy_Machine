@@ -9,7 +9,7 @@ import {
 } from "./create.ts";
 import { hostTokenSchema, sessionTokenSchema } from "./identity.ts";
 import { defaultRoomSettings } from "./room-settings.ts";
-import { roomCodeSchema } from "./server-messages.ts";
+import { roomCodeAlphabet, roomCodeExcludedCharacters, roomCodeSchema } from "./server-messages.ts";
 
 // What the server echoes back after a create: the room's live settings, entry derived.
 const echoedSettings = { ...defaultRoomSettings, title: "", hostLabel: "" } as const;
@@ -189,6 +189,33 @@ describe("code and token generation", () => {
     for (const banned of ["I", "O", "0", "1"]) expect(seen.has(banned)).toBe(false);
     // Sanity that the generator is not somehow constant.
     expect(seen.size).toBeGreaterThan(10);
+  });
+
+  // Closed 2026-08-20. The generator drew from 32 characters and the schema accepted all 36,
+  // and nothing noticed because the generator never produced the other four. What DID reach
+  // them was a person typing: an `O` passed validation, dialled a socket, and came back
+  // "no such room" - the same sentence a room that has ENDED gives, so one mistyped character
+  // read as "your quiz is over". Nothing can fold either: no character in the alphabet is
+  // confusable with I, O, 0 or 1, which is precisely why they are excluded.
+  it("REFUSES a code holding a character the generator could never emit", () => {
+    for (const banned of ["I", "O", "0", "1"]) {
+      const code = `BQKX${banned}`;
+      expect(code).toHaveLength(limits.room.roomCodeLength);
+      expect(roomCodeSchema.safeParse(code).success, code).toBe(false);
+    }
+    expect(roomCodeSchema.safeParse("BQKX7").success).toBe(true);
+  });
+
+  it("holds the alphabet and the generator to ONE definition, not two that agree today", () => {
+    expect(roomCodeAlphabet).toHaveLength(32);
+    for (const excluded of roomCodeExcludedCharacters) {
+      expect(roomCodeAlphabet.includes(excluded), excluded).toBe(false);
+    }
+    // 32 divides 256, which is what makes the generator's modulo unbiased.
+    expect(256 % roomCodeAlphabet.length).toBe(0);
+    for (const character of generateRoomCode()) {
+      expect(roomCodeAlphabet.includes(character), character).toBe(true);
+    }
   });
 
   it("generates 32-hex secrets valid as both host and session tokens", () => {

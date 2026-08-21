@@ -21,7 +21,7 @@ import {
   maxSpectatorsSchema,
   roomSettingsSchema,
 } from "./room-settings.ts";
-import { roomCodeSchema } from "./server-messages.ts";
+import { roomCodeAlphabet, roomCodeSchema } from "./server-messages.ts";
 import { hostLabelSchema, roomListingSchema, roomTitleSchema } from "./visibility.ts";
 
 // Mirrors the board shape of @jeopardy/engine's scenario fixtures (packages/engine/src/
@@ -103,12 +103,10 @@ export const initializeConflictResponseSchema = z.strictObject({
   error: z.literal("already-active"),
 });
 
-// Unambiguous room-code alphabet: uppercase alphanumerics minus I/O/0/1 (shoutable across a
-// noisy hall, un-mistakable on a projector). Length from limits; ~24M five-char codes.
-const roomCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-// Server-allocated codes only (owner decision: never user-chosen). Uses rejection-free
-// modulo over a 32-char alphabet: 32 divides 256, so no bias.
+// Server-allocated codes only (owner decision: never user-chosen). Uses rejection-free modulo
+// over the 32-char alphabet: 32 divides 256, so no bias. The alphabet is `roomCodeSchema`'s
+// own (server-messages.ts) rather than a second copy - they were two copies until 2026-08-20
+// and had drifted apart, so a code this function can never produce still validated.
 export function generateRoomCode(): string {
   const bytes = new Uint8Array(limits.room.roomCodeLength);
   crypto.getRandomValues(bytes);

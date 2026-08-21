@@ -7,6 +7,7 @@ import {
   applyRoomFilter,
   codeCharacters,
   describeCounter,
+  excludedCodeCharacters,
   listedRoomForCode,
   readCounter,
   roomsForCounter,
@@ -169,5 +170,46 @@ describe("what the counter says", () => {
     const verdict = describeCounter(stateOf({ registryAnswering: false, shown: 0, total: 0 }));
     expect(verdict.line).toContain("cannot answer");
     expect(verdict.line).not.toContain("0 of 0");
+  });
+});
+
+// Owner report 2026-08-20, the class of bug this closes: the generator drew codes from 32
+// characters (I, O, 0 and 1 left out so nothing is misread on a projector) while every
+// validator accepted all 36. A typed `O` therefore looked like a perfectly good code - Join
+// armed, the page navigated, a socket dialled - and came back "no such room", which is the
+// SAME sentence a room that has ended gets. One wrong keystroke read as "your quiz is over".
+//
+// Nothing folds: no character in the alphabet is confusable with I, O, 0 or 1, which is the
+// whole reason they are excluded, so there is no candidate to silently correct to. The only
+// honest answer is to refuse early and say which character is the problem.
+describe("a string the right length that is not a code", () => {
+  it("finds the characters no code can contain, in order and without repeats", () => {
+    expect(excludedCodeCharacters("BQKX7")).toBe("");
+    expect(excludedCodeCharacters("BQKXO")).toBe("O");
+    expect(excludedCodeCharacters("O0O1I")).toBe("O01I");
+  });
+
+  it("reads as impossible rather than as a code, so Join never arms", () => {
+    const reading = readCounter("BQKXO");
+    expect(reading.kind).toBe("impossible-code");
+    expect(describeCounter(stateOf({ reading })).codeWins).toBe(false);
+  });
+
+  it("names the offending character instead of just refusing", () => {
+    const verdict = describeCounter(stateOf({ reading: readCounter("BQKXO") }));
+    expect(verdict.tone).toBe("warning");
+    expect(verdict.line).toContain("O");
+    expect(verdict.line).toContain("never contain");
+  });
+
+  it("leaves the list alone - a typo is not a query, and an empty list answers the wrong thing", () => {
+    const listing = [openRoom, lockedRoom];
+    const { rooms, filterActive } = roomsForCounter(listing, readCounter("BQKXO"));
+    expect(rooms).toEqual(listing);
+    expect(filterActive).toBe(false);
+  });
+
+  it("still reads a legal code as a code, so the fix costs nobody anything", () => {
+    expect(readCounter("BQKX7")).toEqual({ kind: "code", code: "BQKX7" });
   });
 });

@@ -114,6 +114,7 @@
     <HostConsole
       {store}
       showSimPanel={dev}
+      joinOrigin={page.url.origin}
       mirror={startInMirror}
       settingsOpen={startWithSettings}
       themeId={theme.id}

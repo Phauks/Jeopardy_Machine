@@ -17,3 +17,20 @@
   --color-surface-text-muted: var(--surface-text-muted);
   --color-surface-border: var(--surface-border);
 }
+
+/* RESERVE THE SCROLLBAR, EVERYWHERE (owner, 2026-08-20: "reserve scrollbar space on all
+ * pages"). Without this, a page whose content crosses the fold gains a scrollbar and every
+ * centred thing on it jumps sideways by its width - which on the front door means the entry
+ * field shifts under a thumb the moment the room list loads, and on the console means the
+ * board twitches each time a panel opens. `stable` keeps the gutter present whether or not
+ * anything is scrolling, so the layout is decided by the design rather than by how much
+ * content happened to arrive.
+ *
+ * On `html` rather than on `body`: the viewport scrollbar belongs to the root element, and a
+ * rule on `body` reserves a gutter inside a box that is not the one scrolling. Surfaces with
+ * their own scroll containers (the console's dock sections, the roster rail) set it locally
+ * for the same reason - see those components. Overlay scrollbars (most phones, macOS by
+ * default) take no space at all, so this is free where it is not needed. */
+html {
+  scrollbar-gutter: stable;
+}

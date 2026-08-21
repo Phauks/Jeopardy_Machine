@@ -119,6 +119,7 @@
 >
   <DisplayScreen
     {store}
+    joinOrigin={page.url.origin}
     {stagingThemeId}
     {environment}
     stageStill={device.stageMotion === "still"}
