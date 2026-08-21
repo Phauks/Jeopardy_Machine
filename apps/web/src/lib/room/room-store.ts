@@ -73,6 +73,18 @@ export type RoomStore = {
   join(request: JoinRequest): void;
   leave(): void;
 
+  /**
+   * Hand this connection the room's password and try the door again.
+   *
+   * The front door normally does this for you - it stashes the password beside the code and
+   * the room route recalls it (src/lib/lobby/join-hand-off.ts). A phone that arrived by the URL
+   * ALONE has nothing stashed, which is the entire point of a password room, and until
+   * 2026-08-19 it was told "this room needs a password / the host has it" with nowhere to type
+   * one. The protocol always allowed for this: `password-required` and `bad-password` KEEP the
+   * socket precisely so the phone can prompt and retry on the same connection.
+   */
+  submitRoomPassword(password: string): void;
+
   // Personal tier (any player, self only) + team tier (leader or host).
   updateIdentity(patch: IdentityPatch): void;
   createTeam(name: string): void;

@@ -66,10 +66,19 @@ describe("stagingFromRoom", () => {
   });
 
   it("stations nobody in an individuals-mode room: everyone waits in the water", () => {
-    const soloView: RoomView = { ...view, teamsMode: false };
+    const soloView: RoomView = { ...view, playerMode: "individuals" };
     const solo = stagingFromRoom(soloView);
     expect(solo.stations).toHaveLength(0);
     expect(solo.waitingEntityIds).toHaveLength(soloView.roster.players.length);
+  });
+
+  it("mixed draws the stations that exist AND leaves the soloists in the water", () => {
+    // The picture teams mode never shows: some people aboard, some deliberately not. Standing
+    // apart is a choice here, not a step somebody has not taken yet.
+    const mixed = stagingFromRoom({ ...view, playerMode: "mixed" });
+    expect(mixed.stations).toHaveLength(view.roster.teams.length);
+    const teamless = view.roster.players.filter((player) => player.teamId === null);
+    expect(mixed.waitingEntityIds).toHaveLength(teamless.length);
   });
 });
 

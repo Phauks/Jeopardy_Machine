@@ -203,18 +203,26 @@
     </div>
 
     <div class="control">
-      <label class="toggle">
-        <input
-          type="checkbox"
-          checked={device.mirror}
-          onchange={(event) => {
-            preferences.update({ mirror: event.currentTarget.checked });
-          }}
-        />
-        Mirror mode
-      </label>
+      <!-- ONE CHOICE, not two features. Mirror mode used to be a lone checkbox here, which left
+           the far more common setup - projector as a second output - with no home and no action
+           at all (owner, 2026-08-19). Both answers live in one control, and the console's own
+           game-screen panel is where the chosen one is acted on. -->
+      <label for="screen-setup">How the room sees this game</label>
+      <select
+        id="screen-setup"
+        value={device.screenSetup}
+        onchange={(event) => {
+          preferences.update({
+            screenSetup: event.currentTarget.value === "mirror" ? "mirror" : "second-screen",
+          });
+        }}
+      >
+        <option value="second-screen">Second screen (projector or TV)</option>
+        <option value="mirror">Mirror this screen</option>
+      </select>
       <p class="hint">
-        The laptop screen IS the projector. Answers stop rendering entirely while it is on.
+        Second screen: the console opens the game screen as its own window and stays private.
+        Mirror: this laptop IS the projector, so answers stop rendering entirely.
       </p>
       <label class="toggle">
         <input
@@ -327,7 +335,10 @@
           />
           Streamer mode (hide the join code)
         </label>
-        <p class="hint">The code and QR stop rendering on the display and every shared surface.</p>
+        <p class="hint">
+          The code and QR stop rendering on the game screen and every shared surface. They stay
+          on this console, which is yours - the join panel says so while it is on.
+        </p>
         <!-- The reveal lives HERE and nowhere else: a reveal button on the streamed screen would
              defeat the setting (docs/decisions/2026-08-14-room-controls-and-staging.md). -->
         {#if view.settings.hideJoinCode}

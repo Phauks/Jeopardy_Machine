@@ -7,6 +7,7 @@ import { playedRoundCount } from "../setup.ts";
 import { cellKey } from "../state.ts";
 import type { GameAction } from "../actions.ts";
 import type { GameEvent } from "../events.ts";
+import { teamsAreOffered, teamsAreRequired } from "@jeopardy/protocol";
 import type { GameSetup } from "../setup.ts";
 import type { GameState } from "../state.ts";
 
@@ -18,11 +19,16 @@ export function handlePlayerJoin(
   setup: GameSetup,
   events: GameEvent[],
 ): string | null {
-  const teamsMode = setup.settings.teams.playerMode === "teams";
-  if (!teamsMode && action.teamId !== undefined) {
+  // Two DIFFERENT questions, and mixed mode is what separates them (@jeopardy/protocol
+  // settings/groups/teams.ts). Offered: may this room have teams at all - naming one is only
+  // nonsense in individuals mode. Required: must everyone be on one - only "teams" says yes,
+  // because in mixed a teamless player is a soloist and their scoring entity is themselves.
+  const offered = teamsAreOffered(setup.settings.teams.playerMode);
+  const required = teamsAreRequired(setup.settings.teams.playerMode);
+  if (!offered && action.teamId !== undefined) {
     return "team-join-in-individuals-mode";
   }
-  if (teamsMode && action.teamId === undefined) {
+  if (required && action.teamId === undefined) {
     return "teams-mode-needs-team";
   }
 
@@ -46,7 +52,7 @@ export function handlePlayerJoin(
   const lateJoin = draft.phase !== "lobby";
   if (lateJoin && !setup.settings.join.lateJoinAllowed) return "late-join-disabled";
 
-  const teamId = teamsMode ? (action.teamId ?? null) : null;
+  const teamId = offered ? (action.teamId ?? null) : null;
   draft.players[action.playerId] = {
     id: action.playerId,
     name: action.name,

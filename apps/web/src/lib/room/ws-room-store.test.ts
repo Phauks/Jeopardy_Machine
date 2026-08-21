@@ -45,7 +45,7 @@ function snapshotFrame(overrides: Record<string, unknown> = {}) {
     phase: "lobby",
     game: null,
     roster: { players: [], teams: [] },
-    teamsMode: false,
+    playerMode: "individuals" as const,
     board: emptyBoard,
     paused: false,
     clueContent: null,
@@ -191,7 +191,7 @@ describe("ws room store: messages become a view", () => {
     room.serve(
       snapshotFrame({
         phase: "lobby",
-        teamsMode: true,
+        playerMode: "teams" as const,
         roster: {
           players: [rosterEntry("p-1", "Ada", "t-1")],
           teams: [
@@ -210,7 +210,7 @@ describe("ws room store: messages become a view", () => {
     room.serve({ type: "room-settings", settings: { ...settings, hideJoinCode: true }, at: 1 });
 
     const view = room.store.view;
-    expect(view.teamsMode).toBe(true);
+    expect(view.playerMode).toBe("teams");
     expect(view.roster.players[0]).toMatchObject({
       playerId: "p-1",
       nickname: "Ada",
@@ -373,9 +373,39 @@ describe("ws room store: messages become a view", () => {
     expect(room.store.view.content?.clueAt(0, 1, 2)).toEqual({
       categoryTitle: "Seconds",
       prompt: "This is the clue",
+      // A words-only clue carries no media, and the store says so with null rather than
+      // leaving the field off - a surface must never have to tell "absent" from "none".
+      media: null,
       response: null,
+      responseMedia: null,
     });
     expect(room.store.view.content?.clueAt(0, 0, 0)).toBeNull();
+
+    // The room resolves media before it sends it, and the store passes the descriptor straight
+    // through: a client holds no document, so any lookup here would be a guess.
+    room.serve({
+      type: "clue-content",
+      content: {
+        target: { kind: "cell", roundIndex: 0, category: 1, row: 3 },
+        category: "Seconds",
+        prompt: {
+          text: "Name this bird",
+          media: {
+            mediaId: "0198f00d-0002-7000-8000-000000000211",
+            kind: "audio",
+            mime: "audio/ogg",
+            alt: "A short birdsong clip",
+            url: "https://media.test/birdsong.ogg",
+          },
+        },
+        answer: null,
+      },
+    });
+    expect(room.store.view.content?.clueAt(0, 1, 3)?.media).toMatchObject({
+      kind: "audio",
+      url: "https://media.test/birdsong.ogg",
+      alt: "A short birdsong clip",
+    });
   });
 
   it("reflects the host's freeze", () => {

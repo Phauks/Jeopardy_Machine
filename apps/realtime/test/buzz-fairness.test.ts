@@ -187,7 +187,17 @@ describe("hibernation across an armed window", () => {
     // the alarm that closes it is storage, so a rebuilt instance finishes the race.
     const { host, ada, bo, code } = await racedClue({ seed: "fair-evict-window" });
     await ada.waitFor((message) => message.type === "arm-window");
-    await new Promise((resolve) => setTimeout(resolve, 450));
+    // INSIDE the window, and that is the whole setup. It slept 450ms here, which is longer than
+    // the 250ms compensation window itself (settings.buzzing.compensationWindowMs), so whether
+    // the pen was still open at eviction was down to scheduling luck - and on the unlucky run
+    // the winner had already been crowned, leaving the wait below hanging on a second
+    // `buzz-won` that was never coming. 200ms is after Ada's press (150ms reaction plus her
+    // simulated round trip, so there is genuinely something held) and comfortably before the
+    // window that press opened can close.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    // Stated rather than assumed: if a future timing change lets adjudication finish first,
+    // this fails as the setup problem it is instead of timing out eight seconds later.
+    expect(host.messagesOf("buzz-won")).toHaveLength(0);
     await evictDurableObject(roomStub(code));
     const won = await host.waitFor("buzz-won", undefined, 8000);
     expect(nicknameOf([ada, bo], won.playerId)).toBe("Ada");

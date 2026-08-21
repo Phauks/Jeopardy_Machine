@@ -121,10 +121,21 @@ async function recolorToDataUrl(request: RecolorRequest): Promise<string | null>
     if (changed === 0) return null;
 
     context.putImageData(image, 0, 0);
+    // PNG, AND LOSSLESS IS THE WHOLE POINT (owner report 2026-08-19, "strange color artifacting
+    // when selecting a player avatar and color"). This encoded `image/webp`, which the canvas
+    // spec leaves at a LOSSY default quality - and a walk sheet is the worst possible input for
+    // one: ten frames of hard-edged sprite laid side by side, so the encoder's blocks straddle
+    // the boundary between one frame and the next and chroma is subsampled straight across the
+    // transparent gutter between them. The viewport shows exactly one frame, so what bled in
+    // from its neighbours appeared as coloured fringes crawling along the edges as the cycle
+    // stepped - and got worse the more saturated the accent, because a stronger accent is more
+    // chroma to smear. PNG has no lossy mode to fall into. It is bigger, but this never touches
+    // the network: it is a data URL held in memory for the life of the page.
+    //
     // A data URL rather than an object URL: these are cached for the life of the page and
     // shared between components, so there is no owner who could safely revokeObjectURL, and a
     // leaked object URL is worse than the bytes.
-    return canvas.toDataURL("image/webp");
+    return canvas.toDataURL("image/png");
   } catch {
     // Any failure - offline, a decode the browser refuses, a tainted canvas - falls back to
     // the baked image. A preview in pack colors is a worse preview, never a broken screen.

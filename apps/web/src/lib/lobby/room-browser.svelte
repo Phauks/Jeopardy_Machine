@@ -1,146 +1,164 @@
 <script lang="ts">
-  // The public room list, as a REGION of the front door rather than a page of its own
-  // (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md: browsing and joining
-  // are the same act, so /lobby folded back into /). Everything the separate page did, it
-  // still does - it simply does it beside the code box instead of one navigation away.
+  // The public room list - a REGION of the front door, and deliberately the minority one
+  // (docs/decisions/2026-08-18-front-door-architecture.md). Rooms are private unless a host
+  // opts in, so the honest expectation is that this region is empty most nights; it earns a
+  // band, not the page's proportions. The same reasoning the whole industry applied to server
+  // browsers, which moved off the front screen once matchmaking arrived
+  // (docs/research/06-join-flow-patterns.md, "the server-browser lineage").
   //
   // Server-browser conventions kept (docs/decisions/2026-08-14-room-visibility-and-lobby.md):
   // newest first, a lock on password rooms, capacity as a fraction, running games dimmed, an
   // inline per-card password prompt, and NO live socket - it polls, because browsing is not
-  // playing.
+  // playing. What is NOT kept is Steam's filter furniture: against a handful of rooms, a lock
+  // badge plus one "open rooms only" toggle is the whole of what scales down.
   //
-  // Four states have to be distinguishable, and the whole reason this component exists is that
-  // they once were not: rooms listed, still loading, genuinely nobody hosting, and the registry
-  // cannot answer. Each one occupies the SAME reserved block, so the column does not jump when
-  // an answer arrives (the standing layout law, same decision doc).
+  // The rooms it shows are already filtered by the counter's field (#lib/lobby/room-filter.ts)
+  // - one field serves both jobs, so this region has no search box of its own.
+  //
+  // Five states have to be distinguishable, and the whole reason this component exists is that
+  // some of them once were not: rooms listed, nothing matching the filter, still loading,
+  // genuinely nobody hosting, and the registry cannot answer. Each one occupies the SAME
+  // reserved block, so the region does not jump when an answer arrives (the layout law).
   import RegistryStatusLine from "#lib/lobby/registry-status-line.svelte";
   import RoomCard from "#lib/lobby/room-card.svelte";
   import { formatClockTime } from "#lib/lobby/room-age.ts";
-  import { filterRooms } from "#lib/lobby/room-search.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
 
   type Props = {
     listing: LobbyListing;
+    /** The rooms left after the counter's field and the open-only toggle. */
+    visibleRooms?: readonly RoomSummary[] | null;
+    /** True when something is narrowing the list, so "none" can say which "none" it means. */
+    filterActive?: boolean;
+    openOnly?: boolean;
+    onOpenOnly?: ((next: boolean) => void) | null;
     /** The fetch itself failed (offline, 500). Never fatal - the code box still works. */
     listingError?: string | null;
     /** False until the first fetch answers - an empty list with no verdict behind it yet. */
     loaded?: boolean;
     /** A complete code is in the box: the list steps back rather than competing for the tap. */
     dimmed?: boolean;
-    /** Seed for the search box, so the filtered state can be server-rendered in a test. */
-    initialQuery?: string;
     onJoinRoom: (room: RoomSummary, password: string) => void;
     onRefresh?: (() => void) | null;
   };
   let {
     listing,
+    visibleRooms = null,
+    filterActive = false,
+    openOnly = false,
+    onOpenOnly = null,
     listingError = null,
     loaded = true,
     dimmed = false,
-    initialQuery = "",
     onJoinRoom,
     onRefresh = null,
   }: Props = $props();
 
   let expandedRoomCode = $state<string | null>(null);
-  // A seed, read once: after the first render the box belongs to whoever is typing in it.
-  // svelte-ignore state_referenced_locally
-  let query = $state(initialQuery);
 
   const registryBroken = $derived(listing.registry.status !== "ok");
-  const rooms = $derived(listing.rooms);
-  // Filtering is instant and local - the whole listing is already in hand, capped at
-  // limits.lobby.listingMax (room-search.ts explains why no request is involved).
-  const shown = $derived(filterRooms(rooms, query));
-  const filtering = $derived(query.trim() !== "");
-  // The fetch's own wall-clock stamp rather than "updated 2m ago": a relative phrase is only
-  // true while something re-renders it, and staleness is the exact question this line answers
-  // (owner call 2026-08-17, room-age.ts).
+  const listingAnswering = $derived(!registryBroken && listingError === null);
+  const allRooms = $derived(listing.rooms);
+  const rooms = $derived(visibleRooms ?? listing.rooms);
+  // A STAMP, not a phrase (owner call 2026-08-17: "instead of updated just now, show time
+  // stamp"). A relative age decays the moment it is painted and is only honest while a timer
+  // re-renders it, which is the wrong answer to the one question this line settles - is what I
+  // am looking at stale (room-age.ts explains it at length). It also needs no clock injected:
+  // the stamp is a pure function of the listing, so this region renders deterministically with
+  // nothing passed in. The room CARDS still age relatively, against the listing's own fetch.
   const freshness = $derived(`Updated ${formatClockTime(listing.fetchedAt)}`);
+  const count = $derived(
+    filterActive
+      ? `${String(rooms.length)} of ${String(allRooms.length)}`
+      : allRooms.length === 0
+        ? "none listed"
+        : `${String(allRooms.length)} live`,
+  );
 </script>
 
-<div class="room-browser" class:dimmed>
-  <!-- The search box is always drawn, whatever the list is doing: a control that appears when
-       the first rooms arrive would move everything under it (the standing layout law). -->
-  <label class="search">
-    <span class="visually-hidden">Search public rooms</span>
-    <input
-      type="search"
-      autocomplete="off"
-      placeholder="Search by room or host"
-      bind:value={query}
-    />
-  </label>
-
-  {#if registryBroken || listingError !== null}
-    <div class="state-block" aria-label="Room list unavailable">
-      <RegistryStatusLine status={listing.registry} />
-      {#if listingError !== null}
-        <p class="state-note">The listing request itself failed: {listingError}.</p>
-      {/if}
-      <p class="state-note">
-        Rooms are still being created and joined by code - only the listing is affected.
-      </p>
-    </div>
-  {:else if !loaded}
-    <p class="state-note waiting" role="status">Looking for rooms...</p>
-  {:else if rooms.length === 0}
-    <div class="state-block empty" aria-label="No public rooms">
-      <h3>Nobody is hosting publicly right now</h3>
-      <p class="state-note">Most rooms are private. A code still gets you in.</p>
-    </div>
-  {:else if shown.length === 0}
-    <div class="state-block empty" aria-label="No matching rooms">
-      <h3>No room matches that search</h3>
-      <button
-        type="button"
-        class="clear-search"
-        onclick={() => {
-          query = "";
-        }}
-      >
-        Show all {rooms.length}
-      </button>
-    </div>
-  {:else}
-    <ul class="room-list">
-      {#each shown as room (room.code)}
-        <li>
-          <RoomCard
-            {room}
-            fetchedAt={listing.fetchedAt}
-            {dimmed}
-            expanded={expandedRoomCode === room.code}
-            onSelect={(picked, password) => {
-              onJoinRoom(picked, password);
-            }}
-            onExpand={(picked) => {
-              expandedRoomCode = picked.code;
-            }}
-            onCollapse={() => {
-              expandedRoomCode = null;
-            }}
-          />
-        </li>
-      {/each}
-    </ul>
-  {/if}
-
-  <footer class="browser-footer">
-    <span class="stamp">{freshness}</span>
-    <span>
-      {#if filtering && shown.length > 0}
-        {shown.length} of {rooms.length}
-      {:else if rooms.length === limits.lobby.listingMax}
-        Newest {limits.lobby.listingMax}
-      {/if}
-    </span>
-    {#if onRefresh !== null}
-      <button type="button" class="refresh" onclick={onRefresh}>Refresh now</button>
+<section class="room-browser" class:dimmed aria-labelledby="rooms-heading">
+  <!-- One row carries what three elements used to: the label, the count, the one filter, the
+       real timestamp and Refresh. Chrome on a minority region has to earn its height. -->
+  <div class="browser-head">
+    <h2 class="browser-title" id="rooms-heading">Public rooms</h2>
+    {#if listingAnswering}
+      <span class="browser-count">{count}</span>
     {/if}
-  </footer>
-</div>
+    <div class="browser-tools">
+      <label class="open-only" class:on={openOnly}>
+        <input
+          type="checkbox"
+          checked={openOnly}
+          onchange={(event) => onOpenOnly?.(event.currentTarget.checked)}
+        />
+        <span>Open rooms only</span>
+      </label>
+      <span class="freshness">
+        {allRooms.length === limits.lobby.listingMax
+          ? `Newest ${String(limits.lobby.listingMax)}`
+          : freshness}
+      </span>
+      {#if onRefresh !== null}
+        <button type="button" class="refresh" onclick={onRefresh}>Refresh</button>
+      {/if}
+    </div>
+  </div>
+
+  <div class="browser-body">
+    {#if registryBroken || listingError !== null}
+      <div class="state-block" aria-label="Room list unavailable">
+        <RegistryStatusLine status={listing.registry} />
+        {#if listingError !== null}
+          <p class="state-note">The listing request itself failed: {listingError}.</p>
+        {/if}
+        <p class="state-note">
+          Rooms are still being created and joined by code - only the listing is affected.
+        </p>
+      </div>
+    {:else if !loaded}
+      <p class="state-note waiting" role="status">Looking for rooms...</p>
+    {:else if allRooms.length === 0}
+      <!-- ONE LINE, no paragraph. The empty state used to explain the listing model back at
+           whoever was reading it, which is the prose the owner deleted on 2026-08-17 - and an
+           empty list is the NORMAL state here (rooms are private unless a host opts in), so it
+           must not read like a fault being apologised for. -->
+      <div class="state-block empty" aria-label="No public rooms">
+        <h3>Nobody is hosting publicly right now</h3>
+      </div>
+    {:else if rooms.length === 0}
+      <div class="state-block empty" aria-label="No matching public rooms">
+        <h3>Nothing here matches</h3>
+        <p class="state-note">
+          {allRooms.length === 1 ? "The one listed room does" : "None of the listed rooms do"} - clear
+          the box above, or turn off "open rooms only", to see everything again.
+        </p>
+      </div>
+    {:else}
+      <ul class="room-grid">
+        {#each rooms as room (room.code)}
+          <li>
+            <RoomCard
+              {room}
+              fetchedAt={listing.fetchedAt}
+              {dimmed}
+              expanded={expandedRoomCode === room.code}
+              onSelect={(picked, password) => {
+                onJoinRoom(picked, password);
+              }}
+              onExpand={(picked) => {
+                expandedRoomCode = picked.code;
+              }}
+              onCollapse={() => {
+                expandedRoomCode = null;
+              }}
+            />
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</section>
 
 <style>
   /* Board materials, not chrome materials: this region sits on the gutter color and its rooms
@@ -152,79 +170,100 @@
     --browser-rule: color-mix(in srgb, var(--clue-text-color) 22%, transparent);
     display: flex;
     flex-direction: column;
-    gap: 0.75rem;
-    /* Reserved height: the four states occupy one block, so an answer arriving does not shove
-       the page (the standing layout law). Two cards' worth - enough that the common case fills
-       it rather than growing into it. */
-    min-height: 13rem;
+    gap: 0.7rem;
     color: var(--browser-ink);
     transition: opacity 150ms ease;
   }
 
+  /* Stepped back rather than switched off: a complete code is what happens next, but the list
+     it was typed over stays readable (decision 2026-08-18 §1). */
   .room-browser.dimmed {
-    opacity: 0.4;
+    opacity: 0.55;
   }
 
-  .search {
+  .browser-head {
     display: flex;
-    flex-direction: column;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--browser-rule);
   }
 
-  /* A well sunk into the panel, like every other field on this page - not a rounded pill on a
-     card, which is the generic search box the art direction rejects. */
-  .search input {
-    font: inherit;
-    font-size: 0.95rem;
-    padding: 0.5rem 0.65rem;
-    width: 100%;
-    min-width: 0;
-    border: 1px solid var(--browser-rule);
-    border-radius: 2px;
-    background: color-mix(in srgb, var(--board-cell-bg) 45%, #000000);
-    color: var(--browser-ink);
+  .browser-title {
+    margin: 0;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.9rem;
   }
 
-  .search input::placeholder {
+  .browser-count {
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.7rem;
+    color: var(--board-value-color);
+  }
+
+  .browser-tools {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+    margin-left: auto;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.66rem;
     color: var(--browser-muted);
   }
 
-  .search input:focus-visible {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
-  }
-
-  .clear-search {
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    font-size: 0.75rem;
-    padding: 0.5rem 0.8rem;
-    border: 1px solid var(--browser-rule);
-    border-radius: 2px;
-    background: transparent;
-    color: var(--board-value-color);
+  /* The one filter the list's size justifies. The lock badge on a card carries the rest of the
+     password story (docs/research/06-join-flow-patterns.md, pattern 5). */
+  .open-only {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
     cursor: pointer;
   }
 
-  .clear-search:focus-visible {
-    outline: 3px solid var(--accent);
-    outline-offset: 2px;
+  .open-only.on {
+    color: var(--board-value-color);
   }
 
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
+  .open-only input {
+    accent-color: var(--board-value-color);
+    width: 0.9rem;
+    height: 0.9rem;
   }
 
-  .room-list {
+  .refresh {
+    font: inherit;
+    background: none;
+    border: none;
+    padding: 0;
+    color: var(--board-value-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+  }
+
+  .browser-body {
+    /* Reserved height: the five states occupy one block, so an answer arriving does not shove
+       the page (the standing layout law). Two cards' worth - enough that the common case fills
+       it rather than growing into it. */
+    min-height: 11rem;
     display: flex;
     flex-direction: column;
-    /* The gutter again, one step finer: rooms read as cells stacked on the board's ground. */
-    gap: 0.4rem;
+  }
+
+  /* A laptop fills its width with rooms instead of running one tall thin column, which is the
+     shape the owner rejected on the play surfaces too; a phone gets the same cards in one. */
+  .room-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr));
+    gap: 0.45rem;
     list-style: none;
     margin: 0;
     padding: 0;
@@ -250,60 +289,22 @@
     letter-spacing: 0.06em;
     font-size: 1rem;
     margin: 0;
-    /* Balanced: an empty-state heading that drops its last word alone is the ragged break the
-       owner reported, in the one place the eye has nothing else to look at. */
-    text-wrap: balance;
     color: var(--browser-ink);
   }
 
   .state-note {
     margin: 0;
-    max-inline-size: 52ch;
+    max-inline-size: 60ch;
     font-size: 0.85rem;
     line-height: 1.5;
     color: var(--browser-muted);
   }
 
-  /* Reserved like every other state in this block: "looking for rooms" occupies the height the
-     rooms will, so the answer arriving changes words rather than positions. */
   .waiting {
     flex: 1;
-    min-height: 6rem;
   }
 
-  .browser-footer {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 0.75rem;
-    flex-wrap: wrap;
-    padding-top: 0.6rem;
-    border-top: 1px solid var(--browser-rule);
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.68rem;
-    color: var(--browser-muted);
-  }
-
-  /* The stamp is the fact this footer exists for, so it is the one that keeps the value color
-     and never wraps mid-time. */
-  .stamp {
-    white-space: nowrap;
-    color: var(--board-value-color);
-  }
-
-  .refresh {
-    font: inherit;
-    background: none;
-    border: none;
-    padding: 0;
-    color: var(--board-value-color);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-    cursor: pointer;
-  }
-
+  .open-only input:focus-visible,
   .refresh:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;

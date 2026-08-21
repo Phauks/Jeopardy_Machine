@@ -72,6 +72,9 @@
     if (preferences.consoleAudio) consoleAudio.prime();
   });
 
+  // ?mirror forces the mirrored layout for THIS render whatever the device prefers - a link a
+  // host can hand to a second machine. The lasting choice is the device's `screenSetup`
+  // preference, which the console's game-screen panel sets (src/lib/room/game-screen.ts).
   const startInMirror = page.url.searchParams.has("mirror");
   const startWithSettings = page.url.searchParams.has("settings");
   const theme = $derived(
@@ -86,19 +89,22 @@
 
 <div class="host-shell" style={themeToStyleAttribute(theme)} data-effects={theme.effectsLevel}>
   {#if tokenMissing}
-    <!-- Not an error screen: nothing went wrong, this tab simply is not the one that made the
-         room. It says what the token is, where it lives, and the two real ways forward. -->
+    <!-- Not an error screen: nothing went wrong, this BROWSER simply is not the one that made
+         the room. Rewritten 2026-08-19 with the storage change behind it: a crashed tab used to
+         land here and be told to start over, which for a room mid-game is the worst advice this
+         app could give. The key now survives the tab, so reopening this console after a crash
+         is the ordinary path and this screen is the genuinely-wrong-device one. -->
     <section class="no-token" aria-label="Host console unavailable">
-      <h1>This tab cannot host room {roomCode}</h1>
+      <h1>This browser cannot host room {roomCode}</h1>
       <p>
-        A room is hosted by the tab that created it. The key is kept in that tab and nowhere
-        else - not in a link, not in your account, because there is no account - so a console
-        opened anywhere else has nothing to prove it is the host with.
+        A room is hosted by the browser that created it. The key is kept there and nowhere else
+        - not in a link, not in your account, because there is no account - so a console opened
+        on another device has nothing to prove it is the host with.
       </p>
       <ul>
-        <li>Still have the tab you made the room in? The console is already there.</li>
-        <li>Closed it? Make a new room - and put its display on the screen before you share
-          the code.</li>
+        <li>Made the room on another laptop or phone? Open this page there - the console comes
+          back, game and all, even if the browser has been closed and reopened since.</li>
+        <li>Hosted it here days ago? The key expires with the room, and the room is gone.</li>
         <li>You can watch this room without hosting it: open <code>/room/{roomCode}</code>
           and join as a player.</li>
       </ul>
@@ -110,6 +116,7 @@
       showSimPanel={dev}
       mirror={startInMirror}
       settingsOpen={startWithSettings}
+      themeId={theme.id}
     />
   {/if}
 </div>

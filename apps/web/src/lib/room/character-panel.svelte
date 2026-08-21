@@ -38,7 +38,10 @@
     value: CharacterDraft;
     mode: IdentityMode;
     /** Teams mode changes what the buzz-sound section promises about who hears it. */
-    teamsMode: boolean;
+    /** Teams exist in this room (teams or mixed) - the buzz-sound note differs when they do. */
+    teamsOffered: boolean;
+    /** ...and everyone must be on one, which is what makes the note unconditional. */
+    teamsRequired: boolean;
     /** Inline name error, owned by the parent so the action bar and the field agree. */
     nameProblem?: string | null;
     onChange: (patch: Partial<CharacterDraft>) => void;
@@ -49,7 +52,8 @@
   let {
     value,
     mode,
-    teamsMode,
+    teamsOffered,
+    teamsRequired,
     nameProblem = null,
     onChange,
     onPreviewSound = null,
@@ -139,8 +143,12 @@
 
   <h3 class="section-label">
     Buzzer sound
-    {#if teamsMode}
-      <span class="section-note">yours plays on your phone; the room hears your team's sound</span>
+    {#if teamsOffered}
+      <span class="section-note">
+        {teamsRequired
+          ? "yours plays on your phone; the room hears your team's sound"
+          : "yours plays on your phone; on a team, the room hears the team's"}
+      </span>
     {/if}
   </h3>
   <BuzzSoundPicker

@@ -15,7 +15,7 @@
 // | refused       | view.refusal (the REASON; room-refusal.ts owns the words). Room-level      |
 // |               | reasons arrive with a close; team/password ones keep the socket            |
 // | snapshot      | replaces game + roster + phase + paused wholesale, and carries the room's  |
-// |               | static facts (teamsMode, board material) so `sync` restores everything     |
+// |               | static facts (playerMode, board material) so `sync` restores everything   |
 // | event         | folds the batch through room-fold.ts and takes the state it carries; a     |
 // |               | stateVersion gap of more than one asks for `sync`                          |
 // | arm-window    | `arm-ack` goes back IMMEDIATELY (see the latency note below), and the     |
@@ -65,6 +65,7 @@ import {
   prunePendingTimers,
 } from "#lib/room/room-fold.ts";
 import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
+import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameState } from "@jeopardy/engine/state";
@@ -158,7 +159,11 @@ function toClueContentView(content: ClueContent): ClueContentView {
     // Null prompt = this role does not get the text (players, unless clueTextOnPhones is on).
     // It arrives anyway so the layout can be drawn without guessing whether more is coming.
     prompt: content.prompt?.text ?? "",
+    // Already resolved by the room - kind, type, alt and (when the bytes are fetchable) a url.
+    // The store does no lookup of its own because a client holds no document to look in.
+    media: content.prompt?.media ?? null,
     response: content.answer?.canonical ?? null,
+    responseMedia: content.answer?.media ?? null,
   };
 }
 
@@ -176,6 +181,12 @@ export class WsRoomStore implements RoomStore {
   private socketOpen = false;
   /** The player's join intent, kept so a reconnect that lost its token can offer it again. */
   private pendingJoin: JoinRequest | null = null;
+  /**
+   * The room's password, as this connection currently believes it. Seeded from the front door's
+   * hand-off and replaceable at runtime (`submitRoomPassword`), because a phone that arrived by
+   * the URL alone starts with none and has to be able to type one.
+   */
+  private roomPassword: string | null;
   private sessionToken: string | null;
   private reconnectAttempt = 0;
   private reconnectHandle: ReturnType<typeof setTimeout> | null = null;
@@ -194,7 +205,7 @@ export class WsRoomStore implements RoomStore {
    */
   private spectatorCountState = $state<number | null>(null);
   private roomPhase = $state<"lobby" | "active" | "ended">("lobby");
-  private teamsModeState = $state(false);
+  private playerModeState = $state<PlayerMode>("individuals");
   private myPlayerIdState = $state<string | null>(null);
   private fold = $state.raw<RoomFoldState>(emptyFold());
   /** The open arming, with the local paint time the surface stamps on it. */
@@ -233,6 +244,7 @@ export class WsRoomStore implements RoomStore {
     // browser-walk found this store politely resuming with an empty string and being told the
     // frame was malformed, after which the phone's join never went out at all.
     this.sessionToken = options.sessionToken === "" ? null : (options.sessionToken ?? null);
+    this.roomPassword = options.password ?? null;
     if (options.autoConnect !== false) this.connect();
   }
 
@@ -247,7 +259,13 @@ export class WsRoomStore implements RoomStore {
         teams: this.rosterTeams,
         spectatorCount: this.spectatorCountState,
       },
-      teamsMode: this.teamsModeState,
+      playerMode: this.playerModeState,
+      // Null until the wire carries a census: the DO counts connections, and a store that
+      // invented one would tell a host a projector was attached to a socket nobody opened
+      // (room-view.ts). The `snapshot` message gains the protocol's `connectionCensus`
+      // (packages/protocol/src/room/diagnostics.ts, already served by the host-authenticated
+      // GET /api/rooms/<CODE>) refreshed on join/leave - tracked in docs/design/surfaces.md.
+      connections: null,
       myPlayerId: this.myPlayerIdState,
       game: this.engineState,
       content: this.contentView(),
@@ -360,7 +378,7 @@ export class WsRoomStore implements RoomStore {
   }
 
   private sendJoin(request: JoinRequest | null): void {
-    const password = this.options.password ?? null;
+    const password = this.roomPassword;
     const hostToken = this.options.hostToken ?? null;
     this.sendMessage({
       type: "join",
@@ -504,7 +522,7 @@ export class WsRoomStore implements RoomStore {
     this.stateVersion = message.stateVersion;
     this.roomPhase = message.phase;
     this.engineState = message.game as GameState | null;
-    this.teamsModeState = message.teamsMode;
+    this.playerModeState = message.playerMode;
     this.boardRounds = message.board.rounds;
     this.pausedState = message.paused;
     this.applyRoster(message.roster);
@@ -601,6 +619,20 @@ export class WsRoomStore implements RoomStore {
     this.pendingJoin = request;
     this.refusalState = null;
     this.sendJoin(request);
+  }
+
+  submitRoomPassword(password: string): void {
+    this.roomPassword = password;
+    // Clearing the refusal FIRST is what makes the retry visible: the screen goes from "that
+    // password did not work" back to waiting, so a second wrong try reads as a new answer
+    // rather than as a screen that never changed.
+    this.refusalState = null;
+    // The same socket, deliberately - both password refusals keep it open (server-messages.ts),
+    // so retrying costs no round trip and no new connection. `pendingJoin` is null for a phone
+    // that was stopped at the door before it ever named itself, and `sendJoin(null)` is the
+    // right message then: it asks whether this connection may be here at all, and the phone
+    // goes on to pick a character once the room says yes.
+    this.sendJoin(this.pendingJoin);
   }
 
   leave(): void {

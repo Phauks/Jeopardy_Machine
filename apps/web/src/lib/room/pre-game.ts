@@ -17,6 +17,7 @@
 //
 // The ONE surface swap left is pre-game -> buzzer, and it is the exception the law names: the
 // game itself changing state, not navigation.
+import { teamsAreOffered, teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { limits } from "@jeopardy/protocol/limits";
 import type { RoomPlayerView, RoomView } from "#lib/room/room-view.ts";
 
@@ -63,6 +64,12 @@ export type TeamsRegionState = {
   canCreateTeam: boolean;
   /** True once you are on a team - the create/move copy differs between the two. */
   hasTeam: boolean;
+  /**
+   * Must this player end up on a team? True in teams mode, FALSE in mixed - where standing
+   * apart is the choice to play solo rather than an unfinished step, and the screen must stop
+   * telling somebody to go and board something.
+   */
+  required: boolean;
 };
 
 export type PreGameRegions = {
@@ -84,7 +91,7 @@ export function preGameRegionsFor(view: RoomView): PreGameRegions {
     identityMode: seated ? "live" : "draft",
     lateJoin: view.phase !== "lobby",
     teams: {
-      shown: view.teamsMode,
+      shown: teamsAreOffered(view.playerMode),
       actionable: seated,
       myTeamId,
       leadsTeam:
@@ -95,6 +102,7 @@ export function preGameRegionsFor(view: RoomView): PreGameRegions {
       atTeamCap,
       canCreateTeam: seated && !atTeamCap,
       hasTeam: myTeamId !== null,
+      required: teamsAreRequired(view.playerMode),
     },
   };
 }

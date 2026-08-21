@@ -25,12 +25,12 @@
   // play devices"). The breakpoints are on the CONTAINER, so a narrow window on a big screen
   // gets the phone layout rather than a stretched one.
   import CharacterPanel from "#lib/room/character-panel.svelte";
-  import HomeButton from "#lib/chrome/home-button.svelte";
+  import AppBar from "#lib/chrome/app-bar.svelte";
   import RosterPanel from "#lib/room/roster-panel.svelte";
   import TeamsPanel from "#lib/room/teams-panel.svelte";
   import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
   import { limits } from "@jeopardy/protocol/limits";
-  import { joinBlock } from "#lib/room/room-refusal.ts";
+  import { joinBlock, passwordPrompt } from "#lib/room/room-refusal.ts";
   import { myPlayer, preGameRegionsFor, uniqueNickname } from "#lib/room/pre-game.ts";
   import type { CharacterDraft } from "#lib/room/character-panel.svelte";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -68,6 +68,8 @@
   // fills in a name and picks a creature only to be turned away by a fact that was true all
   // along (#lib/room/room-refusal.ts).
   const blocked = $derived(joinBlock(view));
+  const door = $derived(passwordPrompt(view));
+  let passwordDraft = $state("");
 
   // The draft is the ONLY screen state here, and it is not a position - it is the answer to
   // "what would I join as", kept until there is a seat to attach it to. Once seated the panel
@@ -147,20 +149,74 @@
 </script>
 
 <div class="pre-game" data-seated={regions.seated} data-teams-mode={regions.teams.shown}>
-  <header class="room-bar">
-    <p class="room-line">
-      Room <strong>{roomCode}</strong>
-      {#if roomNote !== null}<span class="room-note" role="status">{roomNote}</span>{/if}
-    </p>
-    <HomeButton variant="inline" />
-  </header>
+  <!-- The same header bar the front door wears (#lib/chrome/app-bar.svelte). It used to be a
+       room line with a lone "home" button floated to the far right, which read as a stray
+       control rather than as chrome and made a room's top-of-page a different object from the
+       front door's (owner, 2026-08-19). The wordmark IS the way home now, so the button is
+       gone rather than moved - one control, one place, on every surface. -->
+  <AppBar>
+    {#snippet trailing()}
+      <p class="room-line">
+        Room <strong>{roomCode}</strong>
+        {#if roomNote !== null}<span class="room-note" role="status">{roomNote}</span>{/if}
+      </p>
+    {/snippet}
+  </AppBar>
 
-  <div class="regions">
+  <div class="pre-game-body">
+    {#if door.needsPassword}
+      <!-- THE DOOR, and it is the whole screen until it opens. A phone that arrived by the URL
+           alone carries no password - the front door stashes one beside the code, and a QR
+           scan or a pasted link has never been through the front door. It used to be told
+           "this room needs a password / the host has it" with nowhere to type one, which is a
+           dead end dressed as an explanation (deliberately deferred at the M3 reconcile; closed
+           2026-08-19). The socket stayed open the whole time; only the field was missing.
+
+           Everything else is hidden rather than disabled: an unjoined connection is told
+           nothing about the room it is standing outside, which is exactly what makes a password
+           room a password room, so there is nothing behind this to keep on screen. -->
+      <section class="door" aria-label="Room password">
+        <h1>This room has a password</h1>
+        <p class="door-note" role={door.wasWrong ? "alert" : undefined}>
+          {door.wasWrong
+            ? "That one did not work. Check it with whoever is hosting and try again."
+            : "Whoever is hosting can tell you what it is."}
+        </p>
+        <form
+          onsubmit={(event) => {
+            event.preventDefault();
+            const typed = passwordDraft.trim();
+            if (typed === "") return;
+            store.submitRoomPassword(typed);
+          }}
+        >
+          <label class="door-field">
+            <span>Password</span>
+            <!-- svelte-ignore a11y_autofocus - this IS the screen; the only thing to do here is
+                 type, and a phone keyboard opening by itself saves a tap at the door. -->
+            <input
+              type="password"
+              autocomplete="current-password"
+              autocapitalize="none"
+              autocorrect="off"
+              enterkeyhint="go"
+              autofocus
+              bind:value={passwordDraft}
+            />
+          </label>
+          <button type="submit" class="primary" disabled={passwordDraft.trim() === ""}>
+            Go in
+          </button>
+        </form>
+      </section>
+    {:else}
+    <div class="regions">
     <div class="region region-character">
       <CharacterPanel
         value={character}
         mode={regions.identityMode}
-        teamsMode={regions.teams.shown}
+        teamsOffered={regions.teams.shown}
+        teamsRequired={regions.teams.required}
         {nameProblem}
         onChange={changeCharacter}
         onPreviewSound={onPreviewSound}
@@ -193,10 +249,10 @@
     </div>
   </div>
 
-  <!-- Sticky on a phone because the regions are long and the way in should never be a scroll
-       away; a static footer on a laptop, where it always is. It stays MOUNTED after joining and
-       becomes the confirmation line - removing it would be a region disappearing. -->
-  <div class="action-bar">
+    <!-- Sticky on a phone because the regions are long and the way in should never be a scroll
+         away; a static footer on a laptop, where it always is. It stays MOUNTED after joining
+         and becomes the confirmation line - removing it would be a region disappearing. -->
+    <div class="action-bar">
     {#if blocked !== null && !regions.seated}
       <p class="refusal" role="status">
         <strong>{blocked.headline}</strong>
@@ -217,6 +273,8 @@
       <button type="button" class="primary" disabled={blocked !== null} onclick={join}>
         {blocked === null ? (regions.lateJoin ? "Join the game" : "Join the room") : "Waiting for a seat"}
       </button>
+      {/if}
+    </div>
     {/if}
   </div>
 </div>
@@ -230,20 +288,81 @@
     min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    padding: 0.8rem 1rem max(0.8rem, env(safe-area-inset-bottom));
     color: var(--surface-text);
   }
 
-  .room-bar {
+  /* The bar is full-bleed - it is the page's own top edge, exactly as it is on the front door -
+     so the surface's inset lives here rather than on .pre-game. */
+  .pre-game-body {
+    flex: 1;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 0.4rem;
+    flex-direction: column;
+    padding: 0.8rem 1rem max(0.8rem, env(safe-area-inset-bottom));
   }
 
-  .room-line {
+  /* The door is the whole screen, centred, with nothing behind it: an unjoined connection is
+     told nothing about the room it is standing outside. */
+  .door {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+    text-align: center;
+    padding: 2rem 1rem;
+  }
+
+  .door h1 {
     margin: 0;
+    font-family: var(--font-chrome);
+    font-size: 1.3rem;
+    letter-spacing: 0.06em;
+  }
+
+  .door-note {
+    margin: 0;
+    max-inline-size: 44ch;
+    line-height: 1.45;
+    text-wrap: pretty;
+    color: var(--surface-text-muted);
+  }
+
+  .door form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    align-items: stretch;
+    width: min(100%, 22rem);
+  }
+
+  .door-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    text-align: left;
+    font-family: var(--font-chrome);
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--surface-text-muted);
+  }
+
+  .door-field input {
+    font: inherit;
+    font-size: 1.1rem;
+    text-transform: none;
+    letter-spacing: normal;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--surface-border);
+    border-radius: var(--board-radius);
+    background: var(--surface-page);
+    color: var(--surface-text);
+  }
+
+  /* Pushed to the far end of the bar, where a room's identity belongs beside the wordmark. */
+  .room-line {
+    margin-left: auto;
     font-family: var(--font-chrome);
     text-transform: uppercase;
     letter-spacing: 0.12em;

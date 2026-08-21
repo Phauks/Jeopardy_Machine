@@ -20,6 +20,7 @@
     createRoomBody,
     describeCreateFailure,
     handOffAfterCreate,
+    withPlayerMode,
   } from "#lib/landing/create-room-request.ts";
   import { devSurfaces } from "#lib/landing/surface-cards.ts";
   import { limits } from "@jeopardy/protocol/limits";
@@ -30,8 +31,9 @@
   import { page } from "$app/state";
   import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
   import type { CreateState } from "#lib/landing/create-room-panel.svelte";
+  import type { GameLoadResult } from "#lib/landing/game-catalog.ts";
   import type { LobbyListing, RoomSummary } from "@jeopardy/protocol/room/registry";
-  import type { RejoinCandidate } from "#lib/landing/rejoin-panel.svelte";
+  import type { RejoinCandidate } from "#lib/lobby/room-liveness.ts";
 
   // ---- the public listing --------------------------------------------------------------
 
@@ -100,18 +102,49 @@
   const createForm = $state(blankCreateForm());
   let createState = $state<CreateState>({ status: "idle" });
 
+  /**
+   * The definition this room should open with, loaded at the moment of the tap.
+   *
+   * DYNAMIC, all three of them, and for the same reason: the sample game drags the content
+   * schema and the engine's setup path behind it, the club night's game is ~86 KB of documents
+   * and 3.5 MB of pictures, and neither should be carried by the visitors who only came to type
+   * a code. Nothing here is fetched until a host has chosen it.
+   */
+  async function chosenGameDefinition(): Promise<GameLoadResult> {
+    if (createForm.gameChoice === "file") {
+      const { loadGameFromFiles } = await import("#lib/landing/game-catalog.ts");
+      return loadGameFromFiles(createForm.gameFiles);
+    }
+    if (createForm.gameChoice === "event") {
+      const { loadEventGame } = await import("#lib/landing/game-catalog.ts");
+      return loadEventGame(page.url.origin);
+    }
+    const { sampleGameDefinition } = await import("#lib/hotseat/sample-game.ts");
+    return { ok: true, definition: sampleGameDefinition };
+  }
+
   async function createRoom(): Promise<void> {
     createState = { status: "creating" };
     try {
       // Dynamic: the sample game drags the content schema and the engine's setup path behind
       // it, and the front door must not carry that weight for the visitors who only came to
       // type a code. It is fetched at the moment of the tap and never before.
-      const { sampleGameDefinition } = await import("#lib/hotseat/sample-game.ts");
+      const chosen = await chosenGameDefinition();
+      if (!chosen.ok) {
+        createState = { status: "failed", message: chosen.message };
+        return;
+      }
+      // The host's seating choice rides on the GAME, not on the room: how a game seats people
+      // is a rule (create-room-request.ts, withPlayerMode), so it travels with the document and
+      // a room never holds a second copy of the same fact.
       const response = await fetch("/api/rooms", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify(
-          createRoomBody(createForm, { kind: "definition", body: sampleGameDefinition.body }),
+          createRoomBody(createForm, {
+            kind: "definition",
+            body: withPlayerMode(chosen.definition.body, createForm.playerMode),
+          }),
         ),
       });
       if (!response.ok) {

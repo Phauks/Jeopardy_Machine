@@ -106,9 +106,9 @@ Individuals or teams, and how a team buzzes.
 
 | Matrix | Setting | Values | Default | Description |
 | --- | --- | --- | --- | --- |
-| #34 | `playerMode` (Player mode) | `individuals` / `teams` | `"individuals"` | Individual players or shared-score teams. |
-| #35 | `teamBuzzer` (Team buzzer) | `shared-phone` / `any-member` / `rotating-captain` | `"shared-phone"` | shared-phone: one phone per team (simplest and most robust). any-member: first buzz from any teammate counts. rotating-captain: one active buzzer per clue, rotated to keep everyone engaged. _Only read in teams mode._ |
-| #36 | `teamWideEarlyBuzzPenalty` (Team-wide early-buzz penalty) | on / off | `true` | An early buzz locks out the whole team, not just the presser - otherwise multi-phone teams can spam the arm window. _Only read in teams mode._ |
+| #34 | `playerMode` (Player mode) | `individuals` / `teams` / `mixed` | `"individuals"` | individuals: everyone scores for themselves. teams: everyone plays for a shared team score. mixed: teams exist and playing solo is a legitimate choice, so a room can hold three couples and two people who came alone. |
+| #35 | `teamBuzzer` (Team buzzer) | `shared-phone` / `any-member` / `rotating-captain` | `"shared-phone"` | shared-phone: one phone per team (simplest and most robust). any-member: first buzz from any teammate counts. rotating-captain: one active buzzer per clue, rotated to keep everyone engaged. _Only read when teams exist (teams or mixed); soloists are unaffected._ |
+| #36 | `teamWideEarlyBuzzPenalty` (Team-wide early-buzz penalty) | on / off | `true` | An early buzz locks out the whole team, not just the presser - otherwise multi-phone teams can spam the arm window. _Only read when teams exist (teams or mixed). A soloist is their own entity, so it cannot reach them either way._ |
 
 ## End of game (`end`)
 

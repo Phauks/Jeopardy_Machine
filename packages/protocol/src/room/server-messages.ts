@@ -26,7 +26,9 @@
 // full (players AND spectators - both budgets are "this room has no space for you"), 4403
 // join refused, 4000 room-closed. Clients treat any 44xx as "do not reconnect".
 import { z } from "zod";
-import { mediaRefSchema } from "../content/media-ref.ts";
+import { playerModeSchema } from "../settings/groups/teams.ts";
+import { mediaKindSchema } from "../content/media-ref.ts";
+import { idSchema } from "../ids.ts";
 import { extensionBagSchema } from "../ext.ts";
 import { protocolVersion } from "../envelope/wire.ts";
 import { limits } from "../limits.ts";
@@ -169,19 +171,42 @@ export const clueContentTargetSchema = z.discriminatedUnion("kind", [
 ]);
 export type ClueContentTarget = z.infer<typeof clueContentTargetSchema>;
 
+// A clue's media, RESOLVED - what a surface needs to actually paint it, in one object.
+//
+// The clue used to carry `mediaRef` here, which is an id and nothing else. That is exactly
+// right inside a document, where a separate `media` table maps ids to bytes-right-now and
+// moving bytes never touches a content item (content/media-ref.ts). It is exactly wrong on the
+// wire: a phone holds no document, so an id told it there WAS media and gave it no way to
+// learn the kind, the type, the alt text or where the bytes are. Every picture clue rendered as
+// text (owner, 2026-08-19). The room owns the pack, so the room does the lookup once and sends
+// the answer.
+//
+// `url` is absent when the room has no fetchable bytes - a `pending-local` asset that never
+// left the authoring device, or a bundled path nobody resolved before hosting. A surface then
+// shows the alt text, which is what alt has always been for: "a11y, and the fallback when media
+// is missing". Never a broken image.
+export const resolvedMediaSchema = z.strictObject({
+  mediaId: idSchema,
+  kind: mediaKindSchema,
+  mime: z.string().min(1).max(100),
+  alt: z.string().max(300).optional(),
+  url: z.url().optional(),
+});
+export type ResolvedMedia = z.infer<typeof resolvedMediaSchema>;
+
 export const clueContentSchema = z.strictObject({
   target: clueContentTargetSchema,
   // Category title - chrome the display shows above the clue.
   category: z.string().max(80),
   prompt: z
-    .strictObject({ text: z.string().max(2000), media: mediaRefSchema.optional() })
+    .strictObject({ text: z.string().max(2000), media: resolvedMediaSchema.optional() })
     .nullable(),
   // Host only. `accepted` carries the authored equivalents so a host card can show them.
   answer: z
     .strictObject({
       canonical: z.string().max(500),
       accepted: z.array(z.string().max(500)).max(20),
-      media: mediaRefSchema.optional(),
+      media: resolvedMediaSchema.optional(),
     })
     .nullable(),
 });
@@ -249,7 +274,12 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     // room SETTING - it belongs to the game's rule set, not to the host's live controls - and
     // a client cannot derive it: in the lobby the engine has met nobody, so an empty `teams`
     // record says nothing. Without it a teams room's join screen offers no teams at all.
-    teamsMode: z.boolean(),
+    //
+    // The MODE, not a boolean: it was `teamsMode: boolean` until the third mode landed
+    // (2026-08-19), and "mixed" is precisely the case a boolean cannot carry - teams exist AND
+    // playing solo is a legitimate choice, which are two different answers a client needs to
+    // give different screens (settings/groups/teams.ts: teamsAreOffered vs teamsAreRequired).
+    playerMode: playerModeSchema,
     board: boardMaterialSchema,
     // Host-held freeze (the console's pause button). Room-level, not engine-level: the
     // engine has no pause concept, so the room parks its timers and says so.

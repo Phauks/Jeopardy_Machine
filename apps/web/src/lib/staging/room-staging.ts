@@ -8,6 +8,7 @@
 // Colour resolution goes through the avatar manifest (docs/design/theming.md, "Player accents
 // and avatars"): a team's `colorId` is a palette id, exactly like a player's accent, and the
 // hex only ever comes from the generated palette - never from a component.
+import { teamsAreOffered } from "@jeopardy/protocol/settings/player-mode";
 import { accentById } from "#lib/avatars/avatar-manifest.ts";
 import type { StagedOccupant } from "#lib/staging/staged-lobby-2d.svelte";
 import type { StagingStation } from "#lib/staging/staging-layout.ts";
@@ -43,7 +44,12 @@ export function stagingFromRoom(view: RoomView): RoomStaging {
   // An individuals-mode room has no stations at all, and everybody stays in the holding area.
   // That is the honest picture rather than a special case: nobody is choosing a team because
   // there are none, and the water is where you are when you have not.
-  const stations: StagingStation[] = view.teamsMode
+  //
+  // Mixed draws the stations that exist and leaves the soloists in the holding area too - the
+  // same picture, meaning something different: there, standing apart is a choice rather than a
+  // step not yet taken, which is why the copy around it changes and this layout does not
+  // (src/lib/staging/staging-theme.ts names the area for both cases).
+  const stations: StagingStation[] = teamsAreOffered(view.playerMode)
     ? view.roster.teams.map((team) => ({
         stationId: team.teamId,
         label: team.name,

@@ -24,9 +24,19 @@ export const mediaStorageSchema = z.discriminatedUnion("state", [
   z.strictObject({ state: z.literal("pending-local") }),
 ]);
 
+// REVERSED 2026-08-19 (owner: "pictures, videos, audio files, and other files must be
+// renderable"). `kind` was image|audio with a note that video was "deliberately absent until a
+// mode needs it" - the mode needs it. `file` is the open end: anything a clue wants to hand the
+// room that is not one of the three playable kinds, which a surface offers by name and type
+// rather than pretending it can paint. Keeping it an enum rather than a free string is what
+// lets every surface handle every kind exhaustively - a new kind fails to compile instead of
+// falling through to a blank cell.
+export const mediaKindSchema = z.enum(["image", "audio", "video", "file"]);
+export type MediaKind = z.infer<typeof mediaKindSchema>;
+
 export const mediaAssetSchema = z.strictObject({
   id: idSchema,
-  kind: z.enum(["image", "audio"]), // video deliberately absent until a mode needs it
+  kind: mediaKindSchema,
   mime: z.string().min(1).max(100),
   bytes: z.int().positive(), // checked against limits.media caps in lint + upload, not here
   sha256: z.string().regex(/^[0-9a-f]{64}$/), // integrity, dedupe, and re-link key

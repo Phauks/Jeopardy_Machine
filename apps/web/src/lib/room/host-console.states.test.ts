@@ -21,12 +21,30 @@ function markup(
 const fixtureAnswer = "Topsy-Turvy National Park"; // (0,0) of the fixture pack, round 1
 
 describe("host console states (C4)", () => {
-  it("lobby: pre-flight checklist with roster counts and start button", () => {
+  it("lobby: the roster itself, the game-screen setup, and start as an action", () => {
     const store = hostStore();
     const body = markup(store);
-    expect(body).toContain("Pre-flight");
+    // The "Pre-flight" panel was DELETED 2026-08-19 (owner: "pre-flight and roster look the exact
+    // same"). Every count it restated is state on the thing that owns it now: the roster answers
+    // who is here, the game-screen panel answers what the room can see, and Start is an action in
+    // the console's chrome with its readiness attached - one place per fact.
+    expect(body).not.toContain("Pre-flight");
+    expect(body).toContain("Roster");
+    expect(body).toContain("Game screen");
     expect(body).toContain("Start game");
-    expect(body).toContain("30 players in");
+    // The names, not a count of them: the roster is the one place that answers "who is here".
+    expect(body).toContain("Captain Canopy");
+  });
+
+  it("clue open: the PICTURE renders too, not just the words", () => {
+    // Cell (0,0) of the fixture is a picture clue. The wire carried a bare media id until
+    // 2026-08-19, so every picture clue in this room came out as text (owner report).
+    const store = hostStore();
+    store.startGame();
+    store.selectCell(0, 0);
+    const body = markup(store);
+    expect(body).toContain("<img");
+    expect(body).toContain("upside-down waterfall");
   });
 
   it("board up: minimap with values, who-has-control, hidden-wager dot (host-only layer)", () => {

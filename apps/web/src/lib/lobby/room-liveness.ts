@@ -15,6 +15,7 @@
 // the web Worker reading its own D1 table, no DO and no wire protocol involved. It moves to
 // the protocol package the day the room itself answers the question.
 import type { RegistryStatus } from "@jeopardy/protocol/room/registry";
+import type { RememberedRoom } from "#lib/lobby/room-memory.ts";
 
 /** Body of GET /api/rooms/<CODE>/live. Deliberately says nothing else about the room: it is
  * reachable with a code alone, so it must never become a browsable description of a private
@@ -33,6 +34,11 @@ export type RoomLiveness = {
  * Unknown keeps the offer and lets the room itself refuse.
  */
 export type RejoinVerdict = "live" | "gone" | "unknown";
+
+/** A remembered room plus the verdict the probe returned for it - what the front door's rejoin
+ * strip renders. It lives here rather than in the component so the route, the strip and the
+ * tests all name the same type without importing a Svelte file for it. */
+export type RejoinCandidate = RememberedRoom & { verdict: RejoinVerdict };
 
 export function verdictFor(liveness: RoomLiveness): RejoinVerdict {
   if (liveness.registry.status !== "ok") return "unknown";

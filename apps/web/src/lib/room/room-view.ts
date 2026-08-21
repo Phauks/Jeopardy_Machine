@@ -6,7 +6,10 @@
 // nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
+import type { ResolvedMedia } from "@jeopardy/protocol/room/server-messages";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
+import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 
 export type RoomConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
@@ -133,8 +136,20 @@ export type WagerRangeView = {
 export type ClueContentView = {
   categoryTitle: string;
   prompt: string;
+  /**
+   * The clue's picture, sound, video or attachment, already resolved by the room into
+   * something a surface can paint - kind, type, alt text and a URL when the bytes are
+   * fetchable (@jeopardy/protocol room/server-messages.ts, resolvedMediaSchema). Null when the
+   * clue is words only, which is most of them.
+   */
+  media: ResolvedMedia | null;
   /** Host consoles only; null everywhere else (mirror-mode safety starts at the data layer). */
   response: string | null;
+  /**
+   * The ANSWER's media, host-only for the same reason the answer text is: a picture that gives
+   * the answer away must never reach a display or a phone.
+   */
+  responseMedia: ResolvedMedia | null;
 };
 
 export type RoomContentView = {
@@ -153,8 +168,16 @@ export type RoomView = {
   connection: RoomConnectionState;
   phase: RoomPhaseView;
   roster: RoomRosterView;
-  /** True when the room plays in teams (team cards on join, team-scoped room buzz sounds). */
-  teamsMode: boolean;
+  /**
+   * How this room seats people (rules row 34, frozen when the room was created).
+   *
+   * The MODE, not a boolean, since 2026-08-19: "mixed" is a room where teams exist AND playing
+   * solo is a legitimate choice, and that is two different answers a surface needs to give
+   * different screens. Ask through the protocol's predicates rather than comparing here -
+   * `teamsAreOffered` decides whether to draw team machinery at all, `teamsAreRequired` decides
+   * whether a teamless player is unfinished or is simply a soloist.
+   */
+  playerMode: PlayerMode;
   /** This connection's seat; null for host/display/spectator connections. */
   myPlayerId: string | null;
   /**
@@ -174,6 +197,22 @@ export type RoomView = {
   lastJudged: LastJudgedView | null;
   wagerRange: WagerRangeView | null;
   finalWagerRanges: WagerRangeView[];
+  /**
+   * WHO IS ACTUALLY ON A SOCKET, by the role they joined as - the protocol's own census type
+   * (packages/protocol/src/room/diagnostics.ts), counts only, never people.
+   *
+   * The console's first question at 19:55 is "is anything on the projector", and the roster
+   * cannot answer it: a display holds no seat by design (the projector is the host's own screen,
+   * not a participant). `connections.display` is the answer, and it counts displays this console
+   * never opened - a Chromecast, a co-host's laptop, a second projector.
+   *
+   * NULL means "this store cannot know", which is the honest answer in mock mode: the local sim
+   * is one isolated room per tab, so a display window opened beside it is a different room and
+   * counting it would be a lie. The console falls back to the window handle it owns
+   * (src/lib/room/game-screen.ts), which is first-hand either way. The ws store fills this from
+   * the room's snapshot when M3 carries it (docs/design/surfaces.md, the mapping table).
+   */
+  connections: ConnectionCensus | null;
   /** Host pause (C4): a driver concern, not an engine phase - timers freeze, display dims. */
   paused: boolean;
   /**

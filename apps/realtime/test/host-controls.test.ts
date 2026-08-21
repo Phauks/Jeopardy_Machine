@@ -7,7 +7,7 @@
 import { runDurableObjectAlarm } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { clueContentFor, resolveCellContent } from "../src/room/content.ts";
-import { authoredGame, firstCellText } from "./authored-game.ts";
+import { authoredGame, bytelessAsset, firstCellText, pictureAsset } from "./authored-game.ts";
 import {
   compactGame,
   connectBot,
@@ -21,8 +21,8 @@ import {
 } from "./helpers.ts";
 import type { CreateRoomRequestInput } from "@jeopardy/protocol/room/create";
 
-// Drive a room to an open clue: host + one player, start, select the first cell.
-async function roomWithOpenClue() {
+// Drive a room to an open clue: host + one player, start, select a cell.
+async function roomWithOpenClue(cell: { category: number; row: number } = { category: 0, row: 0 }) {
   const code = uniqueCode();
   const { hostToken } = await initializeRoom(code, authoredGame, "content-suite");
   const host = await connectHost(code, hostToken);
@@ -30,7 +30,7 @@ async function roomWithOpenClue() {
   await host.waitFor("roster", (message) => message.roster.players.length === 1);
   host.sendAction({ type: "start-game" });
   await host.takeEvent("game-started");
-  host.sendAction({ type: "select-cell", category: 0, row: 0 });
+  host.sendAction({ type: "select-cell", ...cell });
   await host.takeEvent("clue-presented");
   return { code, hostToken, host };
 }
@@ -45,6 +45,31 @@ describe("clue content on the wire", () => {
     expect(content.category.length).toBeGreaterThan(0);
     expect(content.prompt?.text.length).toBeGreaterThan(0);
     expect(content.answer?.canonical.length).toBeGreaterThan(0);
+  });
+
+  it("RESOLVES a clue's media, so a surface has something to paint", async () => {
+    // The wire carried a bare `mediaId` until 2026-08-19, which told a client there was a
+    // picture and gave it no kind, no type, no alt text and no bytes - every picture clue
+    // rendered as words (owner report). The room owns the pack, so the room does the lookup.
+    const { host } = await roomWithOpenClue({ category: 0, row: 1 });
+    const media = (await host.waitFor("clue-content")).content.prompt?.media;
+    expect(media).toMatchObject({
+      mediaId: pictureAsset.id,
+      kind: "image",
+      mime: "image/webp",
+      alt: pictureAsset.alt,
+      url: "https://media.test/trees.webp",
+    });
+  });
+
+  it("sends an asset with no fetchable bytes WITHOUT a url, keeping its alt text", async () => {
+    // `pending-local` means the bytes never left the authoring device. The honest answer is a
+    // descriptor with no url: the surface says what was meant to be here instead of showing a
+    // broken frame, which is what alt text has always been for.
+    const { host } = await roomWithOpenClue({ category: 0, row: 2 });
+    const media = (await host.waitFor("clue-content")).content.prompt?.media;
+    expect(media?.url).toBeUndefined();
+    expect(media).toMatchObject({ kind: "audio", alt: bytelessAsset.alt });
   });
 
   it("gives a display the prompt and NEVER the answer", async () => {

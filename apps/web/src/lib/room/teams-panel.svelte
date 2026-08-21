@@ -64,12 +64,19 @@
   <header class="region-head">
     <h2 class="region-heading">Teams</h2>
     <p class="region-note">
+      <!-- MIXED CHANGES WHAT STANDING APART MEANS. In teams mode the holding area is an
+           unfinished step and the copy says so; in mixed the same position is a decision
+           somebody made, so the line offers the option instead of issuing an instruction
+           (@jeopardy/protocol settings/groups/teams.ts). -->
       {#if !regions.teams.actionable}
-        Pick a name and join to take a {theme.stationNoun}.
+        Pick a name and join{regions.teams.required ? ` to take a ${theme.stationNoun}` : ""}.
       {:else if regions.teams.hasTeam}
         Tap another {theme.stationNoun} to move - the whole room watches you cross.
-      {:else}
+      {:else if regions.teams.required}
         You are in {theme.holdingAreaNoun}. Tap a {theme.stationNoun} to {theme.boardVerb} it.
+      {:else}
+        You are playing on your own, which is a fine way to play. Tap a {theme.stationNoun} to
+        {theme.boardVerb} it if you would rather share a score.
       {/if}
     </p>
   </header>
@@ -131,6 +138,9 @@
     {#if view.roster.teams.length === 0}
       <p class="no-teams">
         No teams yet. Whoever makes the first one leads it - that could be you.
+        {#if !regions.teams.required}
+          Nobody has to: this room lets you play on your own.
+        {/if}
       </p>
     {/if}
   </div>

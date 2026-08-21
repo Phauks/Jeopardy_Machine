@@ -122,8 +122,14 @@ describe("the regions are ALL present in every pre-game state", () => {
     }
   });
 
-  it("offers a way home from the surface", () => {
-    expect(bodyOf(newStore())).toContain("home-button");
+  it("offers a way home from the surface - the wordmark in the shared header bar", () => {
+    // It was a lone "home" button floated to the right of the room line until 2026-08-19; the
+    // way back is now the same bar the front door wears (#lib/chrome/app-bar.svelte), and the
+    // wordmark is the link. Still an ANCHOR, never history.back(): half the arrivals here are a
+    // QR scan with nothing behind them.
+    const body = bodyOf(newStore());
+    expect(body).toContain('class="wordmark');
+    expect(body).toContain('href="/"');
   });
 });
 
@@ -292,11 +298,31 @@ describe("the at-cap refusal", () => {
   });
 });
 
-describe("individuals-mode rooms keep the region and say what it is", () => {
+describe("the three seating modes, and the two different questions they answer", () => {
   it("never leaves a hole where the teams would be", () => {
     const store = joinedStore();
-    const view = { ...store.view, teamsMode: false };
+    const view = { ...store.view, playerMode: "individuals" as const };
     expect(preGameRegionsFor(view).teams.shown).toBe(false);
+  });
+
+  it("mixed OFFERS teams without REQUIRING one - the case a boolean could not hold", () => {
+    const store = joinedStore();
+    const mixed = preGameRegionsFor({ ...store.view, playerMode: "mixed" as const });
+    expect(mixed.teams.shown).toBe(true);
+    expect(mixed.teams.required).toBe(false);
+  });
+
+  it("teams mode both offers and requires, which is what makes it the strict one", () => {
+    const store = joinedStore();
+    const teams = preGameRegionsFor({ ...store.view, playerMode: "teams" as const });
+    expect(teams.teams.shown).toBe(true);
+    expect(teams.teams.required).toBe(true);
+  });
+
+  it("individuals requires nothing, because there is nothing to require", () => {
+    const store = joinedStore();
+    const solo = preGameRegionsFor({ ...store.view, playerMode: "individuals" as const });
+    expect(solo.teams.required).toBe(false);
   });
 });
 
@@ -305,5 +331,46 @@ describe("nickname de-duplication (A2's auto-suffix)", () => {
     expect(uniqueNickname("Sam", ["Ada", "Bo"])).toBe("Sam");
     expect(uniqueNickname("Sam", ["sam"])).toBe("Sam 2");
     expect(uniqueNickname("Sam", ["Sam", "Sam 2"])).toBe("Sam 3");
+  });
+});
+
+describe("the password door (the gap the M3 reconcile left open)", () => {
+  // A phone that arrived by the URL alone carries no password: the front door stashes one
+  // beside the code, and a QR scan or a pasted link has never been through the front door.
+  // Both password refusals keep the socket open so it can prompt and retry - until 2026-08-19
+  // nothing did, so the room said "the host has it" and offered nowhere to type it.
+  function refusedStore(reason: "password-required" | "bad-password"): LocalSimRoomStore {
+    const store = newStore();
+    store.simRefuse(reason);
+    return store;
+  }
+
+  it("asks for the password instead of explaining the dead end", () => {
+    const body = bodyOf(refusedStore("password-required"));
+    expect(body).toContain("This room has a password");
+    expect(body).toContain('type="password"');
+    expect(body).toContain("Go in");
+  });
+
+  it("reads differently on a retry, so a second wrong try is visibly a new answer", () => {
+    const first = bodyOf(refusedStore("password-required"));
+    const retry = bodyOf(refusedStore("bad-password"));
+    expect(first).toContain("Whoever is hosting can tell you");
+    expect(retry).toContain("did not work");
+    expect(retry).toContain('role="alert"');
+  });
+
+  it("shows NOTHING about the room behind it - that is what a password room is", () => {
+    const body = bodyOf(refusedStore("password-required"));
+    // No roster, no teams, no character picker: an unjoined connection is told nothing about
+    // the room it is standing outside.
+    expect(body).not.toContain('aria-label="Teams"');
+    expect(body).not.toContain("Choose your character");
+  });
+
+  it("is gone the moment the door opens, and the ordinary screen is behind it", () => {
+    const open = newStore();
+    expect(bodyOf(open)).not.toContain("This room has a password");
+    expect(bodyOf(open)).toContain("Choose your character");
   });
 });

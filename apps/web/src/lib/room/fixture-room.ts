@@ -4,6 +4,8 @@
 // store. Fixtures are versioned test data, deliberately imported raw here (fixtures/README.md
 // sanctions dev tooling use); the local-sim store is dev tooling that happens to render
 // through product routes until the ws store exists.
+import { mediaAssetById } from "@jeopardy/protocol";
+import type { ResolvedMedia } from "@jeopardy/protocol/room/server-messages";
 import { parsePortableDocument } from "@jeopardy/protocol";
 import { setupFromGameDefinition } from "@jeopardy/engine/setup";
 import { avatarManifest } from "#lib/avatars/avatar-manifest.ts";
@@ -62,6 +64,27 @@ export function fixtureContentView(includeResponses: boolean): RoomContentView {
   const cellValues = fixtureGameSetup("values-only").rounds.map((round) =>
     round.cells.map((column) => column.map((cell) => cell.value)),
   );
+  // The mock's half of the room's media resolution (apps/realtime/src/room/content.ts): the
+  // fixture pack's own media table, looked up the same way, so the sim and a real room agree on
+  // what a surface receives rather than the sim being the one place pictures never appear.
+  const fixtureMedia = (mediaId: string | undefined): ResolvedMedia | null => {
+    if (mediaId === undefined) return null;
+    // The SIBLING pack, the same one the items come from: the dummy game links its pack
+    // externally (content.kind === "external"), which is exactly the shape a library holds and
+    // exactly the shape that has to be joined before hosting (@jeopardy/protocol,
+    // embedContentPack). Looking only inside an embedded pack found nothing and every fixture
+    // picture rendered as "a file for this clue".
+    const asset = mediaAssetById(fixturePack, mediaId);
+    if (asset === null) return { mediaId, kind: "file", mime: "application/octet-stream" };
+    return {
+      mediaId: asset.id,
+      kind: asset.kind,
+      mime: asset.mime,
+      ...(asset.alt !== undefined && { alt: asset.alt }),
+      ...(asset.storage.state === "remote" && { url: asset.storage.url }),
+    };
+  };
+
   const clueAt = (roundIndex: number, category: number, row: number): ClueContentView | null => {
     const categoryDefinition = rounds[roundIndex]?.categories[category];
     const itemId = categoryDefinition?.cells[row]?.itemId;
@@ -70,7 +93,9 @@ export function fixtureContentView(includeResponses: boolean): RoomContentView {
     return {
       categoryTitle: categoryDefinition.title,
       prompt: item.prompt.text,
+      media: fixtureMedia(item.prompt.media?.mediaId),
       response: includeResponses ? item.answer.canonical : null,
+      responseMedia: includeResponses ? fixtureMedia(item.answer.media?.mediaId) : null,
     };
   };
   const finalSlot = fixtureGameDefinition.body.final;
@@ -81,7 +106,9 @@ export function fixtureContentView(includeResponses: boolean): RoomContentView {
       : {
           categoryTitle: finalSlot.category,
           prompt: finalItem.prompt.text,
+          media: fixtureMedia(finalItem.prompt.media?.mediaId),
           response: includeResponses ? finalItem.answer.canonical : null,
+          responseMedia: includeResponses ? fixtureMedia(finalItem.answer.media?.mediaId) : null,
         };
   return { categoryTitles, cellValues, clueAt, final };
 }

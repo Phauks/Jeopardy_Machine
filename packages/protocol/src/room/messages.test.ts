@@ -238,7 +238,7 @@ describe("room server messages", () => {
         phase: "active",
         game: { phase: "armed" },
         roster: { players: [], teams: [] },
-        teamsMode: false,
+        playerMode: "individuals",
         board: { rounds: [{ categoryTitles: ["Firsts"], cellValues: [[100, 200]] }] },
         paused: false,
         clueContent: null,
@@ -333,9 +333,17 @@ describe("room server messages", () => {
       {
         target: { kind: "final" },
         category: "The final category",
+        // RESOLVED media, not a bare ref: a client holds no document, so the room sends what a
+        // surface can actually paint (resolvedMediaSchema, 2026-08-19).
         prompt: {
           text: "The final prompt",
-          media: { mediaId: "0192f0a0-0000-7000-8000-000000000000" },
+          media: {
+            mediaId: "0192f0a0-0000-7000-8000-000000000000",
+            kind: "image",
+            mime: "image/webp",
+            alt: "A wind turbine at dusk",
+            url: "https://media.example.com/turbine.webp",
+          },
         },
         answer: null,
       },
@@ -390,14 +398,14 @@ describe("room server messages", () => {
       phase: "lobby",
       game: null,
       roster: { players: [], teams: [] },
-      teamsMode: true,
+      playerMode: "teams",
       board: { rounds: [] },
       paused: false,
       clueContent: null,
       timers: [],
     };
     expect(roomServerMessageSchema.safeParse(snapshot).success).toBe(true);
-    for (const missing of ["teamsMode", "board", "timers"]) {
+    for (const missing of ["playerMode", "board", "timers"]) {
       const { [missing]: _dropped, ...rest } = snapshot as Record<string, unknown>;
       expect(roomServerMessageSchema.safeParse(rest).success, missing).toBe(false);
     }

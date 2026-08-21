@@ -37,7 +37,9 @@ So A2 and A3 are one surface with three regions, all present from the first pain
 
 The region does not change when you take a seat; only what its controls mean changes. Before joining they edit a local draft that travels with the join. After joining the identical controls write straight through to the room, which is what replaced the old post-join "identity sheet" modal - a modal being, precisely, a surface that appears and then takes itself away.
 
-**The teams region** (teams mode; individuals-mode rooms get the region saying so, never a hole). Live before you have a seat, so you can see who is on which team while you are still picking a name - only the actions wait for the seat. It holds the staged lobby with the holding area, the team cards, and real team management for players:
+**THREE SEATING MODES, not two** (owner, 2026-08-19; rules matrix row 34). `individuals` - no teams exist. `teams` - everyone plays for a shared team score, and anyone still teamless at start-game is seated as a team of one. `mixed` - teams exist AND playing solo is a legitimate final answer, so a room can hold three couples and two people who came alone without inventing a team for either of them. Every surface asks one of two questions rather than comparing the mode: `teamsAreOffered` (draw the team machinery at all) and `teamsAreRequired` (is a teamless player unfinished, or a soloist). Mixed is the only mode where those two disagree, which is exactly why the old boolean could not express it.
+
+**The teams region** (teams and mixed rooms; individuals-mode rooms get the region saying so, never a hole). Live before you have a seat, so you can see who is on which team while you are still picking a name - only the actions wait for the seat. It holds the staged lobby with the holding area, the team cards, and real team management for players:
 
 - **Join** a host-premade or already-created team: tap its station in the staged view, or its card. You walk across and board it, visibly.
 - **Move** to a different team after joining: every other card keeps its button, reading "Move here". One message, so the room never sees you briefly teamless.
@@ -125,17 +127,23 @@ Autosave to library on every change. Export = versioned JSON (game definition + 
 ### C1. Setup (arrive 15 min early)
 
 Laptop -> Library -> game card -> **"Host this game"** -> room created (DO spun up, code allocated).
-Host console opens; first action offered: **"Open board display"** -> new browser window (route `/room/BQKX7/display`), dragged to the projector, fullscreened. Console and display are independent WS clients of the same room - a display crash never touches the game; reopening the URL restores it instantly. (Casting the display tab via Chromecast/AirPlay works the same way.)
+
+**The console asks one question, once: how does the room see this game?** It is a per-device choice (`screenSetup`, src/lib/host-settings/device-preferences.ts) with two answers and a first-class action attached to each - not two unrelated features, which is what it was until 2026-08-19 (owner: "mirror mode only works when it is the display, but when not in mirror mode, we need a way to generate the screen that will be used for the gameplay").
+
+- **Second screen** (the default, and the common venue): the projector or TV is another output of this laptop. The console's **"Open game screen"** opens `/room/BQKX7/display` as its own popup window - 16:9, named per room so a second press reuses it rather than littering the projector - which the host drags across and fullscreens. The console then SAYS what it knows: game screen open / was closed / none open, in the lobby panel and as a chip in the header in every phase after it. A pop-up blocker is reported, with the URL to open by hand. Console and display remain independent clients of the same room - a display crash never touches the game, reopening restores it instantly, and closing the console never closes the display. (Casting the display window via Chromecast/AirPlay works the same way.)
+- **Mirror this screen** (C1b below): this laptop IS the projector, so there is nothing to open.
+
+**Starting without a game screen warns once, and never blocks.** A room whose projector shows a desktop starts perfectly well and nobody sees it (found by the 2026-08-16 host-loop walk); pressing **Start game** in that state says so and offers "Start anyway", because a small room run off a single laptop is a legitimate setup. An EMPTY room is the different failure: the engine has nobody to seat, so Start is refused with the reason on the button.
 
 ### C1b. Mirrored single-screen setups (owner-specified 2026-08-13)
 
-Not every venue gives the host an extended desktop - sometimes the laptop screen IS the projector (mirrored), so whatever the host sees, the room sees. The console needs an explicit **mirror mode**:
+Not every venue gives the host an extended desktop - sometimes the laptop screen IS the projector (mirrored), so whatever the host sees, the room sees. This is the second answer to C1's question, chosen in the same control (and forced for one render by the `?mirror` link):
 
 - Toggling mirror mode reshapes the console into a display-first layout: the board/clue fills the screen exactly like the public display, with host controls reduced to a slim, unobtrusive dock (arm / correct / wrong / no-takers / undo) that is acceptable for the room to see.
 - **Answers never render on a mirrored screen.** The private layer (per-clue correct responses, DD locations, wager amounts in progress) moves to one of: (a) the **host companion view** - a phone-sized route the host opens on their own phone, joined with a host token, showing exactly the private layer synced to the current clue; or (b) the **print pack** (flow B4) as the low-tech fallback.
 - Keyboard shortcuts still work in mirror mode (the dock is for visibility, not the only input).
-- Mirror mode is a per-device toggle (like audio routing), not a room setting - a co-host on a second laptop can run the full private console simultaneously.
-- **It is entered from the console's own chrome** (owner-specified 2026-08-17): a labelled toggle in the header showing its state, the same switch as the cog's and the dock's. It began as a URL query, which is not a control anybody can reach at the moment they discover the projector is mirroring their laptop. `?mirror` survives as a way to OPEN a console already mirrored - it seeds the device preference rather than overriding it, so leaving works from any of the three.
+- Mirror mode is a per-device choice (like audio routing), not a room setting - a co-host on a second laptop can run the full private console simultaneously.
+- **It is entered from the console's own chrome** (owner-specified 2026-08-17): a labelled toggle in the header showing its state, the same switch as the cog's and the dock's. It began as a URL query, which is not a control anybody can reach at the moment they discover the projector is mirroring their laptop. `?mirror` survives as a way to OPEN a console already mirrored - it seeds the device preference rather than overriding it, so leaving works from any of the three. Since 2026-08-19 it is one half of `screenSetup`, the single question C1 asks about how the room sees the game.
 
 ### C1c. The cog (owner-specified 2026-08-16, shipped)
 
@@ -143,7 +151,7 @@ One settings panel on the console, opened **in place** - a rail beside the conso
 
 It has two halves and says which is which, because the difference is not cosmetic:
 
-- **This device** - local, instant, stored on this laptop, invisible to everyone else: **display text size** and **console text size** as independent controls (a projector is read across a room, a console at arm's length - the same slider for both is the wrong control), room audio here plus master volume, mirror mode, manual mode, timer visibility, roster density, and stage motion (moving / still / no 3D).
+- **This device** - local, instant, stored on this laptop, invisible to everyone else: **display text size** and **console text size** as independent controls (a projector is read across a room, a console at arm's length - the same slider for both is the wrong control), room audio here plus master volume, **how the room sees this game** (second screen / mirror - C1's one question, also asked on the console's game-screen panel where the action lives), manual mode, timer visibility, roster density, and stage motion (moving / still / no 3D).
 - **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, password, the two caps, spectators allowed.
 
 The display type scale reaches the projector window of the same browser live, because both windows read one device-preferences document (C1's laptop-plus-projector setup is two tabs of one origin). A projector driven by a different machine has its own, which the panel says.
@@ -154,7 +162,13 @@ The display type scale reaches the projector window of the same browser live, be
 
 ### C2. Doors open
 
-Display shows the themed title screen + giant QR + code. Console shows live roster with connection health dots, team assignments, rename/kick, and the pre-flight checklist: display connected · N players · sound on · rules preset · start.
+Game screen shows the themed title screen + giant QR + code. The console has its own **join panel**, open in the lobby by default and reachable from "Join info" in any phase - a rail beside the console, never a page (the persistent-layout law), so the roster keeps filling behind it:
+
+- the **room code**, set in the board's value face at a size a room can read off a laptop screen;
+- the **QR**, drawn large enough to scan from a few feet, and again at `min(46vh, 46vw)` in the **"Show fullscreen"** state - the same panel growing to fill the screen (plus a best-effort Fullscreen API request) for holding the laptop up to a room;
+- the **join link**, with **Share link** (the Web Share API first - the phone-to-phone path into a group chat, and the only one that reaches somebody who is not in the room) and **Copy link**, falling back to the clipboard and finally to "read the code out instead". The shared text carries the link AND the code, because the two fail differently.
+
+**Streamer mode's boundary is the opposite here, deliberately.** `hideJoinCode` means "stop broadcasting the code on SHARED surfaces": the game screen drops the code, the QR and the join URL from its markup entirely. The console is the host's own private screen - it already shows every answer - so it KEEPS all three and says out loud that they are not on the big screen. Hiding them there would protect nothing and would leave a streaming host unable to admit a latecomer.
 
 **The roster panel** (owner-specified 2026-08-17: "show all player data, so host can force renaming of teams, names, kicking, etc. Also show spectators") is a rail beside the console, open by default in the lobby and one click away in the header for the rest of the night - never a screen the host leaves the game for (the persistent-layout law). It carries:
 
@@ -162,6 +176,8 @@ Display shows the themed title screen + giant QR + code. Console shows live rost
 - **Every team**: members with the leader marked, colour, lock state, and the team's room-audible buzz sound.
 - **The audience as a count.** Spectators join anonymously and hold no seat, so there is no list of them to show and never will be - what exists is how many are watching, counted by the room. A console that has not been told says so rather than printing zero.
 - **Host powers, behind each row's "..."** (the same overflow rule the team cards follow): rename a player, move them between teams or off one, hand a team's leadership over, rename or lock a team, and remove somebody from the room - which asks a second time, because it ends their evening. Host supremacy holds throughout: a locked team still admits the host's seating, and a host rename is neither rate-limited nor blocked by the armed-window lock.
+
+The console's lobby is then two panels, each owning its own facts: **Game screen** (the setup choice, the window state, the room's display census) and **Roster** (who is here by name, connection health, teams, spectators - detailed below). The old "Pre-flight" checklist was deleted 2026-08-19 (owner: "pre-flight and roster look the exact same, what was the benefit?") - it restated counts the roster already showed and printed the display URL as a hint. One place per fact; **Start game** moved into the console's chrome as an action with its readiness attached. Team drag-to-rebalance and rename/kick from the console remain to do.
 
 ### C3. Sound check (optional, 60 seconds, worth it)
 
@@ -189,7 +205,7 @@ Console is keyboard-first (spacebar = arm, ←/→ = wrong/correct, U = undo) wi
 
 - **Host laptop dies**: room state lives in the DO, not the laptop. Reopen console URL on any device -> full resume. (Hardening in M6; the architecture guarantees it from M3.)
 - **Venue Wi-Fi dies**: phones auto-rejoin on recovery (A5); if it's truly dead, the host falls back to hands-up - and the console still works as scoreboard via phone hotspot. Degrade gracefully, never brick the night.
-- **Projector/display loss**: reopen display URL; meanwhile the console alone can carry a small room.
+- **Projector/display loss**: the console notices ("Game screen was closed") and offers **Reopen game screen** - it restores from room state, since the display holds nothing of its own; meanwhile the console alone can carry a small room.
 - **Disputes**: undo + override + reopen-clue are the escape hatches for every judging argument.
 
 ### C7. After
@@ -209,7 +225,7 @@ Two customization tiers that never collide:
 
 **Skin tone (owner-specified 2026-08-16).** The Mini Characters carry a curated tone axis alongside the accent, recoloured through the same palette mechanism. Three rules, all load-bearing: it is an **explicit choice**, never inferred from a name, an avatar, or anything else; the default is **neutral**, meaning the pack's own colors and not a tone the product picked; and it is offered **only for the human avatars**, because the pets have no skin cells and a control that silently does nothing would be a lie. The set and the reasoning behind its numeric labels live in tools/avatar-bake/src/skin-tone-palette.mjs.
 
-**Buzz sounds are team-scoped in team mode (owner-specified 2026-08-13).** The room-audible buzz-in sound belongs to the team tier: the leader picks it, and when any member wins the buzz the room hears the _team's_ sound while the display shows the team name/color - a **double confirmation** (audio + visual) of who has been selected. One sound per team is learnable by the host and crowd; per-player sounds at 20 teams x 5 members would be noise. Personal buzzer sounds still exist: in individuals mode they ARE the room sound; in team mode they play **locally on the buzzing player's own phone only** as private feedback. The display may additionally show _which member_ buzzed, small, under the team name - identification without audio clutter.
+**Buzz sounds are team-scoped in team mode (owner-specified 2026-08-13).** The room-audible buzz-in sound belongs to the team tier: the leader picks it, and when any member wins the buzz the room hears the _team's_ sound while the display shows the team name/color - a **double confirmation** (audio + visual) of who has been selected. One sound per team is learnable by the host and crowd; per-player sounds at 20 teams x 5 members would be noise. Personal buzzer sounds still exist: in individuals mode they ARE the room sound; on a team they play **locally on the buzzing player's own phone only** as private feedback. In MIXED mode both are true at once, per player: a soloist's own sound is the room sound, a team member's is private and the team's is heard. The display may additionally show _which member_ buzzed, small, under the team name - identification without audio clutter.
 
 **Post-join customization (owner-specified 2026-08-13; how it is reached amended 2026-08-16).** Joining is not a one-shot identity commitment. There is nothing to reopen any more: the character region is simply still there after you join, with the same controls, now writing straight through to the room. The "tap your own chip to open a sheet" affordance and the sheet itself are gone - a modal that appears and takes itself away is the thing the persistent-layout law exists to stop. Leaders edit team name and lock in place on their own team card, behind its "...". Changes apply immediately and sync everywhere. Guardrails unchanged: name changes are rate-limited (anti-confusion, not anti-fun), and identity edits are locked during the brief armed/answering window so the display never relabels mid-adjudication.
 

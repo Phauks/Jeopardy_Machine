@@ -8,6 +8,7 @@
 // Room tier vs engine tier (mirrors the M3 split in packages/protocol/src/room/roster.ts):
 // the roster (identity, teams, leadership) lives HERE and never in engine state; the engine
 // only learns seats at start-game. Roster edits in the lobby need no engine actions.
+import { teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
@@ -125,6 +126,15 @@ export class LocalSimRoomStore implements RoomStore {
     hostLabel: "",
   });
   private refusalState = $state.raw<RoomRefusalView | null>(null);
+  // The non-player connections the sim is pretending exist: a projector plugged in, an audience
+  // watching. Players are counted from the roster instead, because the sim already tracks their
+  // connectedness (simSetConnected) and a seat outlives a dropped phone.
+  private simDisplays = $state(0);
+  // NULL until the sim panel plugs one in, and that is the difference between "nobody is
+  // watching" and "nothing has told me" (room-view.ts, `spectatorCount`): the census below
+  // counts the sockets this simulated room actually has, and the roster reports only what the
+  // room has been told to claim.
+  private simSpectators = $state<number | null>(null);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
@@ -153,13 +163,15 @@ export class LocalSimRoomStore implements RoomStore {
       roster: {
         players: this.rosterPlayers,
         teams: this.rosterTeams,
-        // NULL, not 0. A mock room is one tab (docs/design/surfaces.md "Known gaps"): a
-        // spectator would be a separate simulation in another tab, so this store genuinely
-        // cannot know whether anyone is watching, and saying "0 watching" would be the console
-        // inventing a number about a room it cannot see. Only the DO counts spectators.
-        spectatorCount: null,
+        // NULL, not 0, until something says otherwise. A mock room is one tab
+        // (docs/design/surfaces.md "Known gaps"): a spectator would be a separate simulation in
+        // another tab, so an untold store cannot know whether anyone is watching, and "0
+        // watching" would be the console inventing a number about a room it cannot see. The sim
+        // panel's "audience" control is the one thing that can tell it, and then the roster and
+        // the census below report the SAME number rather than disagreeing on one screen.
+        spectatorCount: this.simSpectators,
       },
-      teamsMode: this.setup.settings.teams.playerMode === "teams",
+      playerMode: this.setup.settings.teams.playerMode,
       myPlayerId: this.myPlayerId,
       game: this.engineState,
       content: this.content,
@@ -172,6 +184,20 @@ export class LocalSimRoomStore implements RoomStore {
       lastJudged: this.lastJudged,
       wagerRange: this.wagerRange,
       finalWagerRanges: this.finalWagerRanges,
+      // The census the DO would count (packages/protocol/src/room/diagnostics.ts). The sim can
+      // justify every number here: one host connection (this console, or the one the simulated
+      // room implies), players from the roster's own connectedness, and displays/spectators from
+      // what the sim panel has been told to pretend. Crucially it does NOT count a display
+      // window the host opened beside this tab: in mock mode that window is a different isolated
+      // room, and the console's own window handle is what answers for it (game-screen.ts).
+      connections: {
+        total: 1 + this.connectedPlayerCount + this.simDisplays + (this.simSpectators ?? 0),
+        host: 1,
+        player: this.connectedPlayerCount,
+        display: this.simDisplays,
+        spectator: this.simSpectators ?? 0,
+        unjoined: 0,
+      },
       paused: this.pausedState,
       settings: this.roomSettings,
       // This store IS the room it describes: its settings are the ones in force, whether they
@@ -180,6 +206,10 @@ export class LocalSimRoomStore implements RoomStore {
       settingsKnown: true,
       refusal: this.refusalState,
     };
+  }
+
+  private get connectedPlayerCount(): number {
+    return this.rosterPlayers.filter((player) => player.connected).length;
   }
 
   // --- engine dispatch + event fan-out ---------------------------------------------------
@@ -354,6 +384,15 @@ export class LocalSimRoomStore implements RoomStore {
    */
   private refuse(reason: RoomRefusalView["reason"]): void {
     this.refusalState = { reason, at: Date.now() };
+  }
+
+  /**
+   * Put this mock connection in a refused state on purpose - the sim panel's refusal probes and
+   * the surface tests both need to SEE the screens a real room's refusals produce, and a mock
+   * room never produces them on its own (it has no password, no cap it enforces, no door).
+   */
+  simRefuse(reason: RoomRefusalView["reason"]): void {
+    this.refuse(reason);
   }
 
   join(request: JoinRequest): void {
@@ -626,14 +665,15 @@ export class LocalSimRoomStore implements RoomStore {
       player.teamId === null
         ? undefined
         : this.rosterTeams.find((entry) => entry.teamId === player.teamId);
-    // Teams mode requires a teamId on every seat; an unteamed player (fixture late joiners,
-    // solo-minded guests) becomes a solo team of one, named after them - the same seating
-    // policy the M3 room will need for the "2 unteamed late joiners" roster case.
-    const teamsMode = this.setup.settings.teams.playerMode === "teams";
+    // Teams mode REQUIRES a teamId on every seat, so an unteamed player (fixture late joiners,
+    // solo-minded guests) becomes a solo team of one named after them - the same seating policy
+    // the real room applies at start-game. Mixed does NOT: a teamless player there chose to
+    // play solo, and their scoring entity is themselves (@jeopardy/protocol
+    // settings/groups/teams.ts, teamsAreRequired).
     const seatTeam =
       team !== undefined
         ? { teamId: team.teamId, teamName: team.name }
-        : teamsMode
+        : teamsAreRequired(this.setup.settings.teams.playerMode)
           ? { teamId: player.playerId, teamName: player.nickname }
           : {};
     this.dispatch({
@@ -754,6 +794,29 @@ export class LocalSimRoomStore implements RoomStore {
         playerId: player.id,
       });
     });
+  }
+
+  /**
+   * Attach or unplug simulated projectors and audience - the census the host console reads to
+   * answer "is anything on the big screen" (RoomView.connections). Displays hold no seat and are
+   * in neither participant budget, so this touches the roster's PLAYERS not at all; naming an
+   * audience does reach `roster.spectatorCount`, because a room that can count watchers reports
+   * the same number in both places.
+   */
+  simSetConnections(patch: { displays?: number; spectators?: number }): void {
+    if (patch.displays !== undefined) this.simDisplays = Math.max(0, Math.trunc(patch.displays));
+    if (patch.spectators !== undefined) {
+      this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
+    }
+  }
+
+  /**
+   * A mock room has no door to knock on: it is one tab, it holds no password, and it has never
+   * refused anybody for one. Accepting the password and doing nothing is the honest mock -
+   * clearing a refusal that cannot exist would be theatre.
+   */
+  submitRoomPassword(): void {
+    this.refusalState = null;
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

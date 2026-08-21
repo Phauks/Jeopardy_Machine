@@ -33,8 +33,13 @@ export type {
 } from "./envelope/migration.ts";
 
 // content layer
-export { mediaAssetSchema, mediaRefSchema, mediaStorageSchema } from "./content/media-ref.ts";
-export type { MediaAsset, MediaRef } from "./content/media-ref.ts";
+export {
+  mediaAssetSchema,
+  mediaKindSchema,
+  mediaRefSchema,
+  mediaStorageSchema,
+} from "./content/media-ref.ts";
+export type { MediaAsset, MediaKind, MediaRef } from "./content/media-ref.ts";
 export { contentItemSchema, contentItemTypeSchema, tagSchema } from "./content/content-item.ts";
 export type { ContentItem, ContentItemType, Tag } from "./content/content-item.ts";
 export {
@@ -54,6 +59,8 @@ export type {
   SettingsMap,
 } from "./settings/definition.ts";
 export { settingsGroups } from "./settings/registry.ts";
+export { playerModeSchema, teamsAreOffered, teamsAreRequired } from "./settings/groups/teams.ts";
+export type { PlayerMode } from "./settings/groups/teams.ts";
 export {
   defaultSettings,
   resolveSettings,
@@ -119,6 +126,13 @@ export {
   resolveGameRules,
 } from "./modes/jeopardy/game-definition.ts";
 export type { GameDefinition, GameDefinitionBody } from "./modes/jeopardy/game-definition.ts";
+export {
+  embedContentPack,
+  mediaAssetById,
+  referencedItemIds,
+  resolveBundledMedia,
+} from "./modes/jeopardy/compose.ts";
+export type { EmbedRefusal, EmbedResult } from "./modes/jeopardy/compose.ts";
 
 // the assembled registry - the one entry point for opening any portable document
 export { documentRegistry, parsePortableDocument } from "./migrations/registry.ts";

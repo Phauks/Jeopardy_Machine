@@ -18,6 +18,7 @@
     createFormProblems,
     playerCapBounds,
   } from "#lib/landing/create-room-request.ts";
+  import { gameCatalog } from "#lib/landing/game-catalog.ts";
   import { limits } from "@jeopardy/protocol/limits";
   import type { CreateRoomForm } from "#lib/landing/create-room-request.ts";
   import type { RegistryStatus } from "@jeopardy/protocol/room/registry";
@@ -106,6 +107,71 @@
       </div>
     </fieldset>
 
+    <!-- WHICH GAME. First, because it is the only choice here that decides what the night
+         actually is - everything below it is about the room, not the game. The file option is a
+         choice by name rather than an import affordance hidden somewhere: "the game I brought"
+         is a first-class answer (game-catalog.ts). -->
+    <fieldset class="field listing-field game-field">
+      <legend class="field-label">Which game</legend>
+      <div class="segmented">
+        {#each gameCatalog as entry (entry.id)}
+          <label class:selected={form.gameChoice === entry.id}>
+            <input type="radio" name="game-choice" value={entry.id} bind:group={form.gameChoice} />
+            <span class="segment-title">{entry.title}</span>
+            <span class="segment-note">{entry.note}</span>
+          </label>
+        {/each}
+      </div>
+      {#if form.gameChoice === "file"}
+        <!-- Both files at once: a game that keeps its questions in a separate pack needs the
+             pack too, and asking for them one at a time is a wizard step. Which file is which
+             is decided by the FORMAT inside, never by the name. -->
+        <label class="file-field">
+          <span class="field-label">Game file, and its pack if it has one</span>
+          <input
+            type="file"
+            accept=".json,application/json"
+            multiple
+            onchange={(event) => {
+              form.gameFiles = Array.from(event.currentTarget.files ?? []);
+            }}
+          />
+        </label>
+      {/if}
+    </fieldset>
+
+    <!-- HOW PEOPLE PLAY, and it belongs on this form because there is nowhere else to put it:
+         teams mode is a rule of the GAME, so it is fixed the moment the room opens and no
+         console switch can flip it mid-night. Without this control every room the front door
+         made was an individuals room, and the pre-game screen's teams region said so - "this
+         room plays as individuals" with no way to have asked for anything else (owner report
+         2026-08-19, "main join screen does not show how to create a team or join a team"). -->
+    <fieldset class="field listing-field player-mode-field">
+      <legend class="field-label">How people play</legend>
+      <div class="segmented">
+        <label class:selected={form.playerMode === "individuals"}>
+          <input
+            type="radio"
+            name="player-mode"
+            value="individuals"
+            bind:group={form.playerMode}
+          />
+          <span class="segment-title">Individuals</span>
+          <span class="segment-note">No teams at all</span>
+        </label>
+        <label class:selected={form.playerMode === "teams"}>
+          <input type="radio" name="player-mode" value="teams" bind:group={form.playerMode} />
+          <span class="segment-title">Teams</span>
+          <span class="segment-note">Everyone on a team</span>
+        </label>
+        <label class:selected={form.playerMode === "mixed"}>
+          <input type="radio" name="player-mode" value="mixed" bind:group={form.playerMode} />
+          <span class="segment-title">Mixed</span>
+          <span class="segment-note">Teams, or play solo</span>
+        </label>
+      </div>
+    </fieldset>
+
     <label class="field">
       <span class="field-label">Password</span>
       <input
@@ -176,39 +242,44 @@
 
 <style>
   /* Board materials (docs/decisions/2026-08-16-persistent-layout-and-pregame-rework.md, art
-     direction): a category-colored panel with fields sunk into it as wells. Derived from
-     --board-* rather than the chrome tokens so it stays legible under every preset, including
-     the light paper one where --surface-page and --surface-text converge. */
+     direction): fields sunk into the surrounding cell as wells. It carries no fill of its own
+     since 2026-08-18 - it opens INSIDE the counter band rather than standing beside it as a
+     slab of its own, and a second colored panel inside a cell reads as a page within a page
+     (docs/decisions/2026-08-18-front-door-architecture.md). Derived from --board-* rather than
+     the chrome tokens so it stays legible under every preset, including the light paper one
+     where --surface-page and --surface-text converge. */
   .create {
     --create-ink: var(--clue-text-color);
     --create-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
     --create-rule: color-mix(in srgb, var(--clue-text-color) 24%, transparent);
-    --create-well: color-mix(in srgb, var(--board-category-bg) 58%, #000000);
+    --create-well: color-mix(in srgb, var(--board-cell-bg) 55%, #000000);
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: clamp(1rem, 2.2vw, 1.5rem);
-    background: var(--board-category-bg);
     color: var(--create-ink);
   }
 
+  /* No section number any more: the numbered headings ("01 Join", "02 Create", "03 Public
+     rooms") belonged to a page of four equal panels, and this panel is now a disclosure the
+     Host button opens (docs/decisions/2026-08-18-front-door-architecture.md). */
   .panel-heading {
     margin: 0;
     font-family: var(--font-chrome);
-    font-size: 0.95rem;
     font-weight: 400;
+    font-size: 0.9rem;
     text-transform: uppercase;
-    letter-spacing: 0.14em;
-    /* Balanced with the other panel headings: a two-word heading must never drop its last
-       word onto a line of its own when the control column narrows. */
-    text-wrap: balance;
+    letter-spacing: 0.16em;
   }
 
+  /* A form column, not a page width: name and password fields stretched across a 1440px laptop
+     look like a database admin screen, and the eye has to travel the whole window to read a
+     label and reach its input. */
   .create-form {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.6rem 0.7rem;
     align-items: end;
+    max-width: 46rem;
   }
 
   .field {
@@ -223,6 +294,8 @@
 
   .name-field,
   .listing-field,
+  .player-mode-field,
+  .game-field,
   .verdict,
   .create-button {
     grid-column: 1 / -1;
@@ -274,9 +347,24 @@
     color: var(--create-muted);
   }
 
+  /* auto-fit rather than a fixed two: the listing control has two options and "how people play"
+     has three since mixed landed, and a hard column count would have squeezed the third out. */
+  .file-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+  }
+
+  .file-field input {
+    font: inherit;
+    font-size: 0.8rem;
+    color: var(--create-ink);
+  }
+
   .segmented {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
     gap: 0.4rem;
   }
 
@@ -364,7 +452,7 @@
     background: var(--board-value-color);
     /* Near-black derived from the panel's own hue, so the slab reads as ink on gold in every
        preset instead of borrowing a chrome token that may be the same color as the panel. */
-    color: color-mix(in srgb, var(--board-category-bg) 26%, #000000);
+    color: color-mix(in srgb, var(--board-cell-bg) 26%, #000000);
     cursor: pointer;
   }
 
