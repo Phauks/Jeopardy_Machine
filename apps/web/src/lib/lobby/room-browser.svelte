@@ -7,8 +7,8 @@
   // (docs/research/06-join-flow-patterns.md, "the server-browser lineage").
   //
   // Server-browser conventions kept (docs/decisions/2026-08-14-room-visibility-and-lobby.md):
-  // newest first, a lock on password rooms, capacity as a fraction, running games dimmed, an
-  // inline per-card password prompt, and NO live socket - it polls, because browsing is not
+  // newest first, capacity as a fraction, running games dimmed, one tap per card (there is no
+  // second secret to collect since 2026-08-20), and NO live socket - it polls, because browsing is not
   // playing. What is NOT kept is Steam's filter furniture: against a handful of rooms, a lock
   // badge plus one "open rooms only" toggle is the whole of what scales down.
   //
@@ -31,23 +31,19 @@
     visibleRooms?: readonly RoomSummary[] | null;
     /** True when something is narrowing the list, so "none" can say which "none" it means. */
     filterActive?: boolean;
-    openOnly?: boolean;
-    onOpenOnly?: ((next: boolean) => void) | null;
     /** The fetch itself failed (offline, 500). Never fatal - the code box still works. */
     listingError?: string | null;
     /** False until the first fetch answers - an empty list with no verdict behind it yet. */
     loaded?: boolean;
     /** A complete code is in the box: the list steps back rather than competing for the tap. */
     dimmed?: boolean;
-    onJoinRoom: (room: RoomSummary, password: string) => void;
+    onJoinRoom: (room: RoomSummary) => void;
     onRefresh?: (() => void) | null;
   };
   let {
     listing,
     visibleRooms = null,
     filterActive = false,
-    openOnly = false,
-    onOpenOnly = null,
     listingError = null,
     loaded = true,
     dimmed = false,
@@ -55,7 +51,6 @@
     onRefresh = null,
   }: Props = $props();
 
-  let expandedRoomCode = $state<string | null>(null);
 
   const registryBroken = $derived(listing.registry.status !== "ok");
   const listingAnswering = $derived(!registryBroken && listingError === null);
@@ -86,14 +81,6 @@
       <span class="browser-count">{count}</span>
     {/if}
     <div class="browser-tools">
-      <label class="open-only" class:on={openOnly}>
-        <input
-          type="checkbox"
-          checked={openOnly}
-          onchange={(event) => onOpenOnly?.(event.currentTarget.checked)}
-        />
-        <span>Open rooms only</span>
-      </label>
       <span class="freshness">
         {allRooms.length === limits.lobby.listingMax
           ? `Newest ${String(limits.lobby.listingMax)}`
@@ -142,15 +129,8 @@
               {room}
               fetchedAt={listing.fetchedAt}
               {dimmed}
-              expanded={expandedRoomCode === room.code}
-              onSelect={(picked, password) => {
-                onJoinRoom(picked, password);
-              }}
-              onExpand={(picked) => {
-                expandedRoomCode = picked.code;
-              }}
-              onCollapse={() => {
-                expandedRoomCode = null;
+              onSelect={(picked) => {
+                onJoinRoom(picked);
               }}
             />
           </li>
@@ -161,82 +141,8 @@
 </section>
 
 <style>
-  /* Board materials, not chrome materials: this region sits on the gutter color and its rooms
-     are cells (room-card.svelte). Deriving from --board-* keeps it legible under every preset,
-     including the light paper one, where the chrome tokens collapse toward each other. */
-  .room-browser {
-    --browser-ink: var(--clue-text-color);
-    --browser-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
-    --browser-rule: color-mix(in srgb, var(--clue-text-color) 22%, transparent);
-    display: flex;
-    flex-direction: column;
-    gap: 0.7rem;
-    color: var(--browser-ink);
-    transition: opacity 150ms ease;
-  }
 
-  /* Stepped back rather than switched off: a complete code is what happens next, but the list
-     it was typed over stays readable (decision 2026-08-18 §1). */
-  .room-browser.dimmed {
-    opacity: 0.55;
-  }
 
-  .browser-head {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.9rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--browser-rule);
-  }
-
-  .browser-title {
-    margin: 0;
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    font-size: 0.9rem;
-  }
-
-  .browser-count {
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    font-size: 0.7rem;
-    color: var(--board-value-color);
-  }
-
-  .browser-tools {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 0.5rem 0.9rem;
-    margin-left: auto;
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.66rem;
-    color: var(--browser-muted);
-  }
-
-  /* The one filter the list's size justifies. The lock badge on a card carries the rest of the
-     password story (docs/research/06-join-flow-patterns.md, pattern 5). */
-  .open-only {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    cursor: pointer;
-  }
-
-  .open-only.on {
-    color: var(--board-value-color);
-  }
-
-  .open-only input {
-    accent-color: var(--board-value-color);
-    width: 0.9rem;
-    height: 0.9rem;
-  }
 
   .refresh {
     font: inherit;
@@ -304,7 +210,6 @@
     flex: 1;
   }
 
-  .open-only input:focus-visible,
   .refresh:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;

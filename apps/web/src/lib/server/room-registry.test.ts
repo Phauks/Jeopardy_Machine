@@ -54,7 +54,6 @@ const liveRow = {
   title: "Pub quiz night",
   host_label: "Board Game Club",
   listing: "public",
-  has_password: 1,
   phase: "active",
   player_count: 12,
   player_cap: limits.room.playerSoftCap,
@@ -75,7 +74,6 @@ describe("registering a room", () => {
       title: "Robert'); DROP TABLE rooms;--",
       hostLabel: "Board Game Club",
       listing: "public",
-      hasPassword: true,
       playerCap: 24,
       spectatorCap: 40,
       spectatorsAllowed: true,
@@ -104,7 +102,6 @@ describe("registering a room", () => {
       title: "Staff rehearsal",
       hostLabel: "",
       listing: "private",
-      hasPassword: false,
       playerCap: 8,
       spectatorCap: limits.room.spectatorSoftCap,
       spectatorsAllowed: false,
@@ -118,7 +115,6 @@ describe("registering a room", () => {
       "Staff rehearsal",
       "",
       "private",
-      0,
       8,
       limits.room.spectatorSoftCap,
       0,
@@ -150,7 +146,6 @@ describe("listing public rooms", () => {
         title: "Pub quiz night",
         hostLabel: "Board Game Club",
         listing: "public",
-        hasPassword: true,
         phase: "active",
         playerCount: 12,
         playerCap: limits.room.playerSoftCap,
@@ -178,13 +173,6 @@ describe("listing public rooms", () => {
     await listPublicRooms(database, 1, 0);
     await listPublicRooms(database, 1, 7);
     expect(database.calls.map((call) => call.values[1])).toEqual([limits.lobby.listingMax, 1, 7]);
-  });
-
-  it("reports no password when the row says 0 (the only password fact that is ever public)", async () => {
-    const database = fakeDatabase([[{ ...liveRow, has_password: 0, host_label: "" }]]);
-    const [room] = await listPublicRooms(database, 1);
-    expect(room?.hasPassword).toBe(false);
-    expect(room?.hostLabel).toBe("");
   });
 });
 
@@ -283,7 +271,6 @@ describe("schema drift gate", () => {
       "title",
       "host_label",
       "listing",
-      "has_password",
       "phase",
       "player_count",
       "player_cap",

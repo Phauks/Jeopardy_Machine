@@ -13,7 +13,7 @@ Built with SvelteKit 3 + Svelte 5 on Cloudflare Workers; one Durable Object per 
 - **The host is always in control** - every automated step has an override and an undo.
 - **Theming as a feature** - the board's look (fonts, colors, background) is a portable theme document, with built-in presets.
 - **Players never log in** - room code is the entire join flow, forever.
-- **Public lobby or private code** - a room is public or private, and independently open or password-protected; the password is a shared room secret, never an account.
+- **Public lobby or private code** - a room is either listed in the public lobby or reachable only by its code. There is no second secret: the code is what admits people (docs/decisions/2026-08-20-no-room-passwords.md).
 
 ## Quick start (development)
 
@@ -22,7 +22,7 @@ pnpm install
 pnpm dev        # SvelteKit app on :5173 + realtime Worker on :8787
 ```
 
-Then open <http://localhost:5173/> - the landing page carries the Join section (room code, password, and the public-rooms lobby) above the index of everything that exists so far. The real room path (create, connect, join) runs under the single-origin loop documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), which also covers testing and the deploy story.
+Then open <http://localhost:5173/> - the landing page carries one entry field (a room code joins, anything else searches the public-rooms list beneath it) with the Host button beside it. The real room path (create, connect, join) runs under the single-origin loop documented in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), which also covers testing and the deploy story.
 
 ## Repo map
 

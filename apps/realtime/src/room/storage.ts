@@ -28,15 +28,14 @@ import type { RunningTimer } from "@jeopardy/protocol/room/server-messages";
 import type { GameActionType } from "@jeopardy/engine/actions";
 import type { GamePhase } from "@jeopardy/engine/state";
 import type { ArmWindow } from "./arm-window.ts";
-import type { StoredRoomPassword } from "./password.ts";
 
 export type RoomLifecycle = "lobby" | "active" | "ended";
 
 // The host-tunable room controls as they are STORED. Everything the wire's RoomSettings
-// carries except the two derived/echoed parts: `entry` (a function of the password below) and
+// carries except the echoed parts:
 // the title/host label (stored beside them on the meta, because the registry row wants them
 // as their own columns). Building the wire shape from these three is roomSettingsPayload().
-export type StoredRoomSettings = Omit<RoomSettings, "entry" | "title" | "hostLabel">;
+export type StoredRoomSettings = Omit<RoomSettings, "title" | "hostLabel">;
 
 export type RoomMeta = {
   code: string;
@@ -48,10 +47,6 @@ export type RoomMeta = {
   settings: StoredRoomSettings;
   title: string;
   hostLabel: string;
-  // The salted hash of the shared room secret (null = an open room), and the entire truth of
-  // the entry axis. The hash lives HERE and only here - the registry row carries has_password
-  // and nothing else, so the lobby can never be used as a password oracle.
-  password: StoredRoomPassword | null;
   createdAt: number;
   // Bumped (coalesced - see the DO's touchActivity) on connects and messages; expiry
   // compares against limits.room.idleExpiryMs.
@@ -178,14 +173,13 @@ export function runningTimers(
 
 /**
  * The wire shape of the room's settings, assembled from the three places the DO keeps them:
- * the tunable controls, the listing text, and the password (which IS the entry axis). One
+ * the tunable controls and the listing text. One
  * function so the join reply, the change broadcast, the inspector and the HTTP response can
  * never describe the same room differently.
  */
 export function roomSettingsPayload(meta: RoomMeta): RoomSettings {
   return {
     ...meta.settings,
-    entry: meta.password === null ? "open" : "password",
     title: meta.title,
     hostLabel: meta.hostLabel,
   };

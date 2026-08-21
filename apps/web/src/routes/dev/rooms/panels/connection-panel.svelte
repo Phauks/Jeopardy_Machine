@@ -26,8 +26,8 @@
     settings: RoomSettings | null;
   };
 
-  // Where this tab is pointed: the code it connects to and the password it presents.
-  export type ConnectionTarget = { code: string; password: string };
+  // Where this tab is pointed: the code it connects to.
+  export type ConnectionTarget = { code: string };
 
   type Props = {
     connection: ConnectionState;
@@ -72,7 +72,6 @@
   }
 
   const open = $derived(connection.phase === "open");
-  const passwordField = $derived(target.password === "" ? {} : { password: target.password });
 </script>
 
 <section class="flex flex-col gap-2 rounded-sm border p-3">
@@ -97,7 +96,7 @@
     <span class="col-span-2">
       room settings seen: {connection.settings === null
         ? "-"
-        : `${connection.settings.listing} · ${connection.settings.entry} · ${connection.settings.maxPlayers}p/${connection.settings.maxSpectators}s · code ${connection.settings.hideJoinCode ? "HIDDEN" : "visible"}`}
+        : `${connection.settings.listing} · ${connection.settings.maxPlayers}p/${connection.settings.maxSpectators}s · code ${connection.settings.hideJoinCode ? "HIDDEN" : "visible"}`}
     </span>
     {#if rttStats}
       <span class="col-span-2">
@@ -131,16 +130,7 @@
 <section class="flex flex-col gap-2 rounded-sm border p-3">
   <h2 class="font-bold">Join</h2>
   <p class="text-xs opacity-70">The room answers nothing until you join or resume.</p>
-  <label class="flex items-center justify-between gap-2 text-sm">
-    room password
-    <input
-      class="w-48 border px-2 py-1"
-      placeholder="(none)"
-      maxlength={limits.room.roomPasswordMaxLength}
-      bind:value={target.password}
-    />
-  </label>
-  <div class="flex flex-wrap gap-2">
+    <div class="flex flex-wrap gap-2">
     <button
       class="border px-3 py-1 text-sm"
       disabled={!open || selectedRoom === null}
@@ -154,7 +144,7 @@
       disabled={!open}
       onclick={() =>
         onSend(
-          { type: "join", role: "player", nickname: "Harness Tester", ...passwordField },
+          { type: "join", role: "player", nickname: "Harness Tester" },
           "join player",
         )}
     >
@@ -163,14 +153,14 @@
     <button
       class="border px-3 py-1 text-sm"
       disabled={!open}
-      onclick={() => onSend({ type: "join", role: "spectator", ...passwordField }, "join spectator")}
+      onclick={() => onSend({ type: "join", role: "spectator" }, "join spectator")}
     >
       Join as spectator
     </button>
     <button
       class="border px-3 py-1 text-sm"
       disabled={!open}
-      onclick={() => onSend({ type: "join", role: "display", ...passwordField }, "join display")}
+      onclick={() => onSend({ type: "join", role: "display" }, "join display")}
     >
       Join as display
     </button>

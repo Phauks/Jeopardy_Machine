@@ -21,7 +21,6 @@ const room: RoomSummary = {
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
   listing: "public",
-  hasPassword: false,
   phase: "lobby",
   playerCount: 7,
   playerCap: 100,
@@ -34,7 +33,6 @@ const lockedRoom: RoomSummary = {
   code: "MJ4TW",
   title: "Environment trivia",
   hostLabel: "Environmental Law Society",
-  hasPassword: true,
 };
 
 function listingOf(rooms: RoomSummary[]): LobbyListing {
@@ -83,9 +81,10 @@ describe("one counter, one list, one host button", () => {
     expect(body.indexOf("Room code")).toBeLessThan(body.indexOf("Public rooms"));
   });
 
-  it("offers no second entry control - no standing password box beside the code", () => {
-    // The password is a STATE of having a code (decision 2026-08-18 §2), so an untouched page
-    // carries no password input anywhere.
+  it("offers ONE entry control: the code box, and nothing beside it", () => {
+    // The code is the whole credential (@jeopardy/protocol room/visibility.ts, 2026-08-20), so
+    // there is no second field for this page to grow back - not beside the box, not revealed
+    // by a valid code, not inside a room card.
     expect(body).not.toContain('type="password"');
   });
 
@@ -139,11 +138,9 @@ describe("the hero, the panels and the drawer are gone", () => {
 });
 
 describe("the code still wins, and now says what it will do", () => {
-  it("arms the join, holds the list back, and offers a password for a room it cannot see", () => {
+  it("arms the join and holds the list back for a room it cannot see", () => {
     const body = renderFrontDoor({ initialCode: "ZZZZZ" });
     expect(body).toContain("not on the public list");
-    expect(body).toContain('type="password"');
-    expect(body).toContain("only if the host set one");
     // The list steps back rather than competing for the tap.
     expect(body).toContain("dimmed");
   });
@@ -165,19 +162,10 @@ describe("the code still wins, and now says what it will do", () => {
     expect(body).not.toContain("Pub quiz night");
   });
 
-  it("names a listed open room and asks for no password", () => {
+  it("names a listed room and still asks for nothing but the code", () => {
     const body = renderFrontDoor({ initialCode: "BQKX7" });
     expect(body).toContain("BQKX7 is Pub quiz night");
     expect(body).not.toContain('type="password"');
-  });
-
-  it("says a listed locked room needs one, before anyone taps Join", () => {
-    const body = renderFrontDoor({
-      listing: listingOf([lockedRoom]),
-      initialCode: "MJ4TW",
-    });
-    expect(body).toContain("needs the room password");
-    expect(body).toContain("this room needs one");
   });
 
   it("leaves the list live while the field is incomplete", () => {
@@ -202,10 +190,6 @@ describe("the same field searches the list", () => {
     const body = renderFrontDoor({ initialCode: "nothing like this" });
     expect(body).toContain("Nothing here matches");
     expect(body).not.toContain("Nobody is hosting publicly");
-  });
-
-  it("carries the one filter the list's size justifies", () => {
-    expect(renderFrontDoor()).toContain("Open rooms only");
   });
 });
 

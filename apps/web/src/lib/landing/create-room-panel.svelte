@@ -172,17 +172,6 @@
       </div>
     </fieldset>
 
-    <label class="field">
-      <span class="field-label">Password</span>
-      <input
-        type="password"
-        autocomplete="new-password"
-        maxlength={limits.room.roomPasswordMaxLength}
-        placeholder="Optional"
-        bind:value={form.password}
-      />
-    </label>
-
     <label class="field cap-field">
       <!-- The bound is printed, not hidden behind a refusal: the field took 128 because the
            only thing that knew the real ceiling was the validator (owner report 2026-08-17). -->
@@ -271,7 +260,7 @@
     letter-spacing: 0.16em;
   }
 
-  /* A form column, not a page width: name and password fields stretched across a 1440px laptop
+  /* A form column, not a page width: name and cap fields stretched across a 1440px laptop
      look like a database admin screen, and the eye has to travel the whole window to read a
      label and reach its input. */
   .create-form {
@@ -330,7 +319,6 @@
   }
 
   .field input[type="text"],
-  .field input[type="password"],
   .field input[type="number"] {
     font: inherit;
     font-size: 0.95rem;

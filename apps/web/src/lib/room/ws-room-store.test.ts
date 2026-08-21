@@ -14,7 +14,7 @@ import type { WsRoomStoreOptions } from "#lib/room/ws-room-store.svelte.ts";
 const origin = "http://localhost:5173";
 const roomCode = "BQKX7";
 
-const settings = { ...defaultRoomSettings, entry: "open" as const, title: "", hostLabel: "" };
+const settings = { ...defaultRoomSettings, title: "", hostLabel: "" };
 
 function rosterEntry(playerId: string, nickname: string, teamId: string | null = null) {
   return {
@@ -113,7 +113,7 @@ describe("ws room store: the door", () => {
   });
 
   it("joins with the whole character, omitting what was never chosen", () => {
-    const room = harness({ password: "hunter22" });
+    const room = harness();
     room.open();
     room.store.join({
       nickname: "Ada",
@@ -131,8 +131,8 @@ describe("ws room store: the door", () => {
       avatarId: "fox",
       accentId: "moss",
       team: { kind: "create", name: "Team Sequoia" },
-      // The password rides the MESSAGE, never the url (join-hand-off.ts).
-      password: "hunter22",
+      // No credential rides the url; the ones that exist ride their own message
+      // (join-hand-off.ts).
     });
     // Absence is the protocol's "not chosen", and a skin tone especially is never guessed.
     expect(room.sent[0]).not.toHaveProperty("buzzSoundId");

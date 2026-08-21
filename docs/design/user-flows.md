@@ -20,10 +20,10 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
 - Room full / game over / bad code -> clear friendly error, not a spinner.
 
-**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md; split across two routes 2026-08-15). The site root `/` carries the room-code box and a link to `/lobby`, which lists live **public** rooms (title, host label, players/capacity, lock, phase badge, age, inline password prompt). Rooms are **private** by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
+**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md; split across two routes 2026-08-15). The site root `/` carries the room-code box and a link to `/lobby`, which lists live **public** rooms (title, host label, players/capacity, phase badge, age). Rooms are **private** by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
 
 - **The code box always wins**: a complete typed code bypasses the list entirely (someone holding a code came to use it, not to browse). The list dims while a code is typed.
-- **Password rooms** show a lock. The password is a shared room secret shouted across the hall or printed on a table tent - never an account (boundary 2.2 stands). It travels in the join message, never in the URL, and a wrong one is refused _on the same socket_ so the phone can just try again; too many wrong tries close the connection.
+- **There is no second door.** A room carries no password (docs/decisions/2026-08-20-no-room-passwords.md, 2026-08-20): the code is what admits people, and a room that should not admit strangers is private rather than locked. A phone that reaches a room is in it.
 - **A room in progress** shows "Playing" and is dimmed - whether it actually accepts an arrival is the late-join setting's business, answered by the room itself, not by the list.
 - The list is a **browse surface, not a live room**: it polls, it is briefly cached, and it is capped (pagination deliberately deferred). A stale row can never open a dead room - the room refuses.
 
@@ -152,13 +152,13 @@ One settings panel on the console, opened **in place** - a rail beside the conso
 It has two halves and says which is which, because the difference is not cosmetic:
 
 - **This device** - local, instant, stored on this laptop, invisible to everyone else: **display text size** and **console text size** as independent controls (a projector is read across a room, a console at arm's length - the same slider for both is the wrong control), room audio here plus master volume, **how the room sees this game** (second screen / mirror - C1's one question, also asked on the console's game-screen panel where the action lives), manual mode, timer visibility, roster density, and stage motion (moving / still / no 3D).
-- **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, password, the two caps, spectators allowed.
+- **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, the two caps, spectators allowed.
 
 The display type scale reaches the projector window of the same browser live, because both windows read one device-preferences document (C1's laptop-plus-projector setup is two tabs of one origin). A projector driven by a different machine has its own, which the panel says.
 
 **The panel is not themed, and that is a rule** (owner-specified 2026-08-17: "settings show the theme assets, which makes them difficult to read"). A control panel is never painted by the thing it controls - the cog steers the type scale a theme renders at, so rendering the cog IN that theme put its labels in the board's poster faces at whatever contrast the theme chose. The panel's chrome is a fixed palette under every theme, present or future; only the type-scale PREVIEW is themed, because it is a picture of the display and is supposed to look like one.
 
-**Room settings that are TYPED wait for an Apply, and say so.** Switches (streamer mode, listing, spectators allowed) reach the room the moment they move; a title, a password or a cap being typed must not travel letter by letter, so those groups state the edit they are holding ("player cap 30 -> 24") beside a button that names its effect and is dead until there is one. "Save caps" - a button named after itself - was the version the owner could not read.
+**Room settings that are TYPED wait for an Apply, and say so.** Switches (streamer mode, listing, spectators allowed) reach the room the moment they move; a title or a cap being typed must not travel letter by letter, so those groups state the edit they are holding ("player cap 30 -> 24") beside a button that names its effect and is dead until there is one. "Save caps" - a button named after itself - was the version the owner could not read.
 
 ### C2. Doors open
 

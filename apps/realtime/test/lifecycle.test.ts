@@ -177,9 +177,9 @@ describe("expiry alarm", () => {
     const code = uniqueCode();
     const now = Date.now();
     await env.DB.prepare(
-      `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+      `INSERT INTO rooms (code, title, host_label, listing, phase, player_count,
          player_cap, created_at, last_seen_at, expires_at, ended_at)
-       VALUES (?, 'Empty suite', '', 'public', 0, 'lobby', 0, ?, ?, ?, ?, NULL)`,
+       VALUES (?, 'Empty suite', '', 'public', 'lobby', 0, ?, ?, ?, ?, NULL)`,
     )
       .bind(code, limits.room.playerSoftCap, now, now, now + limits.room.idleExpiryMs)
       .run();

@@ -35,19 +35,6 @@ describe("limits invariants", () => {
     expect(limits.room.idleExpiryMs).toBeGreaterThanOrEqual(30 * 60 * 1000);
   });
 
-  it("keeps room-password bounds typeable-but-not-trivial and ordered", () => {
-    expect(limits.room.roomPasswordMinLength).toBeGreaterThanOrEqual(4);
-    expect(limits.room.roomPasswordMinLength).toBeLessThan(limits.room.roomPasswordMaxLength);
-    // A shared secret people type on a phone at a bar: a 128-char ceiling would only ever be
-    // a paste bomb aimed at the hash function.
-    expect(limits.room.roomPasswordMaxLength).toBeLessThanOrEqual(128);
-    // The attempt budget must be small (a shared secret survives only behind a rate limit)
-    // and its window must be far shorter than a room's life, or one wrong guess at the door
-    // would lock a phone out for the night.
-    expect(limits.room.passwordAttemptBurstMax).toBeLessThanOrEqual(10);
-    expect(limits.room.passwordAttemptWindowMs).toBeLessThan(limits.room.idleExpiryMs);
-  });
-
   it("keeps lobby listing text short enough to read and the query cap honest", () => {
     expect(limits.room.roomTitleMaxLength).toBeLessThanOrEqual(80);
     expect(limits.room.hostLabelMaxLength).toBeLessThanOrEqual(limits.room.roomTitleMaxLength);

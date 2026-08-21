@@ -12,8 +12,9 @@
 // 1. NEVER SHOW THE CODE. "room-full" and "spectators-full" are different from
 //    "spectators-not-allowed" on purpose - a person turned away deserves to know whether to
 //    wait a minute or to stop trying - and none of them is a protocol string on screen.
-// 2. NEVER BLAME THE PLAYER. A full room, a locked team and a wrong password are all facts
-//    about the room; the sentence says what happened and, where there is one, what to do.
+// 2. NEVER BLAME THE PLAYER. A full room, a locked team and a room that stopped taking late
+//    arrivals are all facts about the ROOM; the sentence says what happened and, where there
+//    is one, what to do.
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
 import type { RoomView } from "#lib/room/room-view.ts";
 
@@ -63,10 +64,6 @@ export function refusalCopy(reason: RefusalReason): RefusalCopy {
         headline: "This room has all the teams it can hold",
         advice: "Join one of the teams that is already here.",
       };
-    case "password-required":
-      return { headline: "This room needs a password", advice: "The host has it." };
-    case "bad-password":
-      return { headline: "That password did not work", advice: "Try again, carefully." };
     // The token refusals are device-level accidents (a stale tab, a copied link), never
     // something a player did wrong - and never a reason to explain tokens to anybody.
     case "bad-host-token":
@@ -87,24 +84,6 @@ export function refusalCopy(reason: RefusalReason): RefusalCopy {
  * Its job is to disable a button with an explanation instead of letting a player fill in a
  * name, tap join, and be turned away by the same fact that was visible all along.
  */
-/**
- * Is this connection standing outside a password door?
- *
- * Both password refusals KEEP the socket open (packages/protocol/src/room/server-messages.ts)
- * precisely so a phone can prompt and retry on it. This is the predicate that turns that
- * allowance into a screen: `needsPassword` means "ask", and `wasWrong` is the difference
- * between the first ask and a retry, which have to read differently or a second wrong attempt
- * looks like a screen that ignored you.
- */
-export function passwordPrompt(
-  view: RoomView,
-): { needsPassword: true; wasWrong: boolean } | { needsPassword: false } {
-  const reason = view.refusal?.reason;
-  if (reason === "password-required") return { needsPassword: true, wasWrong: false };
-  if (reason === "bad-password") return { needsPassword: true, wasWrong: true };
-  return { needsPassword: false };
-}
-
 export function joinBlock(view: RoomView): RefusalCopy | null {
   if (view.role === "spectator") {
     return view.settings.spectatorsAllowed ? null : refusalCopy("spectators-not-allowed");

@@ -5,8 +5,8 @@
 // console may later, and nothing else should. Two rules shape the schema and are gated by
 // apps/realtime/test/diagnostics.test.ts:
 //
-// 1. NO SECRETS, EVER. The host token, the room's password hash and salt, every player's
-//    session token, and all authored clue text/answers are absent by construction - this
+// 1. NO SECRETS, EVER. The host token, every player's session token, and all authored clue
+//    text/answers are absent by construction - this
 //    schema is `strictObject` all the way down, so a field cannot be added by accident at a
 //    call site, only deliberately here.
 // 2. COUNTS, NOT PEOPLE. The lobby lists rooms, never players (registry.ts); the inspector
@@ -83,10 +83,9 @@ export const roomDiagnosticsSchema = z.strictObject({
   code: roomCodeSchema,
   lifecycle: roomPhaseSchema,
   // The live room controls, exactly as every connected client sees them (room-settings.ts).
-  // No secret is reachable from here: `entry` says a password exists, never what it is.
+  // No secret is reachable from here, and since 2026-08-20 there is no secret in the settings
+  // to reach: passwords are gone and the room code is what admits people.
   settings: roomSettingsSchema,
-  // The one password fact that is ever public (registry.ts) - true/false, never the hash.
-  hasPassword: z.boolean(),
   // Unix ms. `expiresAt` is derived (lastActivityAt + the idle-expiry limit), so the gap
   // between "now" and it is exactly how long the room has left if nobody touches it.
   createdAt: z.int().positive(),
@@ -140,8 +139,8 @@ export type RoomInspection = z.infer<typeof roomInspectionSchema>;
 
 // Body of PATCH /api/rooms/<CODE> (host-authenticated): the settings AFTER the edit, plus what
 // the lobby row write made of it - a room that just went public and could not be listed must
-// say so in the same breath, exactly as creation does. The password never travels back; a
-// cleared or replaced secret shows up only as `settings.entry`.
+// say so in the same breath, exactly as creation does. Every field of the settings it echoes
+// is public by construction (room-settings.ts); since 2026-08-20 none of them is a secret.
 export const updateRoomSettingsResponseSchema = z.strictObject({
   code: roomCodeSchema,
   settings: roomSettingsSchema,

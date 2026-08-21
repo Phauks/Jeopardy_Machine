@@ -234,9 +234,6 @@ function recordingNamespace(): {
               expiresAt: Date.now() + 7_200_000,
               settings: {
                 listing: body.listing,
-                // Derived from whether a password was set, never stored twice
-                // (packages/protocol/src/room/visibility.ts).
-                entry: body.password === undefined ? "open" : "password",
                 maxPlayers: body.maxPlayers,
                 maxSpectators: body.maxSpectators,
                 spectatorsAllowed: body.spectatorsAllowed,
@@ -327,7 +324,7 @@ describe("POST /api/rooms - a public titled room stays public and titled", () =>
       platform: { env: { GAME_ROOM: namespace, DB: database } },
     } as unknown as Event);
 
-    // The upsert binds code, title, host_label, listing, has_password, ... in that order
+    // The upsert binds code, title, host_label, listing, ... in that order
     // (src/lib/server/room-registry.ts). A row that came out private or unnamed is the lobby
     // half of the reported bug.
     const upsert = binds()[0] ?? [];
@@ -344,7 +341,7 @@ describe("POST /api/rooms - a public titled room stays public and titled", () =>
         method: "POST",
         body: JSON.stringify(
           createRoomBody(
-            { ...filledForm, listing: "private", password: "quizzy" },
+            { ...filledForm, listing: "private" },
             { kind: "compact", rounds: [{ columns: 3, rows: 3 }] },
           ),
         ),
@@ -356,7 +353,6 @@ describe("POST /api/rooms - a public titled room stays public and titled", () =>
     };
     expect(body.settings).toMatchObject({
       listing: "private",
-      entry: "password",
       title: "Thursday pub quiz",
       hostLabel: "Board Game Club",
     });

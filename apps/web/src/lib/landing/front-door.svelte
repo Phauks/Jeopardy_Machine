@@ -53,8 +53,8 @@
     createForm: CreateRoomForm;
     createState: CreateState;
     surfaces: readonly SurfaceCard[];
-    onJoin: (code: string, password: string) => void;
-    onJoinRoom: (room: RoomSummary, password: string) => void;
+    onJoin: (code: string) => void;
+    onJoinRoom: (room: RoomSummary) => void;
     onRejoin: (room: RejoinCandidate) => void;
     onCreate: () => void;
     onContinueCreate: (code: string) => void;
@@ -81,12 +81,10 @@
   // typing in it, and a `?code=` in the URL must not fight them for it.
   // svelte-ignore state_referenced_locally
   let typed = $state(initialCode);
-  let password = $state("");
-  let openOnly = $state(false);
   let hostRequested = $state(false);
 
   const reading = $derived(readCounter(typed));
-  const shownRooms = $derived(roomsForCounter(listing.rooms, reading, openOnly));
+  const shownRooms = $derived(roomsForCounter(listing.rooms, reading));
   const match = $derived(
     reading.kind === "code" ? listedRoomForCode(listing.rooms, reading.code) : null,
   );
@@ -121,13 +119,9 @@
             typed = raw;
           }}
           {verdict}
-          {password}
-          onPassword={(next) => {
-            password = next;
-          }}
           onJoin={() => {
             if (reading.kind === "code") {
-              onJoin(reading.code, verdict.password === "hidden" ? "" : password);
+              onJoin(reading.code);
             }
           }}
           {hostOpen}
@@ -156,10 +150,6 @@
         {listing}
         visibleRooms={shownRooms.rooms}
         filterActive={shownRooms.filterActive}
-        {openOnly}
-        onOpenOnly={(next) => {
-          openOnly = next;
-        }}
         {listingError}
         loaded={listingLoaded}
         dimmed={verdict.codeWins}

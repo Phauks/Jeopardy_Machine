@@ -121,36 +121,19 @@ describe("room client messages", () => {
     ).toBe(false);
   });
 
-  // docs/decisions/2026-08-14-room-visibility-and-lobby.md: the shared room secret rides the
-  // join MESSAGE (never the URL), is optional (most rooms are open), and is length-bounded.
-  it("carries an optional room password on join, bounded by the limits module", () => {
-    const join = (password?: string) => ({
+  // Room passwords were removed on 2026-08-20 (@jeopardy/protocol room/visibility.ts): the
+  // code is what admits people. The join message must REFUSE one rather than ignore it, or a
+  // client that has not been updated goes on believing its room is protected.
+  it("refuses a password on join - the code is the only thing that admits anybody", () => {
+    const join = (extra: Record<string, unknown> = {}) => ({
       version: v,
       type: "join",
       role: "player",
       nickname: "Lorax",
-      ...(password !== undefined && { password }),
+      ...extra,
     });
     expect(roomClientMessageSchema.safeParse(join()).success).toBe(true);
-    expect(roomClientMessageSchema.safeParse(join("hunter2!")).success).toBe(true);
-    expect(
-      roomClientMessageSchema.safeParse(join("x".repeat(limits.room.roomPasswordMinLength - 1)))
-        .success,
-    ).toBe(false);
-    expect(
-      roomClientMessageSchema.safeParse(join("x".repeat(limits.room.roomPasswordMaxLength + 1)))
-        .success,
-    ).toBe(false);
-    // Every role may present one - a display at the venue needs the room secret too; only the
-    // host is exempt, and it proves the stronger claim with the creation token.
-    expect(
-      roomClientMessageSchema.safeParse({
-        version: v,
-        type: "join",
-        role: "display",
-        password: "hunter2!",
-      }).success,
-    ).toBe(true);
+    expect(roomClientMessageSchema.safeParse(join({ password: "hunter2!" })).success).toBe(false);
   });
 });
 
@@ -182,10 +165,9 @@ describe("room control messages", () => {
     ).toBe(false);
   });
 
-  it("broadcasts the settings back with a stamp, and never the password", () => {
+  it("broadcasts the settings back with a stamp, and never a secret", () => {
     const settings = {
       listing: "public",
-      entry: "password",
       maxPlayers: 24,
       maxSpectators: 50,
       spectatorsAllowed: true,
@@ -415,15 +397,22 @@ describe("room server messages", () => {
     ).toBe(false);
   });
 
-  it("carries both password refusals, which are retryable on the same socket", () => {
+  // Removed with the passwords themselves (2026-08-20). A stale client that still knows how
+  // to prompt for one must not be able to be TOLD to: a room's own code is the only thing that
+  // admits anybody, so "you need a secret I did not give you" is no longer a sentence the
+  // protocol can say.
+  it("has no password refusals left to send", () => {
     for (const reason of ["password-required", "bad-password"]) {
       expect(
         roomServerMessageSchema.safeParse({ version: v, type: "refused", reason }).success,
         reason,
-      ).toBe(true);
+      ).toBe(false);
     }
-    // The exhausted-attempts close reuses the existing join-refusal code - no new code, so
-    // clients written against the M3 catalog still know not to reconnect.
+    // The team-tier refusals that DO keep the socket are still here, and still the only ones.
+    expect(
+      roomServerMessageSchema.safeParse({ version: v, type: "refused", reason: "team-locked" })
+        .success,
+    ).toBe(true);
     expect(roomCloseCodes.joinRefused).toBeGreaterThanOrEqual(4400);
   });
 

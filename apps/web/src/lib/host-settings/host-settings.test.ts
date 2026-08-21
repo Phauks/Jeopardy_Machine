@@ -186,13 +186,12 @@ describe("room settings the console edits", () => {
     expect(store.view.settings.listing).toBe("private");
   });
 
-  it("derives the entry axis from the password rather than storing it twice", () => {
+  it("has no password to set: the code is what admits people (2026-08-20)", () => {
+    // The settings a room broadcasts are all public now - there is no field in them that could
+    // be a secret, which is why the whole object travels to every phone and the projector.
     const store = hostStore();
-    expect(store.view.settings.entry).toBe("open");
-    store.updateRoomSettings({ password: "rhubarb" });
-    expect(store.view.settings.entry).toBe("password");
-    store.updateRoomSettings({ password: null });
-    expect(store.view.settings.entry).toBe("open");
+    expect(Object.keys(store.view.settings)).not.toContain("entry");
+    expect(Object.keys(store.view.settings)).not.toContain("password");
   });
 
   it("refuses a public room with no name, in the room's own vocabulary", () => {
@@ -232,7 +231,6 @@ describe("room settings the console edits", () => {
     store.updateRoomSettings({ hideJoinCode: true });
     const summary = roomSettingsSummary(store.view);
     expect(summary).toContain("Private");
-    expect(summary).toContain("open");
     expect(summary).toContain("code hidden");
     expect(summary).toContain(`${String(store.view.roster.players.length)}/`);
   });
@@ -290,7 +288,6 @@ describe("the panel itself", () => {
       "Streamer mode",
       "Listing",
       "Game title",
-      "Password",
       "Player cap",
       "Spectator cap",
       "Allow spectators",

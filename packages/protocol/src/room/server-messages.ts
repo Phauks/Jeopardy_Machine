@@ -74,13 +74,10 @@ export const refusalReasonSchema = z.enum([
   // from room-full because the room may have plenty of seats left - what is exhausted is the
   // number of teams the board can show, which is a fact about the room and not about them.
   "teams-full",
-  // Password rooms (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Both reasons
-  // KEEP the socket so the phone can prompt and retry on the same connection - the only
-  // difference between them is whether the client sent a password at all, which the client
-  // already knows. Attempts are rate-limited per connection (limits.room.passwordAttempt*);
-  // the connection that exhausts them is closed with joinRefused.
-  "password-required",
-  "bad-password",
+  // GONE 2026-08-20: "password-required" and "bad-password", the two reasons a room could
+  // refuse a connection that knew its code. Rooms have no password any more (visibility.ts) -
+  // the code is what admits people - so a connection that reaches a room is never turned away
+  // for a secret it does not hold. Nothing replaces them: there is no third door.
 ]);
 export type RefusalReason = z.infer<typeof refusalReasonSchema>;
 
@@ -361,7 +358,7 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
   // every host edit (docs/decisions/2026-08-14-room-controls-and-staging.md). Broadcast rather
   // than polled because the strictest requirement is instantaneous: a join code that just
   // became hidden must vanish from the projector at once, not at the next refresh, or streamer
-  // mode is decoration. Carries no secret - `entry` says a password exists, never what it is.
+  // mode is decoration. Carries no secret: there is nothing secret left in room settings.
   z.strictObject({
     ...envelopeFields,
     type: z.literal("room-settings"),
@@ -430,11 +427,11 @@ export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResu
 // WebSocket close codes paired with `refused`/`room-closed` (documented here so both ends
 // share one table; 4xxx is the application range the runtime passes through untouched).
 // Room-level refusals (no-such-room, bad tokens, room-full, the spectator budget refusals,
-// late-join-disabled) close the
-// socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
-// phone keeps its socket and retries the join with another team card. PASSWORD refusals
-// (password-required, bad-password) behave like the team ones - retry on the same socket -
-// until the per-connection attempt budget runs out, which closes with joinRefused.
+// late-join-disabled) close the socket; TEAM-level join refusals (team-locked, unknown-team,
+// teams-full) deliberately do NOT - the phone keeps its socket and retries the join with
+// another team card. Those two tiers are the whole table now that passwords are gone; the
+// third tier that used to sit between them retried on the same socket and, once a connection
+// burned its guess budget, closed with joinRefused.
 export const roomCloseCodes = {
   roomClosed: 4000,
   badToken: 4401,

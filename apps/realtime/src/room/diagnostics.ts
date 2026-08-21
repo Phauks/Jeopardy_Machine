@@ -8,7 +8,7 @@
 // output is this shape, so "does a session token reach the wire" is a unit question.
 //
 // Redaction is by CONSTRUCTION, not by filtering: nothing here reads meta.hostToken,
-// meta.password, entry.sessionToken, or any authored clue text. The storage sizes are
+// entry.sessionToken or any authored clue text. The storage sizes are
 // measured from serialized values and the values themselves are discarded.
 import { limits } from "@jeopardy/protocol/limits";
 import { nextWakeAt, roomSettingsPayload } from "./storage.ts";
@@ -33,7 +33,6 @@ export function buildRoomDiagnostics(input: DiagnosticsInput): RoomDiagnostics {
     code: meta.code,
     lifecycle: meta.lifecycle,
     settings: roomSettingsPayload(meta),
-    hasPassword: meta.password !== null,
     createdAt: meta.createdAt,
     lastActivityAt: meta.lastActivityAt,
     expiresAt,

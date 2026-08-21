@@ -220,8 +220,8 @@ export type RoomView = {
    * come in, how many, and whether the join code is safe to show
    * (packages/protocol/src/room/room-settings.ts). The protocol type verbatim, not a copy:
    * every connection is sent this on join and again on every host edit, so a surface that
-   * respects it cannot drift from the room that owns it. Nothing here is a secret; the
-   * password is the one settings field that never leaves the DO.
+   * respects it cannot drift from the room that owns it. Nothing here is a secret - and since
+   * 2026-08-20 there is no room secret at all for one of these fields to have been.
    */
   settings: RoomSettings;
   /**

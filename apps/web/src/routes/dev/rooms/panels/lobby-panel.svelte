@@ -43,7 +43,7 @@
         <strong>{room.code}</strong>
         <span class="opacity-70">{room.title}</span>
         <span class="text-xs opacity-70">
-          {room.phase} · {room.playerCount}/{room.playerCap}{room.hasPassword ? " · locked" : ""}
+          {room.phase} · {room.playerCount}/{room.playerCap}
         </span>
         <button class="border px-2 py-0.5 text-xs" onclick={() => onJoin(room.code)}>
           Join this room

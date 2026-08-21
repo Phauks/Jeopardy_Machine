@@ -1,5 +1,5 @@
 // Room controls on a LIVE room, inside workerd (docs/decisions/2026-08-14-room-controls-and-
-// staging.md): the two participant budgets, the spectator switch, streamer mode, the password
+// staging.md): the two participant budgets, the spectator switch, streamer mode
 // that can change mid-night, and the broadcast that makes all of it visible immediately.
 //
 // The properties under test are the ones that make the feature trustworthy rather than the
@@ -9,9 +9,6 @@
 //   be able to fill the room the players came to play in);
 // - every change reaches every connection as one `room-settings` message, because a join code
 //   that just became hidden must vanish from the projector at once;
-// - changing the password never disconnects anyone already inside - it is the door, not a
-//   session - while the old secret stops working for the next person immediately;
-// - both doors (the host-only client message and the /settings RPC) land in the same place.
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
@@ -201,9 +198,9 @@ describe("changing a live room's settings", () => {
     const code = uniqueCode();
     const now = Date.now();
     await env.DB.prepare(
-      `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+      `INSERT INTO rooms (code, title, host_label, listing, phase, player_count,
          player_cap, created_at, last_seen_at, expires_at, ended_at)
-       VALUES (?, 'Settings suite', '', 'public', 0, 'lobby', 0, ?, ?, ?, ?, NULL)`,
+       VALUES (?, 'Settings suite', '', 'public', 'lobby', 0, ?, ?, ?, ?, NULL)`,
     )
       .bind(code, limits.room.playerSoftCap, now, now, now + limits.room.idleExpiryMs)
       .run();
@@ -213,105 +210,23 @@ describe("changing a live room's settings", () => {
     });
 
     await patchOverRpc(code, hostToken, { listing: "private", maxPlayers: 12 });
-    const row = await env.DB.prepare(
-      `SELECT listing, player_cap, has_password FROM rooms WHERE code = ?`,
-    )
+    const row = await env.DB.prepare(`SELECT listing, player_cap FROM rooms WHERE code = ?`)
       .bind(code)
-      .first<{ listing: string; player_cap: number; has_password: number }>();
-    expect(row).toMatchObject({ listing: "private", player_cap: 12, has_password: 0 });
-
-    // Setting a password shows up as the lock the lobby renders - and never as the secret.
-    await patchOverRpc(code, hostToken, { password: "sequoia-2026" });
-    const locked = await env.DB.prepare(`SELECT * FROM rooms WHERE code = ?`)
-      .bind(code)
-      .first<Record<string, unknown>>();
-    expect(locked?.["has_password"]).toBe(1);
-    expect(JSON.stringify(locked)).not.toContain("sequoia-2026");
-  });
-});
-
-describe("changing the room password mid-night", () => {
-  it("locks an open room, keeps everyone already inside, and admits only the new secret", async () => {
-    const code = uniqueCode();
-    const { hostToken } = await initializeRoom(code);
-    const host = await connectHost(code, hostToken);
-    const early = new TestClient(await upgradeToRoom(code));
-    early.send({ type: "join", role: "player", nickname: "Early" });
-    await early.waitFor("welcome");
-
-    host.send({ type: "update-room-settings", settings: { password: "sequoia-2026" } });
-    const announced = await early.waitFor(
-      "room-settings",
-      (message) => message.settings.entry === "password",
-    );
-    // The broadcast says a password EXISTS; it can never say what it is.
-    expect(JSON.stringify(announced)).not.toContain("sequoia-2026");
-
-    // The connection that was already inside is untouched: no close, no re-authentication.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(early.closes).toHaveLength(0);
-    early.send({ type: "sync" });
-    expect((await early.waitFor("snapshot")).roster.players).toHaveLength(1);
-
-    // The next phone must present the new secret.
-    const stranger = new TestClient(await upgradeToRoom(code));
-    stranger.send({ type: "join", role: "player", nickname: "Stranger" });
-    expect((await stranger.waitFor("refused")).reason).toBe("password-required");
-    stranger.send({
-      type: "join",
-      role: "player",
-      nickname: "Stranger",
-      password: "sequoia-2026",
-    });
-    expect((await stranger.waitFor("welcome")).role).toBe("player");
-  });
-
-  it("replaces one secret with another: the old one stops working the moment it changes", async () => {
-    const code = uniqueCode();
-    const { hostToken } = await initializeRoom(code, undefined, "password-change", {
-      password: "first-secret",
-    });
-    await patchOverRpc(code, hostToken, { password: "second-secret" });
-
-    const stale = new TestClient(await upgradeToRoom(code));
-    stale.send({ type: "join", role: "player", nickname: "Stale", password: "first-secret" });
-    expect((await stale.waitFor("refused")).reason).toBe("bad-password");
-
-    const current = new TestClient(await upgradeToRoom(code));
-    current.send({
-      type: "join",
-      role: "player",
-      nickname: "Current",
-      password: "second-secret",
-    });
-    expect((await current.waitFor("welcome")).role).toBe("player");
-  });
-
-  it("clears the secret entirely, turning the room back into an open one", async () => {
-    const code = uniqueCode();
-    const { hostToken } = await initializeRoom(code, undefined, "password-clear", {
-      password: "temporary",
-    });
-    const cleared = await patchOverRpc(code, hostToken, { password: null });
-    expect(cleared.status).toBe(200);
-    expect((await settingsOf(code, hostToken)).entry).toBe("open");
-
-    const phone = new TestClient(await upgradeToRoom(code));
-    phone.send({ type: "join", role: "player", nickname: "Walkin" });
-    expect((await phone.waitFor("welcome")).role).toBe("player");
+      .first<{ listing: string; player_cap: number }>();
+    expect(row).toMatchObject({ listing: "private", player_cap: 12 });
   });
 });
 
 describe("what a settings surface may never carry", () => {
-  it("keeps the password out of every settings answer: broadcast, RPC, and inspector", async () => {
+  it("keeps the HOST TOKEN out of every settings answer: broadcast, RPC, and inspector", async () => {
+    // Passwords are gone (@jeopardy/protocol room/visibility.ts), so the host token is the only
+    // secret a room still holds - and these three surfaces are the ones that describe a room to
+    // somebody, which makes them exactly where a leak would happen.
     const code = uniqueCode();
-    const secret = "shout-this-across-the-hall";
     const { hostToken } = await initializeRoom(code, undefined, "redaction-suite");
     const host = await connectHost(code, hostToken);
-
-    // Set the secret over the socket, then read every surface that describes the room.
-    host.send({ type: "update-room-settings", settings: { password: secret } });
-    await host.waitFor("room-settings", (message) => message.settings.entry === "password");
+    host.send({ type: "update-room-settings", settings: { hideJoinCode: true } });
+    await host.waitFor("room-settings", (message) => message.settings.hideJoinCode);
 
     const overRpc = await (await patchOverRpc(code, hostToken, { hideJoinCode: true })).text();
     const inspector = await (
@@ -322,13 +237,12 @@ describe("what a settings surface may never carry", () => {
     const broadcast = JSON.stringify(host.messagesOf("room-settings"));
 
     for (const surface of [overRpc, inspector, broadcast]) {
-      expect(surface).not.toContain(secret);
       // The host token is the room's strongest secret and belongs to no settings surface.
       expect(surface).not.toContain(hostToken);
-      // Nor does any hash material: `entry` is the only password fact any of them carry.
+      // Nor does any leftover hash material from the password era.
       expect(surface).not.toContain("saltHex");
       expect(surface).not.toContain("hashHex");
     }
-    expect(JSON.parse(overRpc)).toMatchObject({ settings: { entry: "password" } });
+    expect(JSON.parse(overRpc)).toMatchObject({ settings: { hideJoinCode: true } });
   });
 });

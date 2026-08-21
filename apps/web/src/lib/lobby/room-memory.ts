@@ -3,7 +3,7 @@
 //
 // The boundary this lives inside (guiding principle 3, players never log in): this is a
 // per-tab note-to-self, not an identity. It is sessionStorage, so it dies with the tab; it
-// holds no token, no player id and no password (join-hand-off.ts owns the two secrets, under
+// holds no token and no player id (join-hand-off.ts owns the credentials, under
 // their own keys, for exactly one hop); and nothing is ever sent to a server from it except
 // the room code the browser was already using. There is nothing here to sign in to and
 // nothing here worth stealing - which is the test any future addition has to pass.

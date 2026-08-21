@@ -121,7 +121,6 @@ export class LocalSimRoomStore implements RoomStore {
   private pausedState = $state(false);
   private roomSettings = $state.raw<RoomSettings>({
     ...defaultRoomSettings,
-    entry: "open",
     title: "",
     hostLabel: "",
   });
@@ -318,8 +317,8 @@ export class LocalSimRoomStore implements RoomStore {
    * The host's room-settings edit, mock-side. Applied with the DO's own two refusals
    * (packages/protocol/src/room/room-settings.ts): a public room needs a title, and a cap never
    * drops below the people already in the room - because nobody is ever ejected by a settings
-   * change. `entry` is DERIVED from the password rather than stored twice, exactly as the room
-   * derives it, so a mock room in streamer mode behaves like a real one on every surface.
+   * change. Every field is applied verbatim, which a mock can only do because none of them is
+   * a secret the room would have to keep (room-settings.ts).
    */
   updateRoomSettings(patch: RoomSettingsPatch): void {
     const next: RoomSettings = { ...this.roomSettings };
@@ -330,7 +329,6 @@ export class LocalSimRoomStore implements RoomStore {
     if (patch.maxSpectators !== undefined) next.maxSpectators = patch.maxSpectators;
     if (patch.spectatorsAllowed !== undefined) next.spectatorsAllowed = patch.spectatorsAllowed;
     if (patch.hideJoinCode !== undefined) next.hideJoinCode = patch.hideJoinCode;
-    if (patch.password !== undefined) next.entry = patch.password === null ? "open" : "password";
     if (next.listing === "public" && next.title.trim().length === 0) return;
     if (next.maxPlayers < this.rosterPlayers.length) return;
     this.roomSettings = next;
@@ -389,7 +387,7 @@ export class LocalSimRoomStore implements RoomStore {
   /**
    * Put this mock connection in a refused state on purpose - the sim panel's refusal probes and
    * the surface tests both need to SEE the screens a real room's refusals produce, and a mock
-   * room never produces them on its own (it has no password, no cap it enforces, no door).
+   * room never produces them on its own (one tab, no cap it enforces, nobody to turn away).
    */
   simRefuse(reason: RoomRefusalView["reason"]): void {
     this.refuse(reason);
@@ -808,15 +806,6 @@ export class LocalSimRoomStore implements RoomStore {
     if (patch.spectators !== undefined) {
       this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
     }
-  }
-
-  /**
-   * A mock room has no door to knock on: it is one tab, it holds no password, and it has never
-   * refused anybody for one. Accepting the password and doing nothing is the honest mock -
-   * clearing a refusal that cannot exist would be theatre.
-   */
-  submitRoomPassword(): void {
-    this.refusalState = null;
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

@@ -42,8 +42,6 @@ export function readCounter(raw: string): CounterReading {
 export type RoomFilter = {
   /** Raw field text. Filters titles, host labels and codes alike. */
   query: string;
-  /** The one filter our list size justifies (a lock badge carries the rest). */
-  openOnly: boolean;
 };
 
 /**
@@ -58,7 +56,6 @@ export function applyRoomFilter(
   const needle = filter.query.trim().toLowerCase();
   const codeNeedle = codeCharacters(filter.query);
   return rooms.filter((room) => {
-    if (filter.openOnly && room.hasPassword) return false;
     if (needle === "") return true;
     if (room.title.toLowerCase().includes(needle)) return true;
     if (room.hostLabel.toLowerCase().includes(needle)) return true;
@@ -83,32 +80,23 @@ export function listedRoomForCode(rooms: readonly RoomSummary[], code: string): 
  * it with an empty list reads as "your code is wrong" when the truth is "that room was never
  * listed". The list steps back (dimmed) with everything still on it; the counter's own
  * sentence carries the news. A code the list CAN see filters to exactly that room, which is
- * the exact match becoming the thing on screen - and it beats the open-only toggle, because a
- * code is a stronger statement of intent than a filter.
+ * the exact match becoming the thing on screen.
  */
 export function roomsForCounter(
   rooms: readonly RoomSummary[],
   reading: CounterReading,
-  openOnly: boolean,
 ): { rooms: readonly RoomSummary[]; filterActive: boolean } {
   if (reading.kind === "code") {
     const match = listedRoomForCode(rooms, reading.code);
     if (match !== null) return { rooms: [match], filterActive: true };
-    return { rooms: applyRoomFilter(rooms, { query: "", openOnly }), filterActive: openOnly };
+    return { rooms, filterActive: false };
   }
   const query = reading.kind === "search" ? reading.query : "";
-  return {
-    rooms: applyRoomFilter(rooms, { query, openOnly }),
-    filterActive: query !== "" || openOnly,
-  };
+  return { rooms: applyRoomFilter(rooms, { query }), filterActive: query !== "" };
 }
-
-/** Whether the counter offers a password box, and why. */
-export type PasswordPrompt = "hidden" | "optional" | "required";
 
 export type CounterVerdict = {
   line: string;
-  password: PasswordPrompt;
   /** True when the typed code is what happens next, so the list steps back. */
   codeWins: boolean;
   tone: "hint" | "code" | "warning";
@@ -128,12 +116,11 @@ export type CounterState = {
 };
 
 /**
- * One sentence for every state of the counter, and whether a password box comes with it.
+ * One sentence for every state of the counter.
  *
- * The password moved in here from a permanent field beside the code box: it is a STATE of
- * having a code, not a second control (decision 2026-08-18 §2). A room the list can see
- * answers the question exactly - locked or open - and a room it cannot see gets the honest
- * "if the host set one", because a private room's password is unknowable from here.
+ * It also decided whether a password box came with it until 2026-08-20, when passwords were
+ * removed outright (@jeopardy/protocol room/visibility.ts): the code is what admits people, so
+ * a code that names a room is the whole story and there is no second thing to ask for.
  */
 export function describeCounter(state: CounterState): CounterVerdict {
   const { reading } = state;
@@ -142,22 +129,12 @@ export function describeCounter(state: CounterState): CounterVerdict {
     if (match === null) {
       return {
         line: `${reading.code} is not on the public list - that is normal, most rooms are private.`,
-        password: "optional",
-        codeWins: true,
-        tone: "code",
-      };
-    }
-    if (match.hasPassword) {
-      return {
-        line: `${reading.code} is ${match.title} - it needs the room password.`,
-        password: "required",
         codeWins: true,
         tone: "code",
       };
     }
     return {
-      line: `${reading.code} is ${match.title}, open to anyone with the code.`,
-      password: "hidden",
+      line: `${reading.code} is ${match.title}.`,
       codeWins: true,
       tone: "code",
     };
@@ -166,7 +143,6 @@ export function describeCounter(state: CounterState): CounterVerdict {
   if (state.listingError !== null) {
     return {
       line: `The public list is unavailable right now (${state.listingError}). A room code still works.`,
-      password: "hidden",
       codeWins: false,
       tone: "warning",
     };
@@ -176,14 +152,12 @@ export function describeCounter(state: CounterState): CounterVerdict {
     if (state.shown === 0) {
       return {
         line: `No public room matches "${reading.query}". A room code is not a search - type all ${String(limits.room.roomCodeLength)} characters to join by code.`,
-        password: "hidden",
         codeWins: false,
         tone: "hint",
       };
     }
     return {
       line: `Showing ${String(state.shown)} of ${String(state.total)} public rooms.`,
-      password: "hidden",
       codeWins: false,
       tone: "hint",
     };
@@ -192,7 +166,6 @@ export function describeCounter(state: CounterState): CounterVerdict {
   if (!state.registryAnswering) {
     return {
       line: "The public list cannot answer right now. A room code still works.",
-      password: "hidden",
       codeWins: false,
       tone: "warning",
     };
@@ -200,7 +173,6 @@ export function describeCounter(state: CounterState): CounterVerdict {
 
   return {
     line: `Type the ${String(limits.room.roomCodeLength)}-character code from the big screen, or search what is on below.`,
-    password: "hidden",
     codeWins: false,
     tone: "hint",
   };

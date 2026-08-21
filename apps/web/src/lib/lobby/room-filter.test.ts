@@ -22,7 +22,6 @@ const openRoom: RoomSummary = {
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
   listing: "public",
-  hasPassword: false,
   phase: "lobby",
   playerCount: 7,
   playerCap: 100,
@@ -35,7 +34,6 @@ const lockedRoom: RoomSummary = {
   code: "MJ4TW",
   title: "Environment trivia",
   hostLabel: "Environmental Law Society",
-  hasPassword: true,
 };
 
 function stateOf(overrides: Partial<CounterState> = {}): CounterState {
@@ -79,21 +77,16 @@ describe("filtering the list", () => {
   const rooms = [openRoom, lockedRoom];
 
   it("keeps the listing's own order, which is the registry's newest-first", () => {
-    expect(applyRoomFilter(rooms, { query: "", openOnly: false })).toEqual(rooms);
+    expect(applyRoomFilter(rooms, { query: "" })).toEqual(rooms);
   });
 
   it("matches the title and the host label, case-insensitively", () => {
-    expect(applyRoomFilter(rooms, { query: "quiz", openOnly: false })).toEqual([openRoom]);
-    expect(applyRoomFilter(rooms, { query: "law society", openOnly: false })).toEqual([lockedRoom]);
+    expect(applyRoomFilter(rooms, { query: "quiz" })).toEqual([openRoom]);
+    expect(applyRoomFilter(rooms, { query: "law society" })).toEqual([lockedRoom]);
   });
 
   it("matches a code the list happens to carry, without the list ever printing one", () => {
-    expect(applyRoomFilter(rooms, { query: "mj4tw", openOnly: false })).toEqual([lockedRoom]);
-  });
-
-  it("drops locked rooms when open-only is on, whatever else is typed", () => {
-    expect(applyRoomFilter(rooms, { query: "", openOnly: true })).toEqual([openRoom]);
-    expect(applyRoomFilter(rooms, { query: "environment", openOnly: true })).toEqual([]);
+    expect(applyRoomFilter(rooms, { query: "mj4tw" })).toEqual([lockedRoom]);
   });
 
   it("finds the listed room a typed code names, and says null for one it cannot see", () => {
@@ -102,27 +95,23 @@ describe("filtering the list", () => {
   });
 
   it("does not empty the list for a code it cannot see - that is the private case, not an error", () => {
-    const shown = roomsForCounter(rooms, readCounter("ZZZZZ"), false);
+    const shown = roomsForCounter(rooms, readCounter("ZZZZZ"));
     expect(shown.rooms).toEqual(rooms);
     expect(shown.filterActive).toBe(false);
   });
 
   it("narrows to exactly the room a listed code names", () => {
-    const shown = roomsForCounter(rooms, readCounter("mj4tw"), false);
+    const shown = roomsForCounter(rooms, readCounter("mj4tw"));
     expect(shown.rooms).toEqual([lockedRoom]);
     expect(shown.filterActive).toBe(true);
   });
 
-  it("lets an exact code beat the open-only toggle, because a code is a stronger intent", () => {
-    expect(roomsForCounter(rooms, readCounter("MJ4TW"), true).rooms).toEqual([lockedRoom]);
-  });
-
   it("passes a search straight through to the filter", () => {
-    expect(roomsForCounter(rooms, readCounter("quiz"), false)).toEqual({
+    expect(roomsForCounter(rooms, readCounter("quiz"))).toEqual({
       rooms: [openRoom],
       filterActive: true,
     });
-    expect(roomsForCounter(rooms, readCounter(""), false)).toEqual({
+    expect(roomsForCounter(rooms, readCounter(""))).toEqual({
       rooms,
       filterActive: false,
     });
@@ -135,7 +124,6 @@ describe("what the counter says", () => {
     expect(verdict.line).toContain("5-character code");
     expect(verdict.line).toContain("search");
     expect(verdict.codeWins).toBe(false);
-    expect(verdict.password).toBe("hidden");
   });
 
   it("treats an unlisted code as ordinary, not as an error", () => {
@@ -143,21 +131,12 @@ describe("what the counter says", () => {
     expect(verdict.line).toContain("not on the public list");
     expect(verdict.line).toContain("most rooms are private");
     expect(verdict.codeWins).toBe(true);
-    // Unknowable from here, so the box is offered rather than demanded.
-    expect(verdict.password).toBe("optional");
   });
 
-  it("names a listed open room and asks for no password at all", () => {
+  it("names a listed room the code points at", () => {
     const verdict = describeCounter(stateOf({ reading: readCounter("BQKX7"), match: openRoom }));
     expect(verdict.line).toContain("Pub quiz night");
-    expect(verdict.password).toBe("hidden");
     expect(verdict.codeWins).toBe(true);
-  });
-
-  it("demands the password for a listed locked room", () => {
-    const verdict = describeCounter(stateOf({ reading: readCounter("MJ4TW"), match: lockedRoom }));
-    expect(verdict.line).toContain("needs the room password");
-    expect(verdict.password).toBe("required");
   });
 
   it("counts what a search left on screen", () => {

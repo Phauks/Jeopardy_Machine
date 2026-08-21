@@ -24,8 +24,6 @@ export type SessionRoom = {
   settings: RoomSettings;
   // The creation token: the harness's proof for joining as host, inspecting, and closing.
   hostToken: string;
-  // What this tab set as the room password, so join is one click rather than a retype.
-  password: string;
   createdAt: number;
   expiresAt: number;
   // Whether the CREATE's registry write landed - "created; NOT listed because the registry
@@ -48,21 +46,20 @@ export function rememberSessionRoom(rooms: SessionRoom[], room: SessionRoom): Se
 
 /**
  * A settings edit landed: the row adopts the SERVER's answer, never what was typed into the
- * form - a cap the room refused to lower must not appear to have moved. `password` is this
+ * form - a cap the room refused to lower must not appear to have moved. This
  * tab's own copy of the shared secret (empty string = the room is open now), kept only so the
  * join field stays one click rather than a retype.
  */
 export function updateSessionRoomSettings(
   rooms: SessionRoom[],
   code: string,
-  change: { settings: RoomSettings; password?: string },
+  change: { settings: RoomSettings },
 ): SessionRoom[] {
   return rooms.map((room) =>
     room.code === code
       ? {
           ...room,
           settings: change.settings,
-          password: change.password ?? room.password,
         }
       : room,
   );

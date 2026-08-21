@@ -12,7 +12,6 @@ const summary = {
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
   listing: "public",
-  hasPassword: true,
   phase: "lobby",
   playerCount: 7,
   playerCap: limits.room.playerSoftCap,
@@ -21,7 +20,7 @@ const summary = {
 };
 
 describe("room summary (the lobby row)", () => {
-  it("parses a full public row, lock included", () => {
+  it("parses a full public row", () => {
     expect(roomSummarySchema.parse(summary)).toEqual(summary);
   });
 

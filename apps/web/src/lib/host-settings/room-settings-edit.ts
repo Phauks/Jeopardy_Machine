@@ -129,7 +129,6 @@ export function roomSettingsSummary(view: RoomView): string {
   const settings = view.settings;
   const parts = [
     settings.listing === "public" ? "Public" : "Private",
-    settings.entry === "password" ? "password" : "open",
     `${String(view.roster.players.length)}/${String(settings.maxPlayers)} players`,
     settings.spectatorsAllowed ? `up to ${String(settings.maxSpectators)} watching` : "no audience",
   ];

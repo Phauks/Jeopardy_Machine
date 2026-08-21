@@ -13,7 +13,6 @@
     hostUrlForRoom,
     joinUrlForRoom,
     rememberHostToken,
-    rememberRoomPassword,
   } from "#lib/lobby/join-hand-off.ts";
   import {
     blankCreateForm,
@@ -159,7 +158,6 @@
       // The creation token rides sessionStorage to the console, never the URL (join-hand-off.ts
       // documents why), and this tab remembers the room so the front door can offer it back.
       rememberHostToken(created.code, created.hostToken);
-      rememberRoomPassword(created.code, createForm.password);
       rememberRoom({
         code: created.code,
         title: created.settings.title,
@@ -187,7 +185,7 @@
 
   // ---- going somewhere -------------------------------------------------------------------
 
-  function enterRoom(code: string, password: string, title: string): void {
+  function enterRoom(code: string, title: string): void {
     let destination: string;
     try {
       destination = joinUrlForRoom(code);
@@ -195,7 +193,6 @@
       listingError = `That is not a room code - they are ${String(limits.room.roomCodeLength)} letters and digits.`;
       return;
     }
-    rememberRoomPassword(code, password);
     rememberRoom({ code, title, role: "player", at: Date.now() });
     globalThis.location.assign(destination);
   }
@@ -228,11 +225,11 @@
     {createForm}
     {createState}
     surfaces={devSurfaces}
-    onJoin={(code, password) => {
-      enterRoom(code, password, titleForCode(code));
+    onJoin={(code: string) => {
+      enterRoom(code, titleForCode(code));
     }}
-    onJoinRoom={(room: RoomSummary, password: string) => {
-      enterRoom(room.code, password, room.title);
+    onJoinRoom={(room: RoomSummary) => {
+      enterRoom(room.code, room.title);
     }}
     onRejoin={(room) => {
       globalThis.location.assign(

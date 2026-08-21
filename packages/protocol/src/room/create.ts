@@ -22,12 +22,7 @@ import {
   roomSettingsSchema,
 } from "./room-settings.ts";
 import { roomCodeSchema } from "./server-messages.ts";
-import {
-  hostLabelSchema,
-  roomListingSchema,
-  roomPasswordSchema,
-  roomTitleSchema,
-} from "./visibility.ts";
+import { hostLabelSchema, roomListingSchema, roomTitleSchema } from "./visibility.ts";
 
 // Mirrors the board shape of @jeopardy/engine's scenario fixtures (packages/engine/src/
 // fixture.ts) - restated here because the engine depends on protocol, not the reverse; the
@@ -66,7 +61,6 @@ export const createRoomRequestSchema = z
     // public ones - an unnamed row in a server browser is noise, not an invitation.
     title: roomTitleSchema.optional(),
     hostLabel: hostLabelSchema.optional(),
-    password: roomPasswordSchema.optional(),
     // Room controls (docs/decisions/2026-08-14-room-controls-and-staging.md). Every one of
     // them is editable AFTER creation through `update-room-settings`, so these are opening
     // positions rather than commitments - the create form is allowed to be short.

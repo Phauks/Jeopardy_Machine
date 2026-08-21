@@ -68,12 +68,13 @@ npx wrangler d1 migrations apply jeopardy-machine --remote -c apps/web/wrangler.
 
 Both Workers bind this database (web writes/reads, the room DO reports its own transitions - see the decision's addendum), but the migration is applied **once**, through the web config that owns the schema.
 
-> **RE-APPLY REQUIRED (2026-08-14, extended 2026-08-16 - ONE re-apply covers both).** `0001_create_rooms.sql` was **rewritten in place**, not extended, twice:
+> **RE-APPLY REQUIRED (2026-08-14, extended 2026-08-16 and again 2026-08-20 - ONE re-apply covers all three).** `0001_create_rooms.sql` was **rewritten in place**, not extended, three times:
 >
 > 1. the listing axis became `public` / `private` (docs/decisions/2026-08-14-room-controls-and-staging.md), so the column is now `listing` and its CHECK constraint moved with it;
-> 2. the room's **spectator budget** joined the projection at the reconcile - `spectator_count`, `spectator_cap`, `spectators_allowed` - so the lobby card can show who is watching beside who is playing.
+> 2. the room's **spectator budget** joined the projection at the reconcile - `spectator_count`, `spectator_cap`, `spectators_allowed` - so the lobby card can show who is watching beside who is playing;
+> 3. `has_password` was **dropped** when room passwords were removed (docs/decisions/2026-08-20-no-room-passwords.md) - the lobby has no lock to render and the row has no flag to carry.
 >
-> The full column list the table now carries: `code, title, host_label, listing, has_password, phase, player_count, player_cap, spectator_count, spectator_cap, spectators_allowed, created_at, last_seen_at, expires_at, ended_at`.
+> The full column list the table now carries: `code, title, host_label, listing, phase, player_count, player_cap, spectator_count, spectator_cap, spectators_allowed, created_at, last_seen_at, expires_at, ended_at`.
 >
 > The file starts with `DROP TABLE IF EXISTS rooms`, which is the honest edit for a product with no users and rooms that live hours - but it means an environment that already ran §2a must run it **again**, and will lose every row it had. Those rows are lobby projections of rooms that expired long ago; no game, code, or player state lives in D1. Wrangler records migrations as applied, so force the re-run in whichever way you prefer:
 >
@@ -162,8 +163,9 @@ for a different failure:
    documents and its eight images ship in the web Worker's assets directory
    (`static/games/board-game-club-x-els/`), and the media URLs are built from the origin the
    host loaded, so a custom domain change is worth re-checking here.
-7. **Make a third room with a password** and open `/room/<CODE>` in a fresh private window - no
-   front door, no stashed password. It must ask for the password and let you in.
+7. **Open `/room/<CODE>` in a fresh private window** - no front door, nothing stashed, just the
+   URL. It must go straight to the joining screen: the code is the whole credential
+   (docs/decisions/2026-08-20-no-room-passwords.md), so anything that asks for more is a bug.
 
 Anything that fails here fails the same way at the event, and every one of them is a
 five-minute fix beforehand.
@@ -234,9 +236,9 @@ Since Workers Builds deploys every push to `main`, GitHub is now the deploy gate
 - [ ] `wrangler login` done locally - only needed for a CLI deploy or to run §2a; Workers Builds does not use it
 - [x] workers.dev subdomain claimed (both Workers have deployed under it)
 - [x] D1 created (dashboard, 2026-08-13) -> id `c12ef3a9-…74d6` bound in apps/web/wrangler.jsonc as `DB` (confirm the database_name field matches the dashboard name); the same id is bound in apps/realtime/wrangler.jsonc since 2026-08-14
-- [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-16**: `0001_create_rooms.sql` was rewritten twice (listing axis renamed to public/private, then the spectator columns added) and drops the table it recreates - one re-apply covers both
+- [ ] D1 migrations applied (§2a) - turns the public lobby on; rooms work without it. **Re-apply after 2026-08-20**: `0001_create_rooms.sql` was rewritten three times (listing axis renamed to public/private, the spectator columns added, then `has_password` dropped) and drops the table it recreates - one re-apply covers all three
 - [x] R2 bucket `jeopardy-machine-media` created (dashboard, 2026-08-13) -> bound as `MEDIA`
 - [x] Both Workers deployed and building from `main` via Workers Builds (2026-08-13; the realtime-before-web ordering mattered for the FIRST deploy only, and both exist now)
-- [ ] §3a smoke test walked end to end (version -> room -> phone -> console recovery -> picture clue -> password room)
+- [ ] §3a smoke test walked end to end (version -> room -> phone -> console recovery -> picture clue -> URL-only join)
 - [ ] (optional) scoped API token added to agent environment
 - [ ] (later) custom domain after the name lands

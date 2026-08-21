@@ -1,6 +1,6 @@
 <script lang="ts">
   // The management tools the owner asked for once a room exists (docs/decisions/2026-08-14-
-  // room-controls-and-staging.md, "Management tools"): change the listing, the entry password,
+  // room-controls-and-staging.md, "Management tools"): change the listing,
   // both participant budgets, the spectator switch and streamer mode - on a LIVE room, with
   // the effect visible on the same screen.
   //
@@ -25,7 +25,6 @@
     maxSpectators: number;
     title: string;
     hostLabel: string;
-    password: string;
   };
 
   type Props = {
@@ -80,7 +79,7 @@
       <dd><strong>{room.code}</strong></dd>
       <dt class="opacity-70">stored settings</dt>
       <dd>
-        {settings.listing} · {settings.entry} · {settings.maxPlayers}p / {settings.spectatorsAllowed
+        {settings.listing} · {settings.maxPlayers}p / {settings.spectatorsAllowed
           ? `${settings.maxSpectators}s`
           : "spectators off"} · code {settings.hideJoinCode ? "HIDDEN" : "visible"}
       </dd>
@@ -88,7 +87,7 @@
       <dd data-broadcast>
         {broadcast === null
           ? "none seen on this socket"
-          : `${broadcast.listing} · ${broadcast.entry} · ${broadcast.maxPlayers}p / ${broadcast.maxSpectators}s · code ${broadcast.hideJoinCode ? "HIDDEN" : "visible"}`}
+          : `${broadcast.listing} · ${broadcast.maxPlayers}p / ${broadcast.maxSpectators}s · code ${broadcast.hideJoinCode ? "HIDDEN" : "visible"}`}
       </dd>
       <dt class="opacity-70">participants</dt>
       <dd>
@@ -195,34 +194,9 @@
       </button>
     </div>
 
-    <div class="flex flex-wrap items-end gap-2 text-sm">
-      <label class="flex items-center gap-1">
-        password
-        <input
-          class="w-48 border px-2 py-1"
-          placeholder="(new shared secret)"
-          maxlength={limits.room.roomPasswordMaxLength}
-          bind:value={draft.password}
-        />
-      </label>
-      <button
-        class="border px-2 py-1 text-xs"
-        disabled={busy || blocked !== null || draft.password.length < limits.room.roomPasswordMinLength}
-        onclick={() => onApply({ password: draft.password })}
-      >
-        Set password
-      </button>
-      <button
-        class="border px-2 py-1 text-xs"
-        disabled={busy || blocked !== null || settings.entry === "open"}
-        onclick={() => onApply({ password: null })}
-      >
-        Clear password (open the room)
-      </button>
-    </div>
     <p class="text-xs opacity-70">
-      Changing the password never disconnects anyone already inside - it is the door, not a
-      session. The old secret stops working immediately for new joins.
+      No edit here ever disconnects anyone already inside - a cap that drops below the roster
+      binds the next arrival, not the people in the room (@jeopardy/protocol room-settings.ts).
     </p>
   {/if}
 

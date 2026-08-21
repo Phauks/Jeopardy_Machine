@@ -54,8 +54,6 @@ export type CreateRoomStoreOptions = {
   // --- ws only -------------------------------------------------------------------------
   /** Creation-time credential for role=host (join-hand-off.ts stashed it at create). */
   hostToken?: string | null;
-  /** The shared room secret, when the room has one. Rides the join message, never the URL. */
-  password?: string | null;
   /** A previous join's resume credential from THIS tab (user-flows A5). */
   sessionToken?: string | null;
   /** Where a newly minted or invalidated session token goes. */
@@ -80,7 +78,6 @@ export function createRoomStore(options: CreateRoomStoreOptions): RoomStore {
       roomCode: options.roomCode,
       role: options.role,
       hostToken: options.hostToken ?? null,
-      password: options.password ?? null,
       sessionToken: options.sessionToken ?? null,
       onSessionToken: options.onSessionToken ?? null,
       onEvent: options.onEvent ?? null,

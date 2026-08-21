@@ -48,7 +48,7 @@ export function roomStub(code: string) {
   return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
 }
 
-// `options` carries the room fields beyond the game itself - listing/title/hostLabel/password
+// `options` carries the room fields beyond the game itself - listing/title/hostLabel
 // (docs/decisions/2026-08-14-room-visibility-and-lobby.md) and the room controls
 // (docs/decisions/2026-08-14-room-controls-and-staging.md). Omitted = the default private,
 // open, spectators-welcome room every pre-existing test in this suite assumes.

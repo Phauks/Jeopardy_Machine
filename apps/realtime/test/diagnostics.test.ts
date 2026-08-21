@@ -4,7 +4,7 @@
 // Two properties carry the weight here. AUTHORIZATION: the token is checked inside the DO,
 // so "the request came through the binding" is never itself permission. REDACTION: the
 // inspector is a diagnostic surface on a room that holds host tokens, session tokens, a
-// password hash and every authored answer - the test that matters is the one that searches
+// every authored answer - the test that matters is the one that searches
 // the serialized response for all four.
 import { describe, expect, it } from "vitest";
 import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
@@ -48,8 +48,7 @@ describe("the DO inspector", () => {
     expect(diagnostics).toMatchObject({
       code,
       lifecycle: "lobby",
-      settings: { listing: "private", entry: "open" },
-      hasPassword: false,
+      settings: { listing: "private" },
       paused: false,
     });
     expect(diagnostics.connections).toMatchObject({ total: 2, host: 1, player: 1 });
@@ -79,19 +78,17 @@ describe("the DO inspector", () => {
     expect(diagnostics.stateVersion).toBeGreaterThan(0);
   });
 
-  it("leaks NOTHING: no host token, no session token, no password hash, no authored answer", async () => {
+  it("leaks NOTHING: no host token, no session token, no authored answer", async () => {
     const code = uniqueCode();
-    const password = "shout-this-across-the-hall";
     const { hostToken } = await initializeRoom(code, authoredGame, "diagnostics-suite", {
       listing: "public",
       title: "Inspector suite",
-      password,
     });
     const host = await connectHost(code, hostToken);
-    // A raw client rather than a bot: this player must present the room password, which is
-    // the whole point of the room under test (bots join open rooms only).
+    // A raw client rather than a bot, so the roster carries a real nickname the inspector
+    // must not echo back.
     const phone = new TestClient(await upgradeToRoom(code));
-    phone.send({ type: "join", role: "player", nickname: "Lorax", password });
+    phone.send({ type: "join", role: "player", nickname: "Lorax" });
     const welcome = await phone.waitFor("welcome");
     await host.waitFor("roster", (message) => message.roster.players.length === 1);
     host.sendAction({ type: "start-game" });
@@ -100,7 +97,7 @@ describe("the DO inspector", () => {
     await host.takeEvent("clue-presented");
 
     const raw = await (await ask(code, hostToken)).text();
-    for (const secret of [hostToken, password, firstCellText.answer, firstCellText.prompt]) {
+    for (const secret of [hostToken, firstCellText.answer, firstCellText.prompt]) {
       expect(raw).not.toContain(secret);
     }
     // Session tokens never appear either - the roster is counted, never listed.
@@ -109,9 +106,7 @@ describe("the DO inspector", () => {
     expect(raw).not.toContain("Lorax");
     // ...while the facts an operator needs are all there.
     const diagnostics = JSON.parse(raw) as RoomDiagnostics;
-    expect(diagnostics.hasPassword).toBe(true);
     expect(diagnostics.settings.listing).toBe("public");
-    expect(diagnostics.settings.entry).toBe("password");
     expect(diagnostics.settings.title).toBe("Inspector suite");
   });
 
@@ -131,9 +126,9 @@ describe("closing a room over the ops endpoint", () => {
     const code = uniqueCode();
     const now = Date.now();
     await env.DB.prepare(
-      `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+      `INSERT INTO rooms (code, title, host_label, listing, phase, player_count,
          player_cap, created_at, last_seen_at, expires_at, ended_at)
-       VALUES (?, 'Closing suite', '', 'public', 0, 'lobby', 0, ?, ?, ?, ?, NULL)`,
+       VALUES (?, 'Closing suite', '', 'public', 'lobby', 0, ?, ?, ?, ?, NULL)`,
     )
       .bind(code, limits.room.playerSoftCap, now, now, now + limits.room.idleExpiryMs)
       .run();

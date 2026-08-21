@@ -59,7 +59,6 @@ import {
   timerExpiryAction,
   timerLiveInPhase,
 } from "./room/engine-glue.ts";
-import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
 import {
   deleteRegistryRow,
@@ -153,10 +152,6 @@ export class GameRoomDO extends Server {
   // the meter, which only ever errs in the client's favor.
   private messageStamps = new Map<string, number[]>();
   private lastPersistedActivity = 0;
-  // Wrong-password attempts per connection, in memory for the same reason as messageStamps:
-  // the budget only ever resets in the client's favor, and resetting it costs an attacker a
-  // fresh WebSocket handshake anyway.
-  private passwordAttempts = new Map<string, number[]>();
   // Coalescing stamp for registry writes (see syncRegistry).
   private lastRegistrySyncAt = 0;
 
@@ -686,10 +681,6 @@ export class GameRoomDO extends Server {
       const now = Date.now();
       const seed = body.data.seed ?? generateSecretToken();
       const setup = setupFromSpec(body.data.game, seed);
-      // The room password is hashed HERE, at creation, and the plaintext is never stored,
-      // logged, or echoed (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
-      const password =
-        body.data.password === undefined ? null : await hashRoomPassword(body.data.password);
       const meta: RoomMeta = {
         code: this.name,
         hostToken: generateSecretToken(),
@@ -704,7 +695,6 @@ export class GameRoomDO extends Server {
         },
         title: body.data.title ?? "",
         hostLabel: body.data.hostLabel ?? "",
-        password,
         createdAt: now,
         lastActivityAt: now,
         stateVersion: 0,
@@ -1042,17 +1032,6 @@ export class GameRoomDO extends Server {
     const room = await this.load();
     if (room === null) return;
 
-    // The room password gates every role EXCEPT host: the creation token is the stronger
-    // claim, and a host locked out of their own room by a typo would be absurd. Checked
-    // BEFORE anything else a join could change, so a wrong password leaves no trace in the
-    // room (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
-    if (
-      message.role !== "host" &&
-      !(await this.admitPassword(connection, room, message.password))
-    ) {
-      return;
-    }
-
     if (message.role === "host") {
       if (message.hostToken !== room.meta.hostToken) {
         this.refuse(connection, "bad-host-token", roomCloseCodes.badToken);
@@ -1238,40 +1217,6 @@ export class GameRoomDO extends Server {
     // The lobby's "7/100" is the one number a browser judges a room by, so a roster change
     // reports itself (coalesced - see syncRegistry).
     await this.syncRegistry();
-  }
-
-  // Password verdict for one join attempt. Returns true when the connection may proceed.
-  // Refusals KEEP the socket so the phone can prompt and retry (server-messages close-code
-  // note) - until the per-connection budget runs out, which closes with joinRefused.
-  private async admitPassword(
-    connection: Connection<Attachment>,
-    room: LoadedRoom,
-    offered: string | undefined,
-  ): Promise<boolean> {
-    const stored = room.meta.password;
-    if (stored === null) return true;
-    if (offered === undefined) {
-      // Not counted against the budget: the FIRST join of a password room legitimately
-      // arrives without one (the client cannot know until it is told).
-      this.refuse(connection, "password-required");
-      return false;
-    }
-    if (await verifyRoomPassword(offered, stored)) {
-      this.passwordAttempts.delete(connection.id);
-      return true;
-    }
-    const now = Date.now();
-    const stamps = (this.passwordAttempts.get(connection.id) ?? []).filter(
-      (at) => now - at < limits.room.passwordAttemptWindowMs,
-    );
-    stamps.push(now);
-    this.passwordAttempts.set(connection.id, stamps);
-    if (stamps.length >= limits.room.passwordAttemptBurstMax) {
-      this.refuse(connection, "bad-password", roomCloseCodes.joinRefused);
-      return false;
-    }
-    this.refuse(connection, "bad-password");
-    return false;
   }
 
   private welcomePlayer(
@@ -1990,13 +1935,6 @@ export class GameRoomDO extends Server {
     if (patch.hideJoinCode !== undefined) meta.settings.hideJoinCode = patch.hideJoinCode;
     if (patch.title !== undefined) meta.title = patch.title;
     if (patch.hostLabel !== undefined) meta.hostLabel = patch.hostLabel;
-    if (patch.password !== undefined) {
-      // Changing the shared secret NEVER disconnects anyone already inside: the password is
-      // the door, not a session (docs/decisions/2026-08-14-room-controls-and-staging.md). It
-      // decides who may come in from now on, and the old one stops working the instant this
-      // lands.
-      meta.password = patch.password === null ? null : await hashRoomPassword(patch.password);
-    }
     await this.persist("meta");
     this.broadcastRoomSettings();
     // Going private must leave the lobby AT ONCE rather than at the next sweep - a browsable
@@ -2053,7 +1991,6 @@ export class GameRoomDO extends Server {
       listing: room.meta.settings.listing,
       title: room.meta.title,
       hostLabel: room.meta.hostLabel,
-      hasPassword: room.meta.password !== null,
       playerCap: room.meta.settings.maxPlayers,
       spectatorCap: room.meta.settings.maxSpectators,
       spectatorsAllowed: room.meta.settings.spectatorsAllowed,

@@ -13,14 +13,6 @@ describe("judging a probe", () => {
     expect(judgeProbe("uncreated-room", {})).toBe("fail");
   });
 
-  it("passes the password probe on either refusal, since both deny entry", () => {
-    expect(judgeProbe("wrong-password", { type: "refused", reason: "bad-password" })).toBe("pass");
-    expect(judgeProbe("wrong-password", { type: "refused", reason: "password-required" })).toBe(
-      "pass",
-    );
-    expect(judgeProbe("wrong-password", { type: "welcome" })).toBe("fail");
-  });
-
   it("holds each wire error to its own reason", () => {
     expect(judgeProbe("stale-version", { type: "error", reason: "unsupported-version" })).toBe(
       "pass",
@@ -36,7 +28,7 @@ describe("judging a probe", () => {
 
 describe("the probe catalog", () => {
   it("states an expectation and a reason for every probe", () => {
-    expect(refusalProbes.length).toBeGreaterThanOrEqual(6);
+    expect(refusalProbes.length).toBeGreaterThanOrEqual(5);
     for (const probe of refusalProbes) {
       expect(probe.expected.length).toBeGreaterThan(0);
       expect(probe.because.length).toBeGreaterThan(0);

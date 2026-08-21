@@ -6,16 +6,20 @@
 // this browser just CREATED the room - to the host console with the creation token. The
 // harness at /dev/rooms is a developer surface and never a destination for a real player.
 //
-// Neither secret EVER rides the URL. Room links are pasted into group chats, printed onto QR
-// codes, and logged by every proxy in between; a secret in a query string would leak into
-// history, referrers, and access logs. Both are handed over in the messages they belong to: the
-// password in `join`, the host token in the host connection's own handshake. The password rides
-// sessionStorage (per tab, cleared with it); the host token rides localStorage with an expiry,
-// because a host whose tab dies must not lose the room - see rememberHostToken.
+// No secret EVER rides the URL. Room links are pasted into group chats, printed onto QR codes,
+// and logged by every proxy in between; a secret in a query string would leak into history,
+// referrers, and access logs. Each is handed over in the message it belongs to: the host token
+// in the host connection's own handshake, the session token on resume. The host token rides
+// localStorage with an expiry, because a host whose tab dies must not lose the room (see
+// rememberHostToken); the session token rides sessionStorage, because a seat is per-tab.
+//
+// A third pair lived here until 2026-08-20 - rememberRoomPassword / recallRoomPassword, the
+// shared room secret stashed beside the code so a join screen reached from the lobby could
+// offer it without asking twice. Rooms have no password now (@jeopardy/protocol
+// room/visibility.ts); the code IS the secret, and it travels in the URL by design.
 import { limits } from "@jeopardy/protocol/limits";
 import { normalizeRoomCode } from "#lib/realtime/room-url.ts";
 
-const passwordStorageKey = "jeopardy.room-password";
 const hostTokenStorageKey = "jeopardy.host-token";
 const sessionTokenStorageKey = "jeopardy.session-token";
 
@@ -27,30 +31,6 @@ export function joinUrlForRoom(rawCode: string): string {
 /** The destination for "you made this room": the host console. */
 export function hostUrlForRoom(rawCode: string): string {
   return `/room/${normalizeRoomCode(rawCode)}/host`;
-}
-
-/** Stash the room password for the next surface. No password = clear any stale one. */
-export function rememberRoomPassword(rawCode: string, password: string): void {
-  const code = normalizeRoomCode(rawCode);
-  const storage = globalThis.sessionStorage as Storage | undefined;
-  if (storage === undefined) return;
-  if (password === "") {
-    storage.removeItem(`${passwordStorageKey}.${code}`);
-    return;
-  }
-  storage.setItem(`${passwordStorageKey}.${code}`, password);
-}
-
-/** What the join surface reads back. Empty string = the room needs no password (yet). */
-export function recallRoomPassword(rawCode: string): string {
-  const storage = globalThis.sessionStorage as Storage | undefined;
-  if (storage === undefined) return "";
-  try {
-    return storage.getItem(`${passwordStorageKey}.${normalizeRoomCode(rawCode)}`) ?? "";
-  } catch {
-    // An unparseable code has no stored password by definition.
-    return "";
-  }
 }
 
 /**

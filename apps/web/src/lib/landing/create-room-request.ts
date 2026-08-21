@@ -9,7 +9,7 @@
 // The validation duplicates the protocol's schema on purpose, and only where a refusal would
 // otherwise arrive as an opaque 400: the room's OWN rules are still the server's
 // (packages/protocol/src/room/create.ts is authority). This exists so a four-character
-// password floor is a sentence under the field rather than a bad-request after the tap.
+// cap is a sentence under the field rather than a bad-request after the tap.
 import { limits } from "@jeopardy/protocol/limits";
 import type { CreateRoomResponse } from "@jeopardy/protocol/room/create";
 import type { GameDefinitionBody } from "@jeopardy/protocol";
@@ -20,8 +20,6 @@ export type CreateRoomForm = {
   title: string;
   hostLabel: string;
   listing: "public" | "private";
-  /** Empty = an open room. Any other value makes the room password-entry. */
-  password: string;
   maxPlayers: number;
   spectatorsAllowed: boolean;
   /**
@@ -55,7 +53,6 @@ export function blankCreateForm(): CreateRoomForm {
     title: "",
     hostLabel: "",
     listing: "private",
-    password: "",
     maxPlayers: playerCapBounds.max,
     spectatorsAllowed: true,
     // Individuals, which is also the settings registry's default (packages/protocol/src/
@@ -68,7 +65,7 @@ export function blankCreateForm(): CreateRoomForm {
 }
 
 export type CreateProblem = {
-  field: "title" | "hostLabel" | "password" | "maxPlayers";
+  field: "title" | "hostLabel" | "maxPlayers";
   message: string;
 };
 
@@ -126,18 +123,6 @@ export function createFormProblems(form: CreateRoomForm): CreateProblem[] {
     problems.push({
       field: "hostLabel",
       message: `Host name is longer than ${String(limits.room.hostLabelMaxLength)} characters.`,
-    });
-  }
-  if (form.password !== "" && form.password.length < limits.room.roomPasswordMinLength) {
-    problems.push({
-      field: "password",
-      message: `A password needs at least ${String(limits.room.roomPasswordMinLength)} characters, or leave it empty for an open room.`,
-    });
-  }
-  if (form.password.length > limits.room.roomPasswordMaxLength) {
-    problems.push({
-      field: "password",
-      message: `Passwords stop at ${String(limits.room.roomPasswordMaxLength)} characters.`,
     });
   }
   if (
@@ -206,7 +191,6 @@ export function createRoomBody(form: CreateRoomForm, game: unknown): Record<stri
     listing: form.listing,
     ...(title === "" ? {} : { title }),
     ...(hostLabel === "" ? {} : { hostLabel }),
-    ...(form.password === "" ? {} : { password: form.password }),
     maxPlayers: form.maxPlayers,
     spectatorsAllowed: form.spectatorsAllowed,
   };

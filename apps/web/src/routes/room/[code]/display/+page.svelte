@@ -12,7 +12,6 @@
   import { page } from "$app/state";
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import { createRoomStore, seedRosterFor } from "#lib/room/create-room-store.ts";
-  import { recallRoomPassword } from "#lib/lobby/join-hand-off.ts";
   import { devicePreferences } from "#lib/host-settings/device-preferences.svelte.ts";
   import { typeScaleStyle } from "#lib/host-settings/device-preferences.ts";
   import { resolveDioramaEnvironment } from "#lib/diorama/diorama-environment.ts";
@@ -50,9 +49,6 @@
     ...(page.url.searchParams.has("sim") && { mode: "local-sim" as const }),
     timerAutopilot: browser,
     autoConnect: browser,
-    // A display is not a spectator, but a password room still gates it (only the host's
-    // creation token outranks the password), so the projector tab carries the same secret.
-    password: browser ? recallRoomPassword(roomCode) : null,
     // Room audio keys off buzz-won ALONE (exactly once per arming - the engine contract), so
     // overlap is structurally impossible; the exclusive slot in RoomAudio is the second belt.
     // The sound arrives resolved: the room decides team-vs-personal, not this window.

@@ -5,7 +5,7 @@
   //   THIS DEVICE  local, instant, nobody else's business. Type scale, audio, mirror, manual
   //                mode, stage motion, density. Stored in localStorage on this laptop.
   //   THIS ROOM    server state, broadcast to everyone connected. Streamer mode, listing,
-  //                password, caps, spectators. Changing one changes the room for the players.
+  //                caps, spectators, title. Changing one changes the room for the players.
   //
   // The split is not decoration: a host who thinks "text size" reaches the players, or that
   // "hide join code" is a local view option, will make exactly the wrong move at exactly the
@@ -58,7 +58,6 @@
   let titleDraft = $state(view.settings.title);
   // svelte-ignore state_referenced_locally
   let hostLabelDraft = $state(view.settings.hostLabel);
-  let passwordDraft = $state("");
   // svelte-ignore state_referenced_locally
   let maxPlayersDraft = $state(view.settings.maxPlayers);
   // svelte-ignore state_referenced_locally
@@ -302,7 +301,7 @@
     <p class="group-note">
       Server settings. Every change reaches every phone and every display in the room at once.
       <strong>Switches take effect the moment you flip them.</strong> Anything you TYPE - the name,
-      the password, the caps - waits for its Apply button, so a half-typed name never reaches the
+      the title, the caps - waits for its Apply button, so a half-typed name never reaches the
       room.
     </p>
     <p class="summary">{roomSettingsSummary(view)}</p>
@@ -394,39 +393,6 @@
         </div>
       </div>
 
-      <div class="control">
-        <label for="room-password">Password</label>
-        <input
-          id="room-password"
-          type="text"
-          autocomplete="off"
-          placeholder={view.settings.entry === "password" ? "set - type to replace" : "no password"}
-          bind:value={passwordDraft}
-        />
-        <div class="row">
-          <button
-            type="button"
-            class="chip"
-            onclick={() => {
-              applyRoomSettings({ password: passwordDraft });
-              passwordDraft = "";
-            }}
-          >
-            Set password
-          </button>
-          <button
-            type="button"
-            class="chip"
-            onclick={() => {
-              applyRoomSettings({ password: null });
-              passwordDraft = "";
-            }}
-          >
-            Remove password
-          </button>
-        </div>
-        <p class="hint">Changing it never disconnects anyone already in the room.</p>
-      </div>
 
       <!-- HOW MANY PEOPLE FIT. Was a pair of number boxes under a button reading "Save caps",
            which told a host the button's name and not its scope (owner, 2026-08-17: "I don't

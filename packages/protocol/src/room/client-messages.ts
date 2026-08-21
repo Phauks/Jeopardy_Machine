@@ -7,10 +7,8 @@
 //
 // | Message         | Who may send                                                          |
 // | --------------- | --------------------------------------------------------------------- |
-// | join            | anyone; a password room additionally requires `password` from every    |
-// |                 | role EXCEPT host (the creation-time hostToken already proves the       |
-// |                 | stronger claim). Wrong/missing password = a `refused` that KEEPS the   |
-// |                 | socket for a retry, rate-limited per connection (limits.room)          |
+// | join            | anyone who reached the room, which means anyone holding its code -    |
+// |                 | rooms carry no second secret (visibility.ts, 2026-08-20)               |
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
 // | arm-ack         | anyone joined; the reply half of the round-trip measurement that      |
@@ -29,7 +27,7 @@
 // | leave           | anyone joined (explicit exit; a dropped socket is NOT a leave)        |
 // | set-pause       | host only (freezes the room and parks every running timer)            |
 // | expire-timer    | host only ("skip the wait": fires whichever timer the room is on)     |
-// | update-room-settings | host only (listing, caps, spectators, streamer mode, password)   |
+// | update-room-settings | host only (listing, caps, spectators, streamer mode, title)      |
 // | close-room      | host only (ends the room for everyone - the polite screen everywhere) |
 import { z } from "zod";
 import { extensionBagSchema } from "../ext.ts";
@@ -45,7 +43,6 @@ import {
 } from "./identity.ts";
 import { roomSettingsPatchSchema } from "./room-settings.ts";
 import { teamIdSchema } from "./roster.ts";
-import { roomPasswordSchema } from "./visibility.ts";
 
 // Every concrete message is strict (unknown fields only in ext) and carries the envelope
 // fields itself, so one parse validates envelope + payload in a single pass.
@@ -112,7 +109,6 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     // visibility-and-lobby.md). It rides the join MESSAGE, never the URL or a query string:
     // room links get pasted into group chats and printed on QR codes, and a secret in a URL
     // ends up in browser history, referrers, and access logs.
-    password: roomPasswordSchema.optional(),
   }),
   z.strictObject({
     ...envelopeFields,
@@ -193,7 +189,7 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   // time), so this is a host convenience over the same path rather than a new authority -
   // the host may already relay each *-timeout action by name (authority.ts).
   z.strictObject({ ...envelopeFields, type: z.literal("expire-timer") }),
-  // Change the ROOM (not the game): listing, caps, spectators, streamer mode, password, title.
+  // Change the ROOM (not the game): listing, caps, spectators, streamer mode, title.
   // Sparse - only the named fields move - and answered by a `room-settings` broadcast to
   // everyone, because the whole point is that a display reacts to the change immediately
   // (docs/decisions/2026-08-14-room-controls-and-staging.md). The same patch shape rides
