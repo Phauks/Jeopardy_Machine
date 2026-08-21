@@ -38,6 +38,7 @@ import {
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { liveRulesSchema } from "./live-rules.ts";
 import { roomSettingsSchema } from "./room-settings.ts";
 import { rosterPayloadSchema, teamIdSchema } from "./roster.ts";
 
@@ -381,6 +382,22 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
     ...envelopeFields,
     type: z.literal("room-settings"),
     settings: roomSettingsSchema,
+    at: z.number().int().nonnegative(),
+  }),
+  /**
+   * The RULES the room is currently playing by - sent on join beside the snapshot, and again
+   * whenever the host retunes one (client-messages.ts `update-game-rules`).
+   *
+   * Separate from `room-settings` because they are different kinds of fact: room settings are
+   * about the ROOM (who may come in, how many, what is on the projector), and these are about
+   * the GAME (how long you have to answer, what a wrong answer costs). A phone reads this to
+   * draw the right answer clock; a console reads it to show what the room is actually playing
+   * by rather than what the game definition shipped with.
+   */
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("game-rules"),
+    rules: liveRulesSchema,
     at: z.number().int().nonnegative(),
   }),
   z.strictObject({

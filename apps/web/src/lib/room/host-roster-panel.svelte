@@ -46,8 +46,15 @@
      * console takes `settingsOpen`).
      */
     openMenu?: string | null;
+    /**
+     * Rendered inside a dock section (#lib/room/dock-section.svelte), which owns the heading,
+     * the border, the close affordance and the scrolling. The panel then draws none of those,
+     * because a bordered panel inside a bordered section is the boxes-in-boxes the owner
+     * rejected on 2026-08-20.
+     */
+    embedded?: boolean;
   };
-  let { store, onClose, openMenu = null }: Props = $props();
+  let { store, onClose, openMenu = null, embedded = false }: Props = $props();
 
   const view = $derived(store.view);
   const roster = $derived(view.roster);
@@ -106,11 +113,13 @@
   }
 </script>
 
-<aside class="roster-panel" aria-label="Room roster">
-  <header class="panel-head">
-    <h2>Roster</h2>
-    <button type="button" class="control-chip" onclick={onClose}>Close</button>
-  </header>
+<aside class="roster-panel" class:embedded aria-label="Room roster">
+  {#if !embedded}
+    <header class="panel-head">
+      <h2>Roster</h2>
+      <button type="button" class="control-chip" onclick={onClose}>Close</button>
+    </header>
+  {/if}
 
   <!-- THE CENSUS. Players are counted from the roster (they hold seats); the audience is
        whatever the room reported, and nothing at all when it reported nothing. -->
@@ -400,6 +409,15 @@
     display: flex;
     flex-direction: column;
     gap: 0.7rem;
+    color: var(--control-text);
+    font-family: var(--control-font);
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  /* Standalone it is a rail with its own chrome; inside a dock section the section IS the
+     chrome (dock-section.svelte). */
+  .roster-panel:not(.embedded) {
     width: 21rem;
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
@@ -407,10 +425,6 @@
     border: 1px solid var(--control-border);
     border-radius: var(--control-radius);
     background: var(--control-page);
-    color: var(--control-text);
-    font-family: var(--control-font);
-    font-size: 0.9rem;
-    line-height: 1.35;
   }
 
   .panel-head {

@@ -10,6 +10,7 @@
   import { fade, scale } from "svelte/transition";
   import { prefersReducedMotion } from "svelte/motion";
   import { renderSVG } from "uqr";
+  import AnswerClock from "#lib/room/answer-clock.svelte";
   import { isScannableJoinUrl, joinUrlFor, joinUrlLabel } from "#lib/room/join-share.ts";
   import AvatarDiorama from "#lib/diorama/avatar-diorama.svelte";
   import BoardDisplay from "#lib/board/board-display.svelte";
@@ -59,6 +60,26 @@
 
   const view = $derived(store.view);
   const game = $derived(view.game);
+
+  // A coarse clock for the answer countdown, at the same 200ms the phone uses
+  // (buzzer-screen.svelte) so the two surfaces step together. Off outside the browser: SSR has
+  // no timers to leak and no frames to draw.
+  let now = $state(Date.now());
+  $effect(() => {
+    const interval = setInterval(() => {
+      now = Date.now();
+    }, 200);
+    return () => {
+      clearInterval(interval);
+    };
+  });
+  // Both windows the room actually counts down in front of people. The wager-entry and final
+  // timers belong to the phones that are typing into them and stay off the projector.
+  const answerTimer = $derived(
+    view.pendingTimers.find(
+      (entry) => entry.kind === "answer-window" || entry.kind === "everyone-answers-window",
+    ) ?? null,
+  );
   const standings = $derived(standingsFor(view));
   const transitionDuration = $derived(prefersReducedMotion.current ? 0 : 250);
 
@@ -416,6 +437,20 @@
                   <span class="winner-member">{buzzWinnerMemberName}</span>
                 {/if}
               </p>
+            {/if}
+            <!-- THE CLOCK, ON THE BIG SCREEN (owner, 2026-08-20: "the timer for answering
+                 should be on the screen as well as the device"). It lived only on the phone,
+                 which is the one place it is least needed - the person answering is not the
+                 one watching a countdown, and the twenty people deciding whether to shout a
+                 correction could not see it at all. Same component and same timer as the
+                 phone's ring (answer-clock.svelte), so the two can never disagree. -->
+            {#if answerTimer !== null}
+              <AnswerClock
+                timer={answerTimer}
+                {now}
+                variant="stage"
+                endsTheAttempt={view.rules.answerTimeoutOutcome === "counts-as-wrong"}
+              />
             {/if}
           </div>
         </div>

@@ -11,6 +11,7 @@
 import { teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
+import { defaultLiveRules, liveRulesOfSettings } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { limits } from "@jeopardy/protocol/limits";
 import { foldEvent, prunePendingTimers } from "#lib/room/room-fold.ts";
@@ -19,6 +20,7 @@ import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
+import type { LiveRules, LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomFoldState } from "#lib/room/room-fold.ts";
 import type {
@@ -100,7 +102,11 @@ export class LocalSimRoomStore implements RoomStore {
 
   private readonly roomCode: string;
   private readonly role: RoomRoleView;
-  private readonly setup: GameSetup;
+  // NOT readonly since 2026-08-20: a host can retune the answering loop live
+  // (updateGameRules), and the mock applies the patch to its own setup so the sim demonstrates
+  // the real consequence rather than a moved readout. Everything the running STATE was built
+  // from is still frozen - that is enforced by the patch schema, not by this field.
+  private setup: GameSetup;
   private readonly content: ReturnType<typeof fixtureContentView>;
   private readonly onEvent: ((event: GameEvent) => void) | undefined;
   private readonly onBuzzWon: ((buzz: RoomBuzz) => void) | undefined;
@@ -140,11 +146,18 @@ export class LocalSimRoomStore implements RoomStore {
   // close control demonstrates the state a real close leaves behind instead of being a dead
   // button in the sim (room-view.ts, RoomConnectionState).
   private simConnection = $state<RoomConnectionState>("connected");
+  // The mock room's rules, and a REAL projection of the setup it is running rather than the
+  // registry defaults: the sim resolves its own rule set (this.setup below), so a demo of a
+  // game whose rules say "no penalty for wrong" must show that on the console rather than the
+  // default deduct. `updateGameRules` moves it exactly as the room's broadcast moves the ws
+  // store's copy.
+  private simRules = $state.raw<LiveRules>(defaultLiveRules);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
     this.role = options.role;
     this.setup = fixtureGameSetup(options.seed ?? `mock-${options.roomCode}`);
+    this.simRules = liveRulesOfSettings(this.setup.settings);
     // Responses exist only in host-role stores - the redaction the M3 server performs is
     // reproduced here so mirror mode and phones are honest even in mock play.
     this.content = fixtureContentView(options.role === "host");
@@ -164,6 +177,7 @@ export class LocalSimRoomStore implements RoomStore {
       roomCode: this.roomCode,
       role: this.role,
       connection: this.simConnection,
+      rules: this.simRules,
       phase: this.roomPhase,
       roster: {
         players: this.rosterPlayers,
@@ -769,6 +783,24 @@ export class LocalSimRoomStore implements RoomStore {
 
   endGame(): void {
     this.dispatch({ type: "end-game", at: Date.now() });
+  }
+
+  /**
+   * The mock applies the patch to its OWN setup rather than pretending, so the sim panel
+   * demonstrates the real consequence: lengthen the answer clock here and the next mock clue
+   * genuinely runs the longer one. That is the whole value of the sim - a control that only
+   * moved a readout would be a picture of the feature rather than the feature.
+   */
+  updateGameRules(patch: LiveRulesPatch): void {
+    this.setup = {
+      ...this.setup,
+      settings: {
+        ...this.setup.settings,
+        buzzing: { ...this.setup.settings.buzzing, ...patch.buzzing },
+        scoring: { ...this.setup.settings.scoring, ...patch.scoring },
+      },
+    };
+    this.simRules = liveRulesOfSettings(this.setup.settings);
   }
 
   /**

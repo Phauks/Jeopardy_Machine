@@ -6,6 +6,7 @@
 // nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { LiveRules } from "@jeopardy/protocol/room/live-rules";
 import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { ResolvedMedia } from "@jeopardy/protocol/room/server-messages";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
@@ -224,6 +225,18 @@ export type RoomView = {
    * 2026-08-20 there is no room secret at all for one of these fields to have been.
    */
   settings: RoomSettings;
+  /**
+   * The RULES this room is currently playing by - not the ones its game definition shipped
+   * with, because a host can retune the answering loop live (@jeopardy/protocol
+   * room/live-rules.ts; owner, 2026-08-20: the answer timer "should be settable by the host").
+   *
+   * A different KIND of fact from `settings` above, which is why it is a different field:
+   * settings are about the room (who may come in, how many, what is on the projector) and
+   * these are about the game (how long you have to answer, what a wrong answer costs). A
+   * phone reads `answerWindowMs` to draw the clock it is actually counting against; the
+   * display reads it to put the same clock in front of the room.
+   */
+  rules: LiveRules;
   /**
    * Has the ROOM actually told us the settings above, or are they still the shell a store
    * carries so surfaces can render before the first message lands?

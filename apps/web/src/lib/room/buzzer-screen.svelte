@@ -9,6 +9,7 @@
   // requested on mount and re-requested on visibility regain (locks release when tabs hide).
   import { prefersReducedMotion } from "svelte/motion";
   import { buzzerStageFor, standingsFor } from "#lib/room/room-view.ts";
+  import AnswerClock from "#lib/room/answer-clock.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
   import WagerPad from "#lib/room/wager-pad.svelte";
   import type { RoomStore } from "#lib/room/room-store.ts";
@@ -102,7 +103,9 @@
     return Math.max(0, Math.min(1, (timer.firesAt - now) / timer.durationMs));
   }
 
-  const answerFraction = $derived(timerFraction(["answer-window"]));
+  const answerTimer = $derived(
+    view.pendingTimers.find((entry) => entry.kind === "answer-window") ?? null,
+  );
   const finalWritingFraction = $derived(
     timerFraction(["final-writing", "everyone-answers-window"]),
   );
@@ -165,10 +168,19 @@
       <div class="stage-block winner" role="alert">
         <p class="you-line">YOU!</p>
         <p class="stage-line">Answer out loud</p>
-        {#if answerFraction !== null}
-          <div class="time-track" aria-hidden="true">
-            <div class="time-bar" style="transform: scaleX({answerFraction})"></div>
-          </div>
+        <!-- The SAME clock the projector now shows (answer-clock.svelte, owner 2026-08-20).
+             It was a bare bar here with no number and no end state, which was fine while this
+             was the only place it appeared; once the room can see one too, two hand-rolled
+             countdowns would drift apart within a clue and the room would watch them
+             disagree about whether time was up. -->
+        {#if answerTimer !== null}
+          <AnswerClock
+            timer={answerTimer}
+            {now}
+            variant="inline"
+            endsTheAttempt={view.rules.answerTimeoutOutcome === "counts-as-wrong"}
+            label="Your time to answer"
+          />
         {/if}
       </div>
     {:else if stage.kind === "other-won"}

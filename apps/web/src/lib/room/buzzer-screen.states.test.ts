@@ -109,7 +109,7 @@ describe("buzzer screen states (A4 table)", () => {
     expect(source).toMatch(/\$effect\(\(\) => \{[^}]*markArmedPainted/);
   });
 
-  it("you won the buzz: full-screen YOU + answer aloud + ring timer", () => {
+  it("you won the buzz: full-screen YOU + answer aloud + the answer clock", () => {
     const store = playerStore();
     store.startGame();
     store.selectCell(0, 0);
@@ -118,7 +118,11 @@ describe("buzzer screen states (A4 table)", () => {
     const body = markup(store);
     expect(body).toContain("YOU!");
     expect(body).toContain("Answer out loud");
-    expect(body).toContain("time-track");
+    // The shared clock since 2026-08-20 (answer-clock.svelte): the phone's hand-rolled bar
+    // was replaced by the same component the projector shows, so the two cannot drift apart
+    // within a clue and leave the room watching them disagree about whether time is up.
+    expect(body).toContain("answer-clock");
+    expect(body).toContain('role="timer"');
   });
 
   it("someone else won: dimmed '<name> buzzed'", () => {

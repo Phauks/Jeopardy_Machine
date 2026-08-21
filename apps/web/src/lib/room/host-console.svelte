@@ -18,7 +18,9 @@
   import DisplayScreen from "#lib/room/display-screen.svelte";
   import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
   import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
+  import DockSection from "#lib/room/dock-section.svelte";
   import JoinPanel from "#lib/room/join-panel.svelte";
+  import RulesPanel from "#lib/host-settings/rules-panel.svelte";
   import ScoresStrip from "#lib/room/scores-strip.svelte";
   import SettingsPanel from "#lib/host-settings/settings-panel.svelte";
   import SimPanel from "#lib/room/sim-panel.svelte";
@@ -77,16 +79,11 @@
   const clue = $derived(game?.clue ?? null);
   const standings = $derived(standingsFor(view));
 
-  // THE COG'S STATE. Mirror, manual mode, the two type scales and the rest are DEVICE
-  // preferences now (src/lib/host-settings/) rather than component state: they belong to this
-  // laptop, they survive a reload mid-game, and the display window of the same browser reads
-  // the same document. Whether the panel is open is the only thing that is genuinely
-  // component state, because it is not a preference - it is where you are looking.
-  // svelte-ignore state_referenced_locally - deliberately the INITIAL value only.
-  let panelOpen = $state(settingsOpen);
-  // svelte-ignore state_referenced_locally - the INITIAL value: open in the lobby, where the
-  // roster is the console's whole job, closed once a game is running.
-  let rosterPanelOpen = $state(rosterOpen ?? store.view.phase === "lobby");
+  // Mirror, manual mode, the two type scales and the rest are DEVICE preferences
+  // (src/lib/host-settings/) rather than component state: they belong to this laptop, they
+  // survive a reload mid-game, and the display window of the same browser reads the same
+  // document. What IS component state is where the host is looking, and since 2026-08-20 that
+  // is one object - `dock` below - rather than three panel booleans.
   const device = $derived(devicePreferences.current);
   // MIRROR IS ONE HALF OF `screenSetup`, and the device preference is the truth: `mirror` (the
   // route's ?mirror) only SEEDS it for this render. It used to be OR-ed with the preference,
@@ -120,11 +117,6 @@
       gameScreenWindow.destroy();
     });
   }
-  // The join panel is OPEN in the lobby by default: at that moment the console has exactly one
-  // job, which is getting thirty people into the room (C2 doors open).
-  // svelte-ignore state_referenced_locally - the INITIAL value only.
-  let joinPanelOpen = $state(joinOpen ?? store.view.phase === "lobby");
-
   // STARTING. Two different failures, one readout (src/lib/room/game-screen.ts): an empty room is
   // refused by the engine, and a room whose projector shows a desktop starts perfectly well and
   // nobody sees it. The second is warned once and never blocked - a small room run off one laptop
@@ -138,6 +130,32 @@
     }),
   );
   let startWarned = $state(false);
+
+  /**
+   * WHICH DOCK SECTIONS ARE OPEN. One object rather than five booleans so the console has one
+   * place that answers "what is the host looking at", and so the lobby-vs-running defaults are
+   * a single readable statement instead of five scattered initialisers.
+   *
+   * The defaults are the console's job at each moment: in the LOBBY the room is arriving, so
+   * the roster and the way in are open and the rules are one caret away. Once a game is
+   * running the board is the job, so everything is shut and the dock is a column of headers
+   * carrying their own facts - a host can read "26/30" without opening anything.
+   *
+   * Nothing here closes anything else. Sections scroll independently (dock-section.svelte), so
+   * five open at once is five reachable things rather than a column that has to take turns.
+   */
+  type DockKey = "roster" | "join" | "screen" | "rules" | "settings";
+  // svelte-ignore state_referenced_locally - the INITIAL arrangement only.
+  let dock = $state<Record<DockKey, boolean>>({
+    roster: rosterOpen ?? store.view.phase === "lobby",
+    join: joinOpen ?? store.view.phase === "lobby",
+    screen: store.view.phase === "lobby",
+    rules: false,
+    settings: settingsOpen,
+  });
+  function setDock(key: DockKey, open: boolean): void {
+    dock = { ...dock, [key]: open };
+  }
 
   /**
    * ENDING, which is two different things, and the console said neither until 2026-08-20
@@ -210,6 +228,14 @@
   // which includes the stretch after game-over when the standings are on the screen. Ending
   // the game is only meaningful in between.
   const gameIsRunning = $derived(phase !== "lobby" && phase !== "game-over");
+  // The game screen's state in three words, so a closed section still answers the question a
+  // host asks it most: is anything on the projector?
+  const gameScreenBadge = $derived.by(() => {
+    if (mirrorMode) return "mirrored";
+    if (gameScreenWindow.state === "open") return "open";
+    if ((view.connections?.display ?? 0) > 0) return "connected";
+    return "none";
+  });
   const canArm = $derived(phase === "reading" || phase === "tiebreaker-reading");
   const canJudge = $derived(
     phase === "answering" || phase === "wager-answering" || phase === "tiebreaker-answering",
@@ -388,21 +414,18 @@
         <span class="roster-health" title="connected / total players">
           {connectedCount}/{view.roster.players.length} connected
         </span>
-        <!-- Roster, join and settings are rails, not screens: they narrow the console and
-             everything the host was reading stays on screen (the persistent-layout law). -->
-        <button
-          type="button"
-          class="chip"
-          class:active={rosterPanelOpen}
-          aria-expanded={rosterPanelOpen}
-          onclick={() => {
-            rosterPanelOpen = !rosterPanelOpen;
-          }}
-        >
-          Roster
-        </button>
-        <!-- The game screen's state, in every phase: a projector can be unplugged at any point in
-             the night, and this console is the only thing in the room that would notice. -->
+        <!-- GONE 2026-08-20: the Roster, Join info and Settings chips. They were three toggles
+             for three rails that opened one at a time on the right, and the owner's read of
+             them was exactly right - "we treat roster, settings, and join info differently
+             relating to if they glow or not. Really, these should be carrot menus." They are
+             sections of the dock now (.console-dock below), which is always on screen, so a
+             header toggle for each would be a second control for a thing that is already
+             visible. What stays in this row is what CHANGES the room rather than what shows
+             it: mirror, pause, undo, and the two endings.
+
+             The game screen's state, in every phase: a projector can be unplugged at any point
+             in the night, and this console is the only thing in the room that would notice.
+             It stays because it is a readout, not a toggle. -->
         <GameScreenPanel
           {view}
           gameScreen={gameScreenWindow}
@@ -445,31 +468,7 @@
         <button type="button" class="chip" onclick={() => store.undo()}>
           Undo <span class="key-hint">U</span>
         </button>
-        <!-- THE COG. Opens a rail beside the console, never a screen: the board, the clue and
-             the judge row stay live while it is open (the persistent-layout law). -->
-        <!-- Join info opens IN PLACE beside the console, like the cog: a host holding the laptop
-             up to the room must not lose the roster filling up behind it. -->
-        <button
-          type="button"
-          class="chip"
-          aria-expanded={joinPanelOpen}
-          onclick={() => {
-            joinPanelOpen = !joinPanelOpen;
-          }}
-        >
-          Join info
-        </button>
-        <button
-          type="button"
-          class="chip cog"
-          aria-expanded={panelOpen}
-          aria-label="Settings"
-          onclick={() => {
-            panelOpen = !panelOpen;
-          }}
-        >
-          Settings
-        </button>
+
         <!-- Last in the row, and the only chip that is not a view toggle: everything to its
              left changes what the host is looking at, this one changes what the room IS. -->
         <button
@@ -564,6 +563,74 @@
     <!-- The console proper and the settings rail, side by side. The rail SHRINKS the console
          rather than covering it, so nothing the host was reading disappears when they open it. -->
     <div class="console-body">
+      <!-- THE DOCK (owner, 2026-08-20: "there is a lot of space on the left side of the screen
+           we are not using. Consdier two columns?" and "Really, these should be carrot menus"
+           and "if we have different sections for hosting, they should be separately
+           scrollable").
+           
+           It replaces three rails that opened on the RIGHT, each with its own border, heading,
+           Close button and scrollbar - three objects that looked like three different kinds of
+           thing and took turns in one column. Now they are five identical sections in a column
+           that is always there, each scrolling inside itself, each able to stay shut with its
+           own fact on the header (dock-section.svelte argues both choices).
+           
+           Always present, never a toggle: a dock that appears and disappears reflows the board
+           every time a host looks something up, which is the reflow the persistent-layout law
+           exists to prevent. What changes is which sections are OPEN. -->
+      <aside class="console-dock" aria-label="Hosting">
+        <DockSection
+          title="Roster"
+          open={dock.roster}
+          onToggle={(open) => setDock("roster", open)}
+          badge="{connectedCount}/{view.roster.players.length}"
+          tone={view.roster.players.length === 0 ? "attention" : "plain"}
+        >
+          <HostRosterPanel {store} embedded onClose={() => setDock("roster", false)} />
+        </DockSection>
+
+        <DockSection
+          title="How people join"
+          open={dock.join}
+          onToggle={(open) => setDock("join", open)}
+          badge={view.settings.hideJoinCode ? "hidden on screen" : view.roomCode}
+        >
+          <JoinPanel {store} {joinOrigin} {shareTarget} embedded />
+        </DockSection>
+
+        <DockSection
+          title="Game screen"
+          open={dock.screen}
+          onToggle={(open) => setDock("screen", open)}
+          badge={gameScreenBadge}
+          tone={gameScreenWindow.state === "open" || mirrorMode ? "plain" : "attention"}
+        >
+          <GameScreenPanel
+            {view}
+            gameScreen={gameScreenWindow}
+            preferences={devicePreferences}
+            {themeId}
+            variant="panel"
+          />
+        </DockSection>
+
+        <DockSection title="Rules" open={dock.rules} onToggle={(open) => setDock("rules", open)}>
+          <RulesPanel {store} embedded />
+        </DockSection>
+
+        <DockSection
+          title="Room and this device"
+          open={dock.settings}
+          onToggle={(open) => setDock("settings", open)}
+        >
+          <SettingsPanel
+            {store}
+            preferences={devicePreferences}
+            embedded
+            onClose={() => setDock("settings", false)}
+          />
+        </DockSection>
+      </aside>
+
       <div class="console-main">
         {#if view.phase === "lobby"}
           <!-- The lobby is two questions, each answered by the thing that can act on it: how does
@@ -1002,41 +1069,6 @@
         {/if}
       </div>
 
-      <!-- THE RAIL. All three panels open IN PLACE beside the console and NARROW it rather
-           than covering it, so nothing the host was reading disappears (the persistent-layout
-           law). Roster leads: it is the console's whole job in the lobby, and it is where the
-           deleted pre-flight checklist's counts now live. -->
-      {#if rosterPanelOpen || joinPanelOpen || panelOpen}
-        <div class="console-rail">
-          {#if rosterPanelOpen}
-            <HostRosterPanel
-              {store}
-              onClose={() => {
-                rosterPanelOpen = false;
-              }}
-            />
-          {/if}
-          {#if joinPanelOpen}
-            <JoinPanel
-              {store}
-              {joinOrigin}
-              {shareTarget}
-              onClose={() => {
-                joinPanelOpen = false;
-              }}
-            />
-          {/if}
-          {#if panelOpen}
-            <SettingsPanel
-              {store}
-              preferences={devicePreferences}
-              onClose={() => {
-                panelOpen = false;
-              }}
-            />
-          {/if}
-        </div>
-      {/if}
     </div>
   </div>
 {/if}
@@ -1065,13 +1097,30 @@
     gap: 0.8rem;
   }
 
-  /* One rail, both panels: they stack rather than fight for the same column, and neither one
-     hides the other (the persistent-layout law - nothing shown gets hidden by a later step). */
-  .console-rail {
+  /* THE DOCK: a column that is always there, on the LEFT, holding every hosting section
+     (owner, 2026-08-20). It replaced three rails on the right that opened one at a time and
+     each carried its own frame; what makes this readable instead of a wall is that the
+     sections are collapsed by default once a game is running and each carries its own fact
+     on its header (dock-section.svelte).
+
+     A fixed column rather than a fraction: the board beside it must not resize every time a
+     roster row makes a section wider, and 17rem is the width at which "26/30 connected" and a
+     team name fit on one line. */
+  .console-dock {
+    flex: none;
+    width: 17rem;
+    align-self: stretch;
     display: flex;
     flex-direction: column;
-    gap: 0.8rem;
-    align-items: stretch;
+    padding: 0.2rem 0.6rem 0.6rem;
+    border: 1px solid var(--control-border);
+    border-radius: var(--control-radius);
+    background: var(--control-page);
+    color: var(--control-text);
+    font-family: var(--control-font);
+    /* ONE box, and this is it. Everything inside is a band separated by a hairline, never a
+       card inside a card inside a card (owner: "settings are boxes in boxes... looks AI
+       made"). The panels drop their own chrome through their `embedded` prop. */
   }
 
   /* The lobby's two questions, side by side on a laptop and stacked on a narrow window: how the
@@ -1157,6 +1206,9 @@
     color: var(--score-negative);
   }
 
+  /* The board's column takes what the dock leaves. `min-width: 0` because a flex child
+     defaults to min-content, and the minimap's own grid would otherwise refuse to shrink and
+     push the dock off screen. */
   .console-main {
     display: flex;
     flex-direction: column;
@@ -1165,10 +1217,19 @@
     min-width: 0;
   }
 
+  /* On a narrow window the two columns stack and the dock goes FIRST, because at that width
+     the thing being narrowed is the board - and a host on a small screen is usually there to
+     look something up rather than to run a board they cannot see. Its sections cap their own
+     height, so a stacked dock is a short header list rather than a page of panels above the
+     game (dock-section.svelte). */
   @media (max-width: 64rem) {
     .console-body {
       flex-direction: column;
       align-items: stretch;
+    }
+
+    .console-dock {
+      width: auto;
     }
   }
 

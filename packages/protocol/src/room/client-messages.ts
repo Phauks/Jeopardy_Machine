@@ -28,6 +28,7 @@
 // | set-pause       | host only (freezes the room and parks every running timer)            |
 // | expire-timer    | host only ("skip the wait": fires whichever timer the room is on)     |
 // | update-room-settings | host only (listing, caps, spectators, streamer mode, title)      |
+// | update-game-rules | host only; the tunable-while-running subset ONLY (live-rules.ts)    |
 // | close-room      | host only (ends the room for everyone - the polite screen everywhere) |
 import { z } from "zod";
 import { extensionBagSchema } from "../ext.ts";
@@ -41,6 +42,7 @@ import {
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { liveRulesPatchSchema } from "./live-rules.ts";
 import { roomSettingsPatchSchema } from "./room-settings.ts";
 import { teamIdSchema } from "./roster.ts";
 
@@ -198,6 +200,23 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     ...envelopeFields,
     type: z.literal("update-room-settings"),
     settings: roomSettingsPatchSchema,
+  }),
+  /**
+   * Retune the RULES of a running game (owner, 2026-08-20: the answer timer "should be
+   * settable by the host"). Host-only and sparse, like update-room-settings, and answered by
+   * a `game-rules` broadcast so every phone's answer clock and every screen's copy of the
+   * rule change together.
+   *
+   * Only the rules on `liveRulesPatchSchema` can move, and the reason is not caution but
+   * coherence: those are the rules the engine reads FRESH when it needs them. A rule the
+   * running STATE was built from - board shape, wager placement, seating, the final - has
+   * already been acted on, and changing one mid-game would make the state a description of a
+   * game that never happened (live-rules.ts argues this at length).
+   */
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("update-game-rules"),
+    rules: liveRulesPatchSchema,
   }),
   // End the room for everyone: every connection gets room-closed(host-closed) and closes.
   z.strictObject({ ...envelopeFields, type: z.literal("close-room") }),

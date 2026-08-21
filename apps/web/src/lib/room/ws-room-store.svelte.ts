@@ -54,6 +54,7 @@
 // Neither implies clock synchronization: both numbers are differences on one machine's own
 // clock. Skipping either is safe and un-punished - the room falls back to arrival order for
 // this connection, which is exactly what it did before compensation existed.
+import { defaultLiveRules } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
@@ -69,6 +70,7 @@ import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameState } from "@jeopardy/engine/state";
+import type { LiveRules, LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type {
   BoardMaterial,
@@ -220,6 +222,11 @@ export class WsRoomStore implements RoomStore {
     hostLabel: "",
   });
   private settingsKnownState = $state(false);
+  // The rules THIS room is playing by, replaced whole whenever the host retunes one
+  // (@jeopardy/protocol room/live-rules.ts). Seeded with the registry's defaults so a surface
+  // rendering before the first `game-rules` frame draws a plausible clock rather than a
+  // zero-length one; the room's own answer overwrites it within the join round trip.
+  private gameRules = $state.raw<LiveRules>(defaultLiveRules);
   private refusalState = $state.raw<RoomRefusalView | null>(null);
   /** The room's last complaint about something this client sent (console-side notice). */
   private lastErrorState = $state.raw<{ reason: string; detail: string | null } | null>(null);
@@ -267,6 +274,7 @@ export class WsRoomStore implements RoomStore {
       finalWagerRanges: this.fold.finalWagerRanges,
       paused: this.pausedState,
       settings: this.roomSettings,
+      rules: this.gameRules,
       settingsKnown: this.settingsKnownState,
       refusal: this.refusalState,
     };
@@ -487,6 +495,11 @@ export class WsRoomStore implements RoomStore {
       case "room-settings":
         this.roomSettings = message.settings;
         this.settingsKnownState = true;
+        return;
+      case "game-rules":
+        // Complete, never a patch (server-messages.ts): a surface merging a patch onto a rules
+        // document it does not hold would be guessing at what it is drawing.
+        this.gameRules = message.rules;
         return;
       case "room-closed":
         // Every reason ends this connection; the surfaces read the refusal-free "closed" state
@@ -818,6 +831,10 @@ export class WsRoomStore implements RoomStore {
 
   updateRoomSettings(patch: RoomSettingsPatch): void {
     this.sendMessage({ type: "update-room-settings", settings: patch });
+  }
+
+  updateGameRules(patch: LiveRulesPatch): void {
+    this.sendMessage({ type: "update-game-rules", rules: patch });
   }
 
   expireTimer(kind?: TimerKind): void {

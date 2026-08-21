@@ -36,6 +36,13 @@
     /** Start in the hold-it-up-to-the-room state - what the fullscreen tests render. */
     expanded?: boolean;
     onClose?: (() => void) | null;
+    /**
+     * Rendered inside a dock section (#lib/room/dock-section.svelte), which owns the heading,
+     * the border, the close affordance and the scrolling - so this draws none of them. The
+     * fullscreen state is untouched by it: holding the laptop up to the room leaves the dock
+     * behind entirely, which is the whole point of that state.
+     */
+    embedded?: boolean;
   };
   let {
     store,
@@ -43,6 +50,7 @@
     shareTarget = null,
     expanded = false,
     onClose = null,
+    embedded = false,
   }: Props = $props();
 
   const view = $derived(store.view);
@@ -117,16 +125,19 @@
 <aside
   class="join-panel"
   class:big={showBig}
+  class:embedded
   aria-label="How people join"
   bind:this={panelElement}
 >
   <header class="panel-head">
-    <h2>How people join</h2>
+    {#if !embedded || showBig}
+      <h2>How people join</h2>
+    {/if}
     <div class="head-actions">
       <button type="button" class="chip" aria-pressed={showBig} onclick={toggleBig}>
         {showBig ? "Done" : "Show fullscreen"}
       </button>
-      {#if onClose !== null && !showBig}
+      {#if onClose !== null && !showBig && !embedded}
         <button type="button" class="chip" onclick={onClose}>Close</button>
       {/if}
     </div>
@@ -183,6 +194,12 @@
     flex-direction: column;
     align-items: center;
     gap: 0.5rem;
+    color: var(--surface-text);
+  }
+
+  /* Standalone it is a rail with its own chrome; inside a dock section the section IS the
+     chrome (dock-section.svelte). The fullscreen state below overrides both. */
+  .join-panel:not(.embedded) {
     width: 20rem;
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
@@ -190,7 +207,6 @@
     border: 1px solid var(--surface-border);
     border-radius: var(--board-radius);
     background: var(--surface-raised);
-    color: var(--surface-text);
   }
 
   .panel-head {

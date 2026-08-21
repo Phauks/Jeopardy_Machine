@@ -85,6 +85,14 @@ export type GameEvent =
       score: number;
     }
   | { type: "rebound-armed"; remainingEntities: string[] }
+  /**
+   * The answer window ran out and the room decided that is NOT a verdict
+   * (settings.scoring.answerTimeoutOutcome = host-decides). Purely informational: no score
+   * moved, nobody was locked out, and the clue is still open on the same buzz winner. Every
+   * surface renders it as "over time" so the room can see the clock has passed without the
+   * game having taken the decision away from the host.
+   */
+  | { type: "answer-time-expired"; entityId: string }
   | {
       type: "clue-finished";
       resolution: "correct" | "dead" | "cancelled";

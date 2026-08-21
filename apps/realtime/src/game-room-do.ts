@@ -53,6 +53,7 @@ import {
   resolveFinalContent,
 } from "./room/content.ts";
 import { buildRoomDiagnostics } from "./room/diagnostics.ts";
+import { liveRulesOf } from "./room/live-rules.ts";
 import {
   identityEditsLocked,
   stampRelayedAction,
@@ -951,6 +952,8 @@ export class GameRoomDO extends Server {
         return this.handleExpireTimer(connection, attachment);
       case "update-room-settings":
         return this.handleUpdateRoomSettings(connection, attachment, incoming);
+      case "update-game-rules":
+        return this.handleUpdateGameRules(connection, attachment, incoming);
       case "close-room":
         return this.handleCloseRoom(connection, attachment);
       default:
@@ -1047,6 +1050,7 @@ export class GameRoomDO extends Server {
       });
       this.sendSnapshot(connection, { role: "host", playerId: null });
       this.sendRoomSettings(connection);
+      this.sendGameRules(connection);
       return;
     }
 
@@ -1075,6 +1079,7 @@ export class GameRoomDO extends Server {
       });
       this.sendSnapshot(connection, { role: message.role, playerId: null });
       this.sendRoomSettings(connection);
+      this.sendGameRules(connection);
       return;
     }
 
@@ -1234,6 +1239,7 @@ export class GameRoomDO extends Server {
     });
     this.sendSnapshot(connection, { role: "player", playerId });
     this.sendRoomSettings(connection);
+    this.sendGameRules(connection);
   }
 
   // Every accepted join ends with the room's settings, so no surface has to ask: a phone knows
@@ -1966,6 +1972,64 @@ export class GameRoomDO extends Server {
           : "a cap cannot be set below the participants already in the room",
       );
     }
+  }
+
+  /**
+   * Retune the rules of a running game (owner, 2026-08-20: the answer timer "should be
+   * settable by the host").
+   *
+   * `setup` is the engine's static input and is written once at initialize - deliberately, and
+   * that stays true of everything the running state was BUILT from. What moves here is only
+   * the subset the engine reads fresh each time it needs it (@jeopardy/protocol
+   * room/live-rules.ts holds the list and the argument), so a change between clues, or during
+   * one, means the next read simply sees the new number. Nothing in flight becomes a
+   * description of a game that never happened.
+   *
+   * Persisted immediately: a room that is evicted a second after the host lengthens the answer
+   * clock must come back with the longer clock, or the setting silently reverts at the worst
+   * possible moment.
+   */
+  private async handleUpdateGameRules(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+    message: Extract<RoomClientMessage, { type: "update-game-rules" }>,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "game rules are host-only");
+      return;
+    }
+    const { buzzing, scoring } = message.rules;
+    room.setup = {
+      ...room.setup,
+      settings: {
+        ...room.setup.settings,
+        buzzing: { ...room.setup.settings.buzzing, ...buzzing },
+        scoring: { ...room.setup.settings.scoring, ...scoring },
+      },
+    };
+    await this.persist("setup");
+    this.broadcastGameRules();
+  }
+
+  /**
+   * The rules every surface is playing by. Broadcast to EVERY connection rather than answered
+   * to the host, for the same reason room settings are: a phone's answer clock and the
+   * console's copy of the rule have to change together, or one of them is lying to the room.
+   */
+  private broadcastGameRules(): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    const payload = { type: "game-rules", rules: liveRulesOf(room.setup), at: Date.now() };
+    for (const connection of this.getConnections<Attachment>()) this.send(connection, payload);
+  }
+
+  /** The same facts to one connection, on join - so a phone draws the right clock immediately. */
+  private sendGameRules(connection: Connection<Attachment>): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    this.send(connection, { type: "game-rules", rules: liveRulesOf(room.setup), at: Date.now() });
   }
 
   // Every connection, joined or not: a socket still choosing a role has already been handed

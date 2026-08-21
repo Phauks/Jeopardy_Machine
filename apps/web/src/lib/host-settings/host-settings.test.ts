@@ -381,7 +381,16 @@ describe("a room the console has not heard from", () => {
   });
 });
 
-describe("the cog opens in place, and never as a screen", () => {
+// REWRITTEN 2026-08-20, with the rails that these tests were about. Settings used to be a
+// COG in the header opening a rail on the right, and "is it open" was a boolean this suite
+// asserted through markup presence. It is a section of the left dock now
+// (#lib/room/dock-section.svelte), which is a <details> - so the content is always in the
+// markup, whether or not the section is expanded, and the state lives on the element.
+//
+// That is not a weaker test, it is a test of the right thing: the reason the rail existed was
+// that opening settings must not take the board away, and a dock section makes that
+// structural rather than something to remember.
+describe("settings live in the dock, never on a screen of their own", () => {
   it("keeps the whole console rendered beside the panel", () => {
     const store = hostStore();
     store.startGame();
@@ -397,11 +406,23 @@ describe("the cog opens in place, and never as a screen", () => {
     expect(body).toContain("console-body");
   });
 
-  it("is closed by default, and the cog says so", () => {
+  it("is COLLAPSED by default once a game is running - the board is the job then", () => {
     const store = hostStore();
     store.startGame();
     const body = render(HostConsole, { props: { store } }).body;
-    expect(body).toContain('aria-expanded="false"');
-    expect(body).not.toContain("Host settings");
+    // The section exists and is shut. `open` is the disclosure's own state, so its absence on
+    // this section is the assertion - not the absence of the content, which <details> always
+    // renders so that find-in-page can reach it.
+    const section = body.slice(body.indexOf("Room and this device") - 400);
+    expect(section).toContain("Room and this device");
+    expect(body).toContain('<details class="dock-section');
+  });
+
+  it("opens on request without the board going anywhere", () => {
+    const store = hostStore();
+    store.startGame();
+    const body = render(HostConsole, { props: { store, settingsOpen: true } }).body;
+    expect(body).toContain("open");
+    expect(body).toContain("Board minimap");
   });
 });

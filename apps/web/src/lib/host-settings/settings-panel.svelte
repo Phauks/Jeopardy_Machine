@@ -46,8 +46,15 @@
     store: RoomStore;
     preferences: DevicePreferencesStore;
     onClose: () => void;
+    /**
+     * Rendered inside a dock section (#lib/room/dock-section.svelte), which owns the heading,
+     * the border, the close affordance and the scrolling. The panel draws none of those then:
+     * a bordered panel inside a bordered section is the boxes-in-boxes the owner rejected on
+     * 2026-08-20.
+     */
+    embedded?: boolean;
   };
-  let { store, preferences, onClose }: Props = $props();
+  let { store, preferences, onClose, embedded = false }: Props = $props();
 
   const view = $derived(store.view);
   const device = $derived(preferences.current);
@@ -98,11 +105,13 @@
   }
 </script>
 
-<aside class="settings-panel" aria-label="Host settings">
-  <header class="panel-head">
-    <h2>Settings</h2>
-    <button type="button" class="chip" onclick={onClose}>Close</button>
-  </header>
+<aside class="settings-panel" class:embedded aria-label="Host settings">
+  {#if !embedded}
+    <header class="panel-head">
+      <h2>Settings</h2>
+      <button type="button" class="chip" onclick={onClose}>Close</button>
+    </header>
+  {/if}
 
   <!-- ---------------------------------------------------------------- device preferences -->
   <section class="group device">
@@ -468,6 +477,13 @@
     display: flex;
     flex-direction: column;
     gap: 0.9rem;
+    color: var(--control-text);
+    font-family: var(--control-font);
+  }
+
+  /* Standalone it is a rail with its own chrome; inside a dock section the section IS the
+     chrome (dock-section.svelte). */
+  .settings-panel:not(.embedded) {
     width: 20rem;
     max-height: calc(100dvh - 2rem);
     overflow-y: auto;
@@ -475,8 +491,6 @@
     border: 1px solid var(--control-border);
     border-radius: var(--control-radius);
     background: var(--control-page);
-    color: var(--control-text);
-    font-family: var(--control-font);
   }
 
   .panel-head {
@@ -493,20 +507,22 @@
     font-size: 1em;
   }
 
+  /* A BAND, NOT A CARD (owner, 2026-08-20: "settings are boxes in boxes. I do not like that,
+     looks shitty, looks AI made"). Each group used to be a bordered, filled card inside the
+     bordered, filled panel - and inside the dock that became three levels of enclosure for
+     one checkbox. What separates the groups now is a hairline and their own heading, which is
+     all a separation ever needed to be. */
   .group {
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
-    padding: 0.7rem 0.75rem 0.9rem;
-    border-radius: var(--control-radius);
-    border: 1px solid var(--control-border);
-    background: var(--control-raised);
+    padding-block: 0.8rem 0.2rem;
+    border-block-start: 1px solid var(--control-border);
   }
 
-  /* The two halves are visibly different objects. A host must never have to remember which
-     column they are in. */
-  .group.device {
-    border-left: 4px solid var(--control-text-muted);
+  .group:first-of-type {
+    border-block-start: none;
+    padding-block-start: 0;
   }
 
   .group.room {

@@ -11,6 +11,7 @@
 // is one module (room-fold.ts), so they cannot drift into two answers about the same event.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomView } from "#lib/room/room-view.ts";
 
@@ -172,6 +173,17 @@ export type RoomStore = {
    * a device preference in every way that matters (src/lib/host-settings/).
    */
   updateRoomSettings(patch: RoomSettingsPatch): void;
+  /**
+   * Retune the RULES of the running game - the answering loop only
+   * (@jeopardy/protocol room/live-rules.ts names the subset and argues for it).
+   *
+   * A different thing from `updateRoomSettings` above, and the difference is worth keeping
+   * straight at every call site: room settings are about the ROOM (who may come in, how many,
+   * what is on the projector); these are about the GAME (how long you have to answer, what a
+   * wrong answer costs). Host-only and sparse; the room answers with the complete rules, which
+   * is what `view.rules` then holds.
+   */
+  updateGameRules(patch: LiveRulesPatch): void;
   /**
    * Fire a pending timer's expiry action now (host force-expire; also how tests and the sim
    * panel advance time). Omitting `kind` fires whichever timer the current phase waits on.
