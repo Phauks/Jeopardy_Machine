@@ -213,9 +213,11 @@ export function describeCounter(state: CounterState): CounterVerdict {
     };
   }
 
-  return {
-    line: `Type the ${String(limits.room.roomCodeLength)}-character code from the big screen, or search what is on below.`,
-    codeWins: false,
-    tone: "hint",
-  };
+  // NOTHING TO SAY, and saying nothing is the answer (owner, 2026-08-20, for the second time -
+  // the line came back once already). An untouched field on a page whose only control is that
+  // field does not need a sentence explaining what to type into it: the label says "Room code",
+  // the placeholder shows the shape of one, and the list underneath is visibly a list. The
+  // block still holds its height, so the verdicts that DO have something to say - a match
+  // count, a named room, a listing warning - change words rather than positions.
+  return { line: "", codeWins: false, tone: "hint" };
 }

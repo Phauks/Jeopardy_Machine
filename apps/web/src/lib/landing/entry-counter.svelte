@@ -34,11 +34,8 @@
     /** What the field currently means, in words (`describeCounter`). */
     verdict: CounterVerdict;
     onJoin: () => void;
-    /** The create form is open below the counter; the button says so rather than moving. */
-    hostOpen: boolean;
-    onToggleHost: () => void;
   };
-  let { value, onInput, verdict, onJoin, hostOpen, onToggleHost }: Props = $props();
+  let { value, onInput, verdict, onJoin }: Props = $props();
 
   // Anything a room code or a room name can contain, and nothing else: the field is shared, so
   // it accepts letters, digits and the separators a title uses, and `readCounter` decides.
@@ -56,10 +53,7 @@
 >
   <div class="entry-row">
     <label class="field">
-      <span class="field-label">
-        Room code
-        <span class="field-sub">or search what is on</span>
-      </span>
+      <span class="field-label">Room code</span>
       <input
         class="entry-input"
         class:armed={verdict.codeWins}
@@ -79,21 +73,12 @@
     </label>
   </div>
 
-  <!-- ONE ROW, TWO EQUAL BUTTONS. Join and Host sat on different rows at different widths and
-       read as unrelated controls that happened to be near each other (owner, 2026-08-20). They
-       are the page's two ways forward, so they are the same size and side by side; only their
-       weight says which is primary. -->
+  <!-- ONE BUTTON. It was two - Join beside "Host a game" - which was the right answer while
+       hosting was a disclosure that had to be reachable from somewhere. Hosting is its own
+       COLUMN now (owner, 2026-08-20), so a second button here would be a second control for a
+       thing already on screen, and this counter is once again about exactly one action. -->
   <div class="action-row">
     <button class="join-button" type="submit" disabled={!verdict.codeWins}>Join</button>
-    <button
-      type="button"
-      class="host-button"
-      aria-expanded={hostOpen}
-      aria-controls="create-room-panel"
-      onclick={onToggleHost}
-    >
-      {hostOpen ? "Close hosting" : "Host a game"}
-    </button>
   </div>
 
   <!-- One block for every state the counter can be in. Its height is reserved for everything
@@ -157,15 +142,6 @@
     color: var(--counter-muted);
   }
 
-  /* The second job, said out loud on the label - the omnibox rule: a field that does two
-     things has to name both (docs/research/06-join-flow-patterns.md, pattern 4). */
-  .field-sub {
-    letter-spacing: 0.08em;
-    text-transform: none;
-    font-size: 0.72rem;
-    opacity: 0.8;
-  }
-
   /* NOT --font-values. A room code is data a person transcribes, so it is set in the app's
      legibility face and stays that way under every theme (src/lib/theme/tokens.css). */
   .entry-input {
@@ -204,8 +180,7 @@
     gap: 0.6rem;
   }
 
-  .join-button,
-  .host-button {
+  .join-button {
     flex: 1 1 0;
     min-width: 0;
     font-family: var(--font-chrome);
@@ -261,22 +236,8 @@
     color: var(--score-negative);
   }
 
-  /* Hosting is a peer BUTTON, never a peer form: one person per event needs it, and the form
-     it opens used to be the code box's loudest competitor (decision 2026-08-18 §3). Outlined
-     rather than filled, so the filled Join beside it stays the only primary action. */
-  .host-button {
-    border-color: var(--board-value-color);
-    background: transparent;
-    color: var(--board-value-color);
-  }
-
-  .host-button:hover {
-    background: color-mix(in srgb, var(--board-value-color) 14%, transparent);
-  }
-
   .entry-input:focus-visible,
-  .join-button:focus-visible,
-  .host-button:focus-visible {
+  .join-button:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: 2px;
   }

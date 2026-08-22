@@ -20,6 +20,7 @@
   "dependencies": {
     "@jeopardy/engine": "workspace:*",
     "@jeopardy/protocol": "workspace:*",
+    "@lucide/svelte": "catalog:",
     "three": "catalog:",
     "uqr": "catalog:"
   },

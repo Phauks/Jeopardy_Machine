@@ -1,7 +1,6 @@
 <script lang="ts">
-  // The masthead, as a STRIP: the shared header bar (#lib/chrome/app-bar.svelte) plus the two
-  // things only the front door puts in it - one short line saying what this is, and the
-  // developer index behind a gear.
+  // The masthead, as a STRIP: the shared header bar (#lib/chrome/app-bar.svelte) plus the one
+  // thing only the front door puts in it - the developer index behind a gear.
   //
   // The SHELL is shared on purpose since 2026-08-19 (owner: "we should have a header bar, same
   // one on the other page"): the wordmark's size, the bar's ground and its rule live in one
@@ -13,6 +12,7 @@
   // against (Kahoot, Jackbox, Google Meet, Among Us) puts a hero above its entry control
   // (docs/research/06-join-flow-patterns.md, pattern 7). The title here is a WORDMARK, not a
   // hero: one line of chrome type, the same height as the gear beside it.
+  import { Settings } from "@lucide/svelte";
   import AppBar from "#lib/chrome/app-bar.svelte";
   import type { SurfaceCard } from "#lib/landing/surface-cards.ts";
 
@@ -27,30 +27,20 @@
      that cannot do anything. -->
 <AppBar href={null}>
   {#snippet trailing()}
-    <p class="tagline">Quiz night, on everyone's phone</p>
-
     <!-- `details` rather than a hand-rolled popover: it opens without JavaScript, closes on
          Escape, and is a real disclosure to a screen reader. Closed by default, so the index
          costs one button of height instead of a band at the bottom of the page. -->
     <details class="dev-menu">
       <summary aria-label="Developer surfaces">
-        <!-- A drawn gear, not an emoji (CLAUDE.md forbids those in the UI) and not an icon
-             font (a whole download for one glyph); it inherits currentColor and themes free. -->
-        <svg class="gear" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-          <path
-            d="M8 5.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.3"
-          />
-          <path
-            d="M8 1.2 9 3l2-.6.6 2 2 1-1 1.6 1 1.6-2 1-.6 2L9 13l-1 1.8L7 13l-2 .6-.6-2-2-1 1-1.6-1-1.6 2-1L5 2.4 7 3Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.1"
-            stroke-linejoin="round"
-          />
-        </svg>
+        <!-- Lucide, not a hand-drawn path (owner, 2026-08-20: "use lucide icons ... replace
+             all custom svg's like the settings icon at the top right"). The gear this replaces
+             was two `d` attributes somebody had to eyeball against a 16px grid, and it was the
+             only icon on the page, so it had nothing to be consistent WITH. Lucide is
+             tree-shaken per icon, inherits currentColor exactly as the drawn one did, and every
+             future icon comes out of the same drawing. Still not an emoji (CLAUDE.md) and still
+             not an icon font - the objection to a font was the whole download for one glyph,
+             which per-icon components do not have. -->
+        <Settings class="icon" aria-hidden="true" />
       </summary>
       <div class="dev-panel">
         <p class="dev-lede">
@@ -71,25 +61,10 @@
 
 <style>
   /* The bar's own shell - ground, rule, height, wordmark - lives in #lib/chrome/app-bar.svelte
-     now. What is left here is what only the front door hangs in it. */
-  .tagline {
-    margin: 0;
-    flex: 1;
-    min-width: 0;
-    font-size: 0.8rem;
-    line-height: 1.2;
-    color: color-mix(in srgb, var(--clue-text-color) 70%, transparent);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  /* A phone spends its whole width on the wordmark and the gear; the line is chrome. */
-  @media (max-width: 34rem) {
-    .tagline {
-      display: none;
-    }
-  }
+     now. What is left here is what only the front door hangs in it, which since 2026-08-20 is
+     the developer gear alone: the tagline ("Quiz night, on everyone's phone") is deleted on
+     the owner's call. It was the last of the marketing copy, and it was explaining the product
+     to somebody who had already opened it. */
 
   .dev-menu {
     position: relative;
@@ -118,9 +93,13 @@
     color: var(--board-value-color);
   }
 
-  .gear {
+  /* Lucide draws at 24px with a 2px stroke; at 17px the stroke reads heavy next to chrome
+     type this size, so it is thinned to match rather than left at the default. `:global`
+     because the icon is a child component and Svelte's scoping does not reach into one. */
+  .dev-menu summary :global(.icon) {
     width: 1.05rem;
     height: 1.05rem;
+    stroke-width: 1.75;
   }
 
   .dev-panel {

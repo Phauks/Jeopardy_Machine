@@ -67,18 +67,38 @@ function renderFrontDoor(overrides: Overrides = {}): string {
   }).body;
 }
 
-describe("one counter, one list, one host button", () => {
+describe("two columns: joining on the left, hosting on the right", () => {
   const body = renderFrontDoor();
 
-  it("puts a single field on the page that names both of its jobs", () => {
+  // The field still does both jobs; it no longer SAYS so in a second label. "or search what is
+  // on" went with the standing hint on 2026-08-20 - the list sits directly under the field
+  // now, which shows the second job rather than describing it.
+  it("puts a single field on the page, with one action beside it", () => {
     expect(body).toContain("Room code");
-    expect(body).toContain("or search what is on");
     expect(body).toContain(">Join<");
+    expect(body).not.toContain("or search what is on");
   });
 
-  it("orders the page: masthead, then the counter, then the list", () => {
+  it("orders the page: masthead, then the counter, then the list it filters", () => {
     expect(body.indexOf("Jeopardy Machine")).toBeLessThan(body.indexOf("Room code"));
     expect(body.indexOf("Room code")).toBeLessThan(body.indexOf("Public rooms"));
+  });
+
+  it("gives joining and hosting a column each, in that order", () => {
+    expect(body).toContain('aria-label="Join a room"');
+    expect(body).toContain('aria-label="Host a game"');
+    expect(body.indexOf('aria-label="Join a room"')).toBeLessThan(
+      body.indexOf('aria-label="Host a game"'),
+    );
+  });
+
+  it("keeps the room list in the JOIN column, under the field that filters it", () => {
+    const joinColumn = body.slice(
+      body.indexOf('aria-label="Join a room"'),
+      body.indexOf('aria-label="Host a game"'),
+    );
+    expect(joinColumn).toContain("Room code");
+    expect(joinColumn).toContain("Public rooms");
   });
 
   it("offers ONE entry control: the code box, and nothing beside it", () => {
@@ -122,7 +142,12 @@ describe("the hero, the panels and the drawer are gone", () => {
     expect(body).not.toContain(">01<");
     expect(body).not.toContain(">02<");
     expect(body).not.toContain(">03<");
-    expect(body).not.toContain("Join a room");
+    // The deleted thing was the numbered HEADING "01 Join a room", not the words. Since
+    // 2026-08-20 the join side is a landmark carrying that name for a screen reader, which is
+    // the opposite of a decorative panel heading - so this asserts no visible heading rather
+    // than the absence of a string the page now legitimately uses.
+    expect(body).not.toContain("<h2>Join a room");
+    expect(body).not.toContain(">Join a room<");
   });
 
   it("keeps the developer index complete, but as one gear in the masthead", () => {
@@ -270,16 +295,23 @@ describe("rejoin memory", () => {
   });
 });
 
-describe("hosting is a button, and its form opens in place", () => {
-  it("offers hosting without laying a six-field form beside the code box", () => {
+// REWRITTEN 2026-08-20. Hosting was a BUTTON whose form opened in place, and the reason was
+// space: the form had nowhere to go without pushing the room list down a screen. Given a
+// column of its own it has somewhere, so the disclosure is gone - a tap to reveal a thing
+// that has room to simply be there is a tap charged for nothing. Same reasoning that took the
+// Roster and Settings toggles out of the console header on the same day.
+describe("hosting has a column, not a button", () => {
+  it("lays the form out beside the code box rather than behind a toggle", () => {
     const body = renderFrontDoor();
-    expect(body).toContain("Host a game");
-    expect(body).not.toContain("Room name");
-    expect(body).not.toContain("Player cap");
+    expect(body).toContain("Room name");
+    expect(body).toContain("Player cap");
     expect(body).not.toContain('href="/dev/rooms">Create');
+    // ...and there is no longer a control that opens it, because nothing is closed.
+    expect(body).not.toContain(">Host a game<");
+    expect(body).not.toContain("Close hosting");
   });
 
-  it("opens the real form - and keeps the counter on screen with it", () => {
+  it("keeps the counter on screen while a room is being created", () => {
     const body = renderFrontDoor({ createState: { status: "creating" } });
     expect(body).toContain("Room name");
     expect(body).toContain("Hosted by");

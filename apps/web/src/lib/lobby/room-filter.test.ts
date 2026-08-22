@@ -120,11 +120,20 @@ describe("filtering the list", () => {
 });
 
 describe("what the counter says", () => {
-  it("asks for a code, and mentions the second job, when the field is empty", () => {
+  // SAYS NOTHING on an untouched field (owner, 2026-08-20 - the second deletion of this line;
+  // it grew back once). A page whose only control is one field does not need a sentence
+  // explaining what to type into it: the label says "Room code", the placeholder shows the
+  // shape of one, and the list underneath is visibly a list. What the block keeps is its
+  // HEIGHT, so the verdicts that do have something to say change words rather than positions.
+  it("says nothing at all when the field is untouched", () => {
     const verdict = describeCounter(stateOf());
-    expect(verdict.line).toContain("5-character code");
-    expect(verdict.line).toContain("search");
+    expect(verdict.line).toBe("");
     expect(verdict.codeWins).toBe(false);
+  });
+
+  it("still speaks the moment the field means something", () => {
+    expect(describeCounter(stateOf({ reading: readCounter("ZZZZZ") })).line).not.toBe("");
+    expect(describeCounter(stateOf({ reading: readCounter("pub") })).line).not.toBe("");
   });
 
   it("treats an unlisted code as ordinary, not as an error", () => {
