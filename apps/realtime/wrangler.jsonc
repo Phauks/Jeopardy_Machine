@@ -5,8 +5,8 @@
   // Bump deliberately, in its own commit, after reading the compat-date changelog.
   "compatibility_date": "2026-08-01",
   "observability": {
-    // Workers Logs (persisted + queryable, includes DO logs). Free tier is generous; head
-    // sampling can be added here if volume ever matters.
+    // Workers Logs (persisted + queryable, includes DO logs). This account is on Workers Paid,
+    // so the ceiling is not a concern; head sampling can be added here if volume ever matters.
     "enabled": true,
   },
   // Readable stack traces in the dashboard; source maps are not served to clients.
@@ -19,7 +19,8 @@
   },
   "migrations": [
     // SQLite-backed from birth: live game state (roster, scores, buzz log) must survive
-    // hibernation/eviction, and SQLite classes are also what the free plan includes.
+    // hibernation/eviction. (It was also the only DO flavour the free plan included, which
+    // mattered before the account settled on Workers Paid - the choice stands on its own.)
     { "tag": "v1", "new_sqlite_classes": ["GameRoomDO"] },
   ],
   // The SAME D1 database the web Worker binds (apps/web/wrangler.jsonc) - D1 bindings are

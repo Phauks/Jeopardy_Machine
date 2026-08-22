@@ -59,7 +59,8 @@ What wrong answers and timeouts cost.
 | Matrix | Setting | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | #17 | `wrongAnswerPenalty` (Wrong answer penalty) | `deduct` / `floor-at-zero` / `none` | `"deduct"` | deduct is the TV rule (negative scores are normal); floor-at-zero deducts but never below zero; none is the kids/casual mode. |
-| #18 | `deductOnAnswerTimeout` (Deduct on answer timeout) | on / off | `true` | Buzzing in and then running out the answer window is treated as a wrong answer (TV rule). |
+| - | `answerTimeoutOutcome` (When the answer clock runs out) | `counts-as-wrong` / `host-decides` | `"counts-as-wrong"` | counts-as-wrong is the TV rule: the window closes the attempt and the game moves on. host-decides leaves the clue open and the verdict with the host - the timer informs the room instead of judging it. |
+| #18 | `deductOnAnswerTimeout` (Deduct on answer timeout) | on / off | `true` | Buzzing in and then running out the answer window is treated as a wrong answer (TV rule). _Only read when the answer clock counts as wrong._ |
 | #19 | `questionFormatRequired` (Question format required) | `off` / `host-reminder` / `strict-later-rounds` | `"off"` | Whether responses must be phrased as a question. strict-later-rounds is the TV rule (gentle reminder in round one, strictly enforced from round two); off is the natural default for typed answers. |
 
 ## Answer mode (`answerMode`)

@@ -11,6 +11,8 @@
   // Token-only styling (docs/design/theming.md), so it inherits whatever theme the surface it
   // is dropped into applies - including the unthemed /dev pages, where tokens.css defaults
   // supply the retro-tv look.
+  import { ChevronLeft } from "@lucide/svelte";
+
   type Props = {
     /** Where back leads. Defaults to the front door, which is what "home" means here. */
     href?: string;
@@ -46,12 +48,11 @@
     if (!globalThis.confirm(confirmMessage)) event.preventDefault();
   }}
 >
-  <!-- A drawn chevron rather than an emoji or an icon font (CLAUDE.md forbids the first, and
-       the second is a whole download for one glyph); it inherits currentColor and themes for
-       free. -->
-  <svg class="chevron" viewBox="0 0 8 12" aria-hidden="true" focusable="false">
-    <path d="M6.5 1 1.5 6l5 5" fill="none" stroke="currentColor" stroke-width="1.6" />
-  </svg>
+  <!-- Lucide, like every other icon in the app since 2026-08-20 (owner: "use lucide icons and
+       replace all custom svg's"). Still not an emoji (CLAUDE.md) and still not an icon font -
+       the objection to a font was a whole download for one glyph, which a tree-shaken per-icon
+       component does not have. It inherits currentColor exactly as the drawn chevron did. -->
+  <ChevronLeft class="chevron" aria-hidden="true" />
   <span class="label">{label}</span>
 </a>
 
@@ -85,10 +86,14 @@
     outline-offset: 2px;
   }
 
-  .chevron {
-    width: 0.55em;
-    height: 0.85em;
+  /* `:global` because the icon is a child component and Svelte's scoping does not reach into
+     one. Sized in em so it tracks the label beside it under any type scale, and thinned from
+     Lucide's 2px default, which reads heavy against chrome type at this size. */
+  .home-button :global(.chevron) {
+    width: 0.9em;
+    height: 0.9em;
     flex: none;
+    stroke-width: 2.25;
     color: var(--accent);
   }
 

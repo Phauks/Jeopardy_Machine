@@ -138,14 +138,21 @@ describe("host console states (C4)", () => {
     expect(markup(store)).toContain("Game over");
   });
 
-  it("score override drawer control, pause, undo and the cog are always in the header", () => {
+  // The header's job narrowed on 2026-08-20. It used to carry three view TOGGLES (Roster,
+  // Join info, Settings) beside the actions; those are sections of the left dock now
+  // (#lib/room/dock-section.svelte), and a header button for a panel that is already on
+  // screen would be a second control for one thing. What is left is what CHANGES the room.
+  it("keeps the actions in the header: override, pause, undo, and the endings", () => {
     const store = hostStore();
     store.startGame();
     const body = markup(store);
     expect(body).toContain("Override");
     expect(body).toContain("Pause");
     expect(body).toContain("Undo");
-    expect(body).toContain('aria-label="Settings"');
+    expect(body).toContain(">End<");
+    // ...and no longer duplicates the dock's own sections as header toggles.
+    expect(body).not.toContain('aria-label="Settings"');
+    expect(body).not.toContain(">Join info<");
   });
 });
 
@@ -202,12 +209,16 @@ describe("the roster rail", () => {
     expect(body).toContain("Players");
   });
 
-  it("closes once a game is running, and stays one click away in the header", () => {
+  // A dock section is a <details>, so its content is in the markup whether or not it is
+  // expanded - that is what lets find-in-page reach a collapsed section, and it means "is it
+  // open" is the element's state rather than the content's presence.
+  it("collapses once a game is running, with its count still readable on the header", () => {
     const store = hostStore();
     store.startGame();
     const body = markup(store);
-    expect(body).not.toContain('aria-label="Room roster"');
     expect(body).toContain(">Roster<");
+    // The whole reason a section can stay shut: the fact a host checks most is on the header.
+    expect(body).toContain("26/30");
   });
 
   it("opens beside the console rather than replacing it (the persistent-layout law)", () => {

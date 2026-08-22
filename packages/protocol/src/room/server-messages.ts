@@ -38,6 +38,7 @@ import {
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { liveRulesSchema } from "./live-rules.ts";
 import { roomSettingsSchema } from "./room-settings.ts";
 import { rosterPayloadSchema, teamIdSchema } from "./roster.ts";
 
@@ -46,9 +47,27 @@ const envelopeFields = {
   ext: extensionBagSchema.optional(),
 };
 
+/**
+ * The room-code alphabet: uppercase alphanumerics MINUS I, O, 0 and 1 - shoutable across a
+ * noisy hall, un-mistakable on a projector. 32 characters, which is also what makes the
+ * generator's modulo unbiased (create.ts `generateRoomCode`).
+ *
+ * It lives here, beside the schema, because the two must agree and for a week they did not:
+ * the generator drew from these 32 characters while the schema accepted all 36. A typed `O`
+ * therefore passed validation, dialled a socket, and came back "no such room" - the same
+ * answer a room that ENDED gives, so a person who mistyped one character was told their
+ * quiz was over. Nothing can fold a stray I/O/0/1 onto something else, either: no member of
+ * this alphabet is confusable with them, which is the entire point of leaving them out. So
+ * the only honest handling is to refuse the string early, by name.
+ */
+export const roomCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+/** The characters a code can never contain, for a refusal that can say which one is wrong. */
+export const roomCodeExcludedCharacters = "IO01";
+
 export const roomCodeSchema = z
   .string()
-  .regex(new RegExp(`^[A-Z0-9]{${String(limits.room.roomCodeLength)}}$`));
+  .regex(new RegExp(`^[${roomCodeAlphabet}]{${String(limits.room.roomCodeLength)}}$`));
 export type RoomCode = z.infer<typeof roomCodeSchema>;
 
 export const refusalReasonSchema = z.enum([
@@ -74,13 +93,10 @@ export const refusalReasonSchema = z.enum([
   // from room-full because the room may have plenty of seats left - what is exhausted is the
   // number of teams the board can show, which is a fact about the room and not about them.
   "teams-full",
-  // Password rooms (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Both reasons
-  // KEEP the socket so the phone can prompt and retry on the same connection - the only
-  // difference between them is whether the client sent a password at all, which the client
-  // already knows. Attempts are rate-limited per connection (limits.room.passwordAttempt*);
-  // the connection that exhausts them is closed with joinRefused.
-  "password-required",
-  "bad-password",
+  // GONE 2026-08-20: "password-required" and "bad-password", the two reasons a room could
+  // refuse a connection that knew its code. Rooms have no password any more (visibility.ts) -
+  // the code is what admits people - so a connection that reaches a room is never turned away
+  // for a secret it does not hold. Nothing replaces them: there is no third door.
 ]);
 export type RefusalReason = z.infer<typeof refusalReasonSchema>;
 
@@ -361,11 +377,27 @@ export const roomServerMessageSchema = z.discriminatedUnion("type", [
   // every host edit (docs/decisions/2026-08-14-room-controls-and-staging.md). Broadcast rather
   // than polled because the strictest requirement is instantaneous: a join code that just
   // became hidden must vanish from the projector at once, not at the next refresh, or streamer
-  // mode is decoration. Carries no secret - `entry` says a password exists, never what it is.
+  // mode is decoration. Carries no secret: there is nothing secret left in room settings.
   z.strictObject({
     ...envelopeFields,
     type: z.literal("room-settings"),
     settings: roomSettingsSchema,
+    at: z.number().int().nonnegative(),
+  }),
+  /**
+   * The RULES the room is currently playing by - sent on join beside the snapshot, and again
+   * whenever the host retunes one (client-messages.ts `update-game-rules`).
+   *
+   * Separate from `room-settings` because they are different kinds of fact: room settings are
+   * about the ROOM (who may come in, how many, what is on the projector), and these are about
+   * the GAME (how long you have to answer, what a wrong answer costs). A phone reads this to
+   * draw the right answer clock; a console reads it to show what the room is actually playing
+   * by rather than what the game definition shipped with.
+   */
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("game-rules"),
+    rules: liveRulesSchema,
     at: z.number().int().nonnegative(),
   }),
   z.strictObject({
@@ -430,11 +462,11 @@ export function parseRoomServerMessage(raw: unknown): RoomServerMessageParseResu
 // WebSocket close codes paired with `refused`/`room-closed` (documented here so both ends
 // share one table; 4xxx is the application range the runtime passes through untouched).
 // Room-level refusals (no-such-room, bad tokens, room-full, the spectator budget refusals,
-// late-join-disabled) close the
-// socket; TEAM-level join refusals (team-locked, unknown-team) deliberately do NOT - the
-// phone keeps its socket and retries the join with another team card. PASSWORD refusals
-// (password-required, bad-password) behave like the team ones - retry on the same socket -
-// until the per-connection attempt budget runs out, which closes with joinRefused.
+// late-join-disabled) close the socket; TEAM-level join refusals (team-locked, unknown-team,
+// teams-full) deliberately do NOT - the phone keeps its socket and retries the join with
+// another team card. Those two tiers are the whole table now that passwords are gone; the
+// third tier that used to sit between them retried on the same socket and, once a connection
+// burned its guess budget, closed with joinRefused.
 export const roomCloseCodes = {
   roomClosed: 4000,
   badToken: 4401,

@@ -20,7 +20,6 @@ import type { RoomSettings } from "@jeopardy/protocol/room/room-settings";
 function settings(overrides: Partial<RoomSettings> = {}): RoomSettings {
   return {
     listing: "public",
-    entry: "open",
     maxPlayers: 100,
     maxSpectators: 50,
     spectatorsAllowed: true,
@@ -36,7 +35,6 @@ function room(code: string, overrides: Partial<SessionRoom> = {}): SessionRoom {
     code,
     settings: settings(),
     hostToken: "0".repeat(32),
-    password: "",
     createdAt: 1_760_000_000_000,
     expiresAt: 1_760_007_200_000,
     registry: { status: "ok" },
@@ -54,7 +52,6 @@ function listing(codes: string[], registry: LobbyListing["registry"] = { status:
       title: `Room ${code}`,
       hostLabel: "",
       listing: "public" as const,
-      hasPassword: false,
       phase: "lobby" as const,
       playerCount: 0,
       playerCap: 100,
@@ -135,24 +132,12 @@ describe("adopting a settings change", () => {
   it("takes the SERVER's answer, and leaves every other row alone", () => {
     const rooms = rememberSessionRoom(rememberSessionRoom([], room("AAAAA")), room("BBBBB"));
     const updated = updateSessionRoomSettings(rooms, "AAAAA", {
-      settings: settings({ listing: "private", entry: "password", maxPlayers: 8 }),
-      password: "sequoia-2026",
+      settings: settings({ listing: "private", maxPlayers: 8 }),
     });
     const changed = updated.find((entry) => entry.code === "AAAAA");
     expect(changed?.settings.listing).toBe("private");
     expect(changed?.settings.maxPlayers).toBe(8);
-    // The tab's own copy of the shared secret follows, so joining stays one click.
-    expect(changed?.password).toBe("sequoia-2026");
     expect(updated.find((entry) => entry.code === "BBBBB")?.settings.listing).toBe("public");
-  });
-
-  it("keeps the stored password when a change did not touch it", () => {
-    const rooms = [room("AAAAA", { password: "old-secret" })];
-    const updated = updateSessionRoomSettings(rooms, "AAAAA", {
-      settings: settings({ hideJoinCode: true }),
-    });
-    expect(updated[0]?.password).toBe("old-secret");
-    expect(updated[0]?.settings.hideJoinCode).toBe(true);
   });
 
   // A room that just went private must stop being called "NOT in lobby": the presence verdict

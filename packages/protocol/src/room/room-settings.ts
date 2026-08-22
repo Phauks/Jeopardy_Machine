@@ -15,28 +15,22 @@
 // 2. THE CODE STILL WORKS WHEN IT IS HIDDEN. `hideJoinCode` is streamer mode: the display and
 //    every shared surface stop RENDERING the code and its QR, so a stream audience cannot read
 //    it off the screen. It is not a lock - the code still admits anyone who was given it, and
-//    the host can reveal it on demand. Entry is the password axis's job, not this one's.
+//    the host can reveal it on demand. There is no lock to reach for either (visibility.ts).
 import { z } from "zod";
 import { limits } from "../limits.ts";
-import {
-  hostLabelSchema,
-  roomEntrySchema,
-  roomListingSchema,
-  roomPasswordSchema,
-  roomTitleSchema,
-} from "./visibility.ts";
+import { hostLabelSchema, roomListingSchema, roomTitleSchema } from "./visibility.ts";
 
 // Independent budgets, both bounded by limits: a stream audience must never be able to crowd
 // out the people who came to play, which is the whole reason there are two numbers.
 export const maxPlayersSchema = z.int().min(1).max(limits.room.playerHardCap);
 export const maxSpectatorsSchema = z.int().min(0).max(limits.room.spectatorHardCap);
 
-// What every client is told about the room it is in. `entry` is DERIVED from whether a
-// password is set (visibility.ts explains why it is not stored twice); nothing here is or
-// contains a secret, so this payload is safe on the display, on a phone, and in a log.
+// What every client is told about the room it is in. Nothing here is or contains a secret, so
+// this payload is safe on the display, on a phone, and in a log. It carried an `entry` axis
+// (open / password) until 2026-08-20; passwords are gone and the code is the only thing that
+// admits anybody (visibility.ts explains the trade).
 export const roomSettingsSchema = z.strictObject({
   listing: roomListingSchema,
-  entry: roomEntrySchema,
   maxPlayers: maxPlayersSchema,
   maxSpectators: maxSpectatorsSchema,
   spectatorsAllowed: z.boolean(),
@@ -51,19 +45,19 @@ export type RoomSettings = z.infer<typeof roomSettingsSchema>;
 
 // The defaults a room is created with when the create payload says nothing. Private + open is
 // the untouched QR flow (guiding principle 3): nothing a host does by accident publishes their
-// game, and nothing by default requires a password.
+// game, and a room is private until a host says otherwise.
 export const defaultRoomSettings = {
   listing: "private",
   maxPlayers: limits.room.playerSoftCap,
   maxSpectators: limits.room.spectatorSoftCap,
   spectatorsAllowed: true,
   hideJoinCode: false,
-} as const satisfies Omit<RoomSettings, "entry" | "title" | "hostLabel">;
+} as const satisfies Omit<RoomSettings, "title" | "hostLabel">;
 
-// A host's edit: SPARSE, so a console can change one control without restating the room.
-// `password` is the entry axis - a string sets/replaces the shared secret, null clears it back
-// to an open room - and it is the only field here that is ever a secret, which is why it never
-// appears in `roomSettingsSchema` above and never travels back in a response.
+// A host's edit: SPARSE, so a console can change one control without restating the room. It
+// carried a `password` field until 2026-08-20 - the only field here that was ever a secret -
+// and with passwords gone every field in this patch is public, which is why the whole thing
+// travels straight back to every connection as `room-settings`.
 export const roomSettingsPatchSchema = z
   .strictObject({
     listing: roomListingSchema.optional(),
@@ -71,7 +65,6 @@ export const roomSettingsPatchSchema = z
     maxSpectators: maxSpectatorsSchema.optional(),
     spectatorsAllowed: z.boolean().optional(),
     hideJoinCode: z.boolean().optional(),
-    password: roomPasswordSchema.nullable().optional(),
     title: roomTitleSchema.optional(),
     hostLabel: hostLabelSchema.or(z.literal("")).optional(),
   })

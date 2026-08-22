@@ -8,7 +8,7 @@
   //
   //   left   - Rooms:         create, and every room THIS TAB made, with delete + connect
   //          - Room settings: change a LIVE room (listing, caps, spectators, streamer mode,
-  //                           password) through either door, with the broadcast visible
+  //                           through either door, with the broadcast visible
   //          - Lobby:         the public list, auto-refreshing, registry health in words
   //   middle - Connection:    socket/room state, join controls, action probes, DO inspector
   //   right  - Log:           full height, filterable, compact or verbose bodies
@@ -31,8 +31,7 @@
   import { generateRoomCode } from "@jeopardy/protocol/room/create";
   import { hostTokenHeader } from "@jeopardy/protocol/room/diagnostics";
   import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
-  import { recallRoomPassword } from "#lib/lobby/join-hand-off.ts";
-  import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
+    import { roomWebSocketUrl } from "#lib/realtime/room-url.ts";
   import { sampleGameDefinition } from "#lib/hotseat/sample-game.ts";
   import { summarizeRegistryStatus } from "#lib/lobby/registry-status.ts";
   import {
@@ -102,14 +101,13 @@
     source: "sample",
     title: "Harness room",
     hostLabel: "Harness",
-    password: "",
     maxPlayers: limits.room.playerSoftCap,
     maxSpectators: limits.room.spectatorSoftCap,
     spectatorsAllowed: true,
     hideJoinCode: false,
   });
-  // Where this tab is pointed: the code it connects to and the password it presents.
-  const target = $state<ConnectionTarget>({ code: "", password: "" });
+  // Where this tab is pointed: the code it connects to.
+  const target = $state<ConnectionTarget>({ code: "" });
 
   const selectedRoom = $derived(sessionRooms.find((room) => room.code === target.code) ?? null);
 
@@ -138,7 +136,6 @@
           maxSpectators: createForm.maxSpectators,
           spectatorsAllowed: createForm.spectatorsAllowed,
           hideJoinCode: createForm.hideJoinCode,
-          ...(createForm.password !== "" && { password: createForm.password }),
         }),
       });
       if (response.status === 503) {
@@ -159,18 +156,16 @@
         code: body.code,
         settings: body.settings,
         hostToken: body.hostToken,
-        password: createForm.password,
         createdAt: Date.now(),
         expiresAt: body.expiresAt,
         registry: body.registry,
         closedAt: null,
       });
       target.code = body.code;
-      target.password = createForm.password;
-      syncSettingsDraft(body.settings, createForm.password);
+      syncSettingsDraft(body.settings);
       append(
         "info",
-        `room ${body.code} created (${body.settings.listing}, ${body.settings.entry}, ${String(body.settings.maxPlayers)}p/${String(body.settings.maxSpectators)}s) - expires ${new Date(body.expiresAt).toLocaleTimeString()} - ${summarizeRegistryStatus(body.registry)}`,
+        `room ${body.code} created (${body.settings.listing}, ${String(body.settings.maxPlayers)}p/${String(body.settings.maxSpectators)}s) - expires ${new Date(body.expiresAt).toLocaleTimeString()} - ${summarizeRegistryStatus(body.registry)}`,
       );
       if (body.registry.status !== "ok") {
         append(
@@ -222,30 +217,24 @@
     maxSpectators: limits.room.spectatorSoftCap,
     title: "",
     hostLabel: "",
-    password: "",
   });
   let settingsBusy = $state(false);
   let settingsResult = $state<string | null>(null);
 
-  function syncSettingsDraft(settings: RoomSettings, password: string): void {
+  function syncSettingsDraft(settings: RoomSettings): void {
     settingsDraft.maxPlayers = settings.maxPlayers;
     settingsDraft.maxSpectators = settings.maxSpectators;
     settingsDraft.title = settings.title;
     settingsDraft.hostLabel = settings.hostLabel;
-    settingsDraft.password = password;
   }
 
   async function applySettings(patch: RoomSettingsPatch): Promise<void> {
     const room = selectedRoom;
     if (room === null) return;
-    // What this tab now believes the shared secret is, so the join field keeps working: a
-    // cleared password is an open room, a set one is what was just typed.
-    const password = patch.password === undefined ? undefined : (patch.password ?? "");
     if (settingsDraft.door === "socket") {
       sendJson({ type: "update-room-settings", settings: patch }, "update-room-settings");
       // The answer is the BROADCAST (and an error message if the room refuses), so nothing is
       // assumed here - trackServerMessage adopts whatever comes back.
-      if (password !== undefined) target.password = password;
       return;
     }
     settingsBusy = true;
@@ -268,11 +257,9 @@
       const updated = body as UpdateRoomSettingsResponse;
       sessionRooms = updateSessionRoomSettings(sessionRooms, room.code, {
         settings: updated.settings,
-        ...(password !== undefined && { password }),
       });
-      if (password !== undefined) target.password = password;
-      syncSettingsDraft(updated.settings, password ?? room.password);
-      settingsResult = `applied · ${updated.settings.listing} · ${updated.settings.entry} · ${String(updated.settings.maxPlayers)}p/${String(updated.settings.maxSpectators)}s · code ${updated.settings.hideJoinCode ? "hidden" : "visible"} · ${summarizeRegistryStatus(updated.registry)}`;
+      syncSettingsDraft(updated.settings);
+      settingsResult = `applied · ${updated.settings.listing} · ${String(updated.settings.maxPlayers)}p/${String(updated.settings.maxSpectators)}s · code ${updated.settings.hideJoinCode ? "hidden" : "visible"} · ${summarizeRegistryStatus(updated.registry)}`;
       append("info", `settings ${room.code}: ${settingsResult}`);
       void refreshLobby();
       void inspectRoom();
@@ -325,13 +312,12 @@
     return () => clearInterval(timer);
   });
 
-  // Arriving from the lobby hand-off (/?code=... -> /dev/rooms?code=XXXXX): take the code from
-  // the URL and the password from sessionStorage, which is where the lobby left it.
+  // Arriving from the lobby hand-off (/?code=... -> /dev/rooms?code=XXXXX): the code is the
+  // whole hand-off, because the code is the whole credential (join-hand-off.ts).
   $effect(() => {
     const fromLobby = new URL(globalThis.location.href).searchParams.get("code");
     if (fromLobby === null || target.code !== "") return;
     target.code = fromLobby.toUpperCase();
-    target.password = recallRoomPassword(target.code);
     append("info", `arrived from the lobby with room ${target.code}`);
   });
 
@@ -439,7 +425,7 @@
       sessionRooms = updateSessionRoomSettings(sessionRooms, target.code, {
         settings: message.settings,
       });
-      settingsResult = `broadcast · ${message.settings.listing} · ${message.settings.entry} · code ${message.settings.hideJoinCode ? "hidden" : "visible"}`;
+      settingsResult = `broadcast · ${message.settings.listing} · code ${message.settings.hideJoinCode ? "hidden" : "visible"}`;
     }
     if (message.type === "room-closed") {
       connection.roomLifecycle = `closed (${message.reason})`;
@@ -557,7 +543,6 @@
   const probeContext = $derived({
     socketOpen: connection.phase === "open",
     joinedRole: connection.joinedRole,
-    hasPasswordRoom: selectedRoom !== null && selectedRoom.settings.entry === "password",
   });
 
   function beginProbe(id: ProbeId): void {
@@ -588,7 +573,6 @@
   // share the single socket and a parallel burst would let one settle another's frame.
   function runProbe(id: ProbeId): Promise<void> {
     if (id === "uncreated-room") return probeUncreatedRoom();
-    if (id === "wrong-password") return probeWrongPassword();
     if (id === "stale-version") {
       return armSocketProbe(id, () =>
         sendRaw(JSON.stringify({ version: protocolVersion + 1, type: "sync" }), "stale version"),
@@ -669,49 +653,6 @@
     });
   }
 
-  // Wrong password on a SEPARATE socket: a refused join must leave no trace in the room, and
-  // running it on the main connection would risk spending this tab's own attempt budget.
-  function probeWrongPassword(): Promise<void> {
-    const room = selectedRoom;
-    if (room === null || room.settings.entry !== "password") return Promise.resolve();
-    beginProbe("wrong-password");
-    return new Promise((resolve) => {
-      let settled = false;
-      const settle = (observed: ProbeObservation) => {
-        if (settled) return;
-        settled = true;
-        finishProbe("wrong-password", observed);
-        resolve();
-      };
-      try {
-        const ws = new WebSocket(roomWebSocketUrl(room.code));
-        ws.addEventListener("open", () => {
-          ws.send(
-            JSON.stringify({
-              version: protocolVersion,
-              type: "join",
-              role: "player",
-              nickname: "Wrong Password Probe",
-              password: `definitely-not-${room.password}`,
-            }),
-          );
-        });
-        ws.addEventListener("message", (event) => {
-          const parsed = parseRoomServerMessage(String(event.data));
-          if (!parsed.ok) return;
-          settle({
-            type: parsed.message.type,
-            ...("reason" in parsed.message && { reason: parsed.message.reason }),
-          });
-          ws.close();
-        });
-        ws.addEventListener("error", () => settle({}));
-      } catch (error) {
-        settle({ type: error instanceof Error ? error.message : "threw" });
-      }
-    });
-  }
-
   // Run all: SEQUENTIAL, skipping what this tab cannot currently perform, and finishing with
   // one line a reader can act on (owner request 2026-08-14).
   async function runAllProbes(): Promise<void> {
@@ -768,13 +709,11 @@
         selectedCode={target.code}
         onUse={(room) => {
           target.code = room.code;
-          target.password = room.password;
-          syncSettingsDraft(room.settings, room.password);
+          syncSettingsDraft(room.settings);
         }}
         onConnect={(room) => {
           target.code = room.code;
-          target.password = room.password;
-          syncSettingsDraft(room.settings, room.password);
+          syncSettingsDraft(room.settings);
           connect();
         }}
         onDelete={(room) => void deleteRoom(room)}

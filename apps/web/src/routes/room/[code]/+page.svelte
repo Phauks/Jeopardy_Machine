@@ -18,8 +18,8 @@
   // A REAL room since the 2026-08-17 reconcile: the store is a live socket to this code's
   // GameRoomDO, so this phone, the projector, and everybody else's phone are in one room
   // (#lib/room/create-room-store.ts decides; the demo code still gets the local simulation).
-  // The two secrets travel the way join-hand-off.ts describes - the room password in the join
-  // message, this tab's seat token in sessionStorage - and neither ever rides the URL. Players
+  // This tab's seat token travels the way join-hand-off.ts describes - sessionStorage, offered
+  // on connect, never in the URL. It is the only credential a player surface holds. Players
   // never see accounts, installs, or prompts here: the room code IS the join flow (guiding
   // principle 3).
   import { onDestroy } from "svelte";
@@ -28,11 +28,7 @@
   import BuzzerScreen from "#lib/room/buzzer-screen.svelte";
   import PreGameScreen from "#lib/room/pre-game-screen.svelte";
   import { createRoomStore, seedRosterFor } from "#lib/room/create-room-store.ts";
-  import {
-    recallRoomPassword,
-    recallSessionToken,
-    rememberSessionToken,
-  } from "#lib/lobby/join-hand-off.ts";
+  import { recallSessionToken, rememberSessionToken } from "#lib/lobby/join-hand-off.ts";
   import { playerSurfaceFor } from "#lib/room/pre-game.ts";
   import { RoomAudio } from "#lib/room/room-audio.ts";
   import { retroTvPreset, themePresets } from "#lib/theme/theme-presets.ts";
@@ -48,7 +44,6 @@
     ...(page.url.searchParams.has("sim") && { mode: "local-sim" as const }),
     timerAutopilot: browser,
     autoConnect: browser,
-    password: browser ? recallRoomPassword(roomCode) : null,
     // A reload mid-game is a returning player, not a new one: the token this tab already holds
     // resumes the same seat and the room puts the phone back on the screen it left (A5).
     sessionToken: browser ? recallSessionToken(roomCode) : null,

@@ -6,6 +6,8 @@
 // nickname/avatarId/accentId/buzzSoundId are the protocol's own names.
 import type { GamePhase, GameState } from "@jeopardy/engine/state";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { DeviceKind } from "@jeopardy/protocol/room/identity";
+import type { LiveRules } from "@jeopardy/protocol/room/live-rules";
 import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { ResolvedMedia } from "@jeopardy/protocol/room/server-messages";
 import type { RefusalReason } from "@jeopardy/protocol/room/server-messages";
@@ -36,6 +38,29 @@ export type RoomPlayerView = {
   teamId: string | null;
   connected: boolean;
   joinedAt: number;
+  /**
+   * Phone or computer, or null when this seat's client did not say - which the roster renders
+   * as nothing rather than as a guess (@jeopardy/protocol room/identity.ts).
+   *
+   * A fact about the live SOCKET, not about the seat: a player who is away reports no device,
+   * because nobody knows what they will come back on.
+   */
+  deviceKind: DeviceKind | null;
+};
+
+/**
+ * A watcher, by name (owner, 2026-08-20: "spectators still should have a name").
+ *
+ * Not a `RoomPlayerView`: a spectator holds no seat, no team, no score and no curated
+ * identity, and giving them the player shape would invite every surface that iterates players
+ * to iterate these too. `name` is null for somebody watching anonymously, which is still a
+ * legitimate way to watch.
+ */
+export type RoomSpectatorView = {
+  spectatorId: string;
+  name: string | null;
+  deviceKind: DeviceKind | null;
+  joinedAt: number;
 };
 
 export type RoomTeamView = {
@@ -63,6 +88,15 @@ export type RoomRosterView = {
    * (src/lib/lobby/room-capacity.ts).
    */
   spectatorCount: number | null;
+  /**
+   * The audience BY NAME, or null when this room does not report one.
+   *
+   * `spectatorCount` above stays the authority on how many: it is counted from live
+   * connections and includes the watchers who gave no name, so this list can be shorter than
+   * that number and both are right. A console renders the names it has and the count for
+   * everyone (host-roster-panel.svelte).
+   */
+  spectators: RoomSpectatorView[] | null;
 };
 
 /**
@@ -220,10 +254,22 @@ export type RoomView = {
    * come in, how many, and whether the join code is safe to show
    * (packages/protocol/src/room/room-settings.ts). The protocol type verbatim, not a copy:
    * every connection is sent this on join and again on every host edit, so a surface that
-   * respects it cannot drift from the room that owns it. Nothing here is a secret; the
-   * password is the one settings field that never leaves the DO.
+   * respects it cannot drift from the room that owns it. Nothing here is a secret - and since
+   * 2026-08-20 there is no room secret at all for one of these fields to have been.
    */
   settings: RoomSettings;
+  /**
+   * The RULES this room is currently playing by - not the ones its game definition shipped
+   * with, because a host can retune the answering loop live (@jeopardy/protocol
+   * room/live-rules.ts; owner, 2026-08-20: the answer timer "should be settable by the host").
+   *
+   * A different KIND of fact from `settings` above, which is why it is a different field:
+   * settings are about the room (who may come in, how many, what is on the projector) and
+   * these are about the game (how long you have to answer, what a wrong answer costs). A
+   * phone reads `answerWindowMs` to draw the clock it is actually counting against; the
+   * display reads it to put the same clock in front of the room.
+   */
+  rules: LiveRules;
   /**
    * Has the ROOM actually told us the settings above, or are they still the shell a store
    * carries so surfaces can render before the first message lands?

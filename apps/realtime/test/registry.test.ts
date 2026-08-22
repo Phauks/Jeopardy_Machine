@@ -34,7 +34,6 @@ type RoomRow = {
   title: string;
   host_label: string;
   listing: string;
-  has_password: number;
   phase: string;
   player_count: number;
   player_cap: number;
@@ -48,18 +47,17 @@ type RoomRow = {
 // Stands in for the web Worker's create route, which is what really inserts the row (this
 // Worker only ever updates one). Keeping the insert here in test-land is the honest shape:
 // the DO must never conjure a row for a room the registry never heard of.
-async function seedRow(code: string, options: { listing?: string; hasPassword?: boolean } = {}) {
+async function seedRow(code: string, options: { listing?: string } = {}) {
   const now = Date.now();
   await env.DB.prepare(
-    `INSERT INTO rooms (code, title, host_label, listing, has_password, phase, player_count,
+    `INSERT INTO rooms (code, title, host_label, listing, phase, player_count,
        player_cap, spectator_count, spectator_cap, spectators_allowed,
        created_at, last_seen_at, expires_at, ended_at)
-     VALUES (?, 'Registry suite', 'Suite', ?, ?, 'lobby', 0, ?, 0, ?, 1, ?, ?, ?, NULL)`,
+     VALUES (?, 'Registry suite', 'Suite', ?, 'lobby', 0, ?, 0, ?, 1, ?, ?, ?, NULL)`,
   )
     .bind(
       code,
       options.listing ?? "public",
-      options.hasPassword === true ? 1 : 0,
       limits.room.playerSoftCap,
       limits.room.spectatorSoftCap,
       now,
@@ -100,7 +98,7 @@ describe("the DO's registry statements against the real schema", () => {
     expect(row?.listing).toBe("public");
   });
 
-  it("relists a room whose host changed its settings - listing, text, lock and cap", async () => {
+  it("relists a room whose host changed its settings - listing, text and caps", async () => {
     const code = uniqueCode();
     await seedRow(code);
     await relistRegistryRow(env.DB, {
@@ -108,7 +106,6 @@ describe("the DO's registry statements against the real schema", () => {
       listing: "private",
       title: "Renamed room",
       hostLabel: "New byline",
-      hasPassword: true,
       playerCap: 12,
       spectatorCap: 30,
       spectatorsAllowed: false,
@@ -119,7 +116,6 @@ describe("the DO's registry statements against the real schema", () => {
       listing: "private",
       title: "Renamed room",
       host_label: "New byline",
-      has_password: 1,
       player_cap: 12,
       spectator_cap: 30,
       spectators_allowed: 0,

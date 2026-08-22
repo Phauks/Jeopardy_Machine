@@ -334,43 +334,17 @@ describe("nickname de-duplication (A2's auto-suffix)", () => {
   });
 });
 
-describe("the password door (the gap the M3 reconcile left open)", () => {
-  // A phone that arrived by the URL alone carries no password: the front door stashes one
-  // beside the code, and a QR scan or a pasted link has never been through the front door.
-  // Both password refusals keep the socket open so it can prompt and retry - until 2026-08-19
-  // nothing did, so the room said "the host has it" and offered nowhere to type it.
-  function refusedStore(reason: "password-required" | "bad-password"): LocalSimRoomStore {
-    const store = newStore();
-    store.simRefuse(reason);
-    return store;
-  }
-
-  it("asks for the password instead of explaining the dead end", () => {
-    const body = bodyOf(refusedStore("password-required"));
-    expect(body).toContain("This room has a password");
-    expect(body).toContain('type="password"');
-    expect(body).toContain("Go in");
-  });
-
-  it("reads differently on a retry, so a second wrong try is visibly a new answer", () => {
-    const first = bodyOf(refusedStore("password-required"));
-    const retry = bodyOf(refusedStore("bad-password"));
-    expect(first).toContain("Whoever is hosting can tell you");
-    expect(retry).toContain("did not work");
-    expect(retry).toContain('role="alert"');
-  });
-
-  it("shows NOTHING about the room behind it - that is what a password room is", () => {
-    const body = bodyOf(refusedStore("password-required"));
-    // No roster, no teams, no character picker: an unjoined connection is told nothing about
-    // the room it is standing outside.
-    expect(body).not.toContain('aria-label="Teams"');
-    expect(body).not.toContain("Choose your character");
-  });
-
-  it("is gone the moment the door opens, and the ordinary screen is behind it", () => {
-    const open = newStore();
-    expect(bodyOf(open)).not.toContain("This room has a password");
-    expect(bodyOf(open)).toContain("Choose your character");
+// GONE 2026-08-20, with the passwords themselves. This screen carried a full-page password
+// door - the closing of a gap the M3 reconcile left open - and it was deleted rather than
+// hidden, along with the two refusal reasons that were its only trigger (@jeopardy/protocol
+// room/server-messages.ts). The gate stays because the failure it guards is silent: a password
+// field that survived the removal would ask for a secret no room can check and no host can
+// give, and it would look exactly like a working door.
+describe("no door in front of the room: the code is the only thing that admits anybody", () => {
+  it("renders the ordinary joining screen, with nothing to type a secret into", () => {
+    const body = bodyOf(newStore());
+    expect(body).toContain("Choose your character");
+    expect(body).not.toContain('type="password"');
+    expect(body.toLowerCase()).not.toContain("password");
   });
 });

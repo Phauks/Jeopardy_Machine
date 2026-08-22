@@ -9,7 +9,13 @@
 // out-ranks both (guiding principle 4).
 import { z } from "zod";
 import { limits } from "../limits.ts";
-import { curatedAssetIdSchema, personalIdentitySchema, playerIdSchema } from "./identity.ts";
+import {
+  curatedAssetIdSchema,
+  deviceKindSchema,
+  nicknameSchema,
+  personalIdentitySchema,
+  playerIdSchema,
+} from "./identity.ts";
 
 export const teamIdSchema = z.string().min(1).max(64);
 export type TeamId = z.infer<typeof teamIdSchema>;
@@ -37,8 +43,34 @@ export const rosterEntrySchema = z.strictObject({
   // Unix ms of first join - team-leadership succession picks the longest-tenured connected
   // member, and the roster UI sorts by it.
   joinedAt: z.number().int().nonnegative(),
+  /**
+   * Phone or computer, as this seat's own client reported it (identity.ts explains the two
+   * values and why it is client-reported). Absent means the client did not say, which the
+   * console renders as nothing rather than as a guess.
+   */
+  deviceKind: deviceKindSchema.optional(),
 });
 export type RosterEntry = z.infer<typeof rosterEntrySchema>;
+
+/**
+ * A WATCHER, since 2026-08-20 (owner: "spectators still should have a name").
+ *
+ * Deliberately not a `rosterEntry`: a spectator holds no seat, no team, no score and no
+ * curated identity, and giving them the player shape would invite every surface that iterates
+ * players to iterate these too. What a spectator has is a connection, optionally a name, and
+ * the kind of device it is on.
+ *
+ * `name` is nullable rather than optional because absent and anonymous are the same thing
+ * here and the distinction would be noise: somebody watching without giving a name is one
+ * state, and the console says "someone watching" for it.
+ */
+export const spectatorEntrySchema = z.strictObject({
+  spectatorId: playerIdSchema,
+  name: nicknameSchema.nullable(),
+  deviceKind: deviceKindSchema.optional(),
+  joinedAt: z.number().int().nonnegative(),
+});
+export type SpectatorEntry = z.infer<typeof spectatorEntrySchema>;
 
 // The full roster payload as broadcast in `roster` messages and embedded in snapshots.
 // Always sent whole: at the 128-player hard cap this is a few KB, and whole-payload sync
@@ -57,5 +89,20 @@ export const rosterPayloadSchema = z.strictObject({
   // room-capacity.ts). A host console showing "0 watching" for a room nobody has counted is
   // the invented-number bug that rule exists to prevent.
   spectatorCount: z.int().nonnegative().max(limits.room.spectatorHardCap).optional(),
+  /**
+   * The audience BY NAME, for the host console (owner, 2026-08-20). Optional for exactly the
+   * reason `spectatorCount` is: a producer that does not report its audience must not be read
+   * as reporting an empty one.
+   *
+   * The count above stays the authority on HOW MANY - it is counted from live connections,
+   * and it includes the watchers who gave no name. This list is what the console draws so a
+   * host can see whether the person they are waiting for is in the room yet, which "12
+   * watching" could never answer.
+   *
+   * NEVER leaves the room. The lobby's projection carries counts and no people at all
+   * (registry.ts), and the diagnostics surface redacts identity by construction
+   * (diagnostics.ts) - both of those rules are unchanged by this.
+   */
+  spectators: z.array(spectatorEntrySchema).max(limits.room.spectatorHardCap).optional(),
 });
 export type RosterPayload = z.infer<typeof rosterPayloadSchema>;

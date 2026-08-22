@@ -196,6 +196,50 @@ describe("polite endings", () => {
     expect((await phone.waitFor("room-closed")).reason).toBe("host-closed");
     expect((await host.waitFor("room-closed")).reason).toBe("host-closed");
   });
+
+  // The OTHER ending, added 2026-08-20 (owner: "there is no end game button for the host").
+  // The pair is the point: one stops the game and leaves the room standing, the other stops
+  // the room. Before this only the second existed, so "we are out of time" and "everyone has
+  // gone home" had the same button - and taking it mid-game meant every screen went dark with
+  // no scores on it.
+  it("ends the GAME on the host's word, leaving the room and every phone alive", async () => {
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code);
+    const host = await connectHost(code, hostToken);
+    const phone = new TestClient(await upgradeToRoom(code));
+    phone.send({ type: "join", role: "player", nickname: "Maya" });
+    await phone.waitFor("welcome");
+    await host.waitFor("roster", (message) => message.roster.players.length === 1);
+    host.sendAction({ type: "start-game" });
+    await host.takeEvent("game-started");
+
+    host.sendAction({ type: "end-game" });
+    const over = await host.takeEvent("game-over");
+    expect(over.note).toBe("ended-early");
+    // The phone sees the same ending - it is a room-wide event, not a console readout.
+    expect((await phone.takeEvent("game-over")).note).toBe("ended-early");
+    // Nobody was disconnected, and the room is still there to be rejoined or closed properly.
+    expect(host.messagesOf("room-closed")).toEqual([]);
+    expect(phone.messagesOf("room-closed")).toEqual([]);
+    const diagnostics = await roomStub(code).fetch("https://do/registry-snapshot");
+    expect(diagnostics.status).toBe(200);
+  });
+
+  it("is host-only: a phone cannot end everybody's game", async () => {
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code);
+    const host = await connectHost(code, hostToken);
+    const phone = new TestClient(await upgradeToRoom(code));
+    phone.send({ type: "join", role: "player", nickname: "Chancer" });
+    await phone.waitFor("welcome");
+    await host.waitFor("roster", (message) => message.roster.players.length === 1);
+    host.sendAction({ type: "start-game" });
+    await host.takeEvent("game-started");
+
+    phone.sendAction({ type: "end-game" });
+    expect((await phone.waitFor("error")).reason).toBe("unauthorized");
+    expect(phone.engineEvents.filter((event) => event.type === "game-over")).toEqual([]);
+  });
 });
 
 describe("teams-mode seating policy", () => {

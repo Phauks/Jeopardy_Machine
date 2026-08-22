@@ -11,14 +11,17 @@
 import { teamsAreRequired } from "@jeopardy/protocol/settings/player-mode";
 import { createInitialState } from "@jeopardy/engine/state";
 import { transition } from "@jeopardy/engine/transition";
+import { defaultLiveRules, liveRulesOfSettings } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { limits } from "@jeopardy/protocol/limits";
+import { detectDeviceKind } from "#lib/room/device-kind.ts";
 import { foldEvent, prunePendingTimers } from "#lib/room/room-fold.ts";
 import { fixtureContentView, fixtureGameSetup, fixtureRosterView } from "#lib/room/fixture-room.ts";
 import type { GameAction, Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameSetup } from "@jeopardy/engine/setup";
 import type { GameState } from "@jeopardy/engine/state";
+import type { LiveRules, LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomFoldState } from "#lib/room/room-fold.ts";
 import type {
@@ -31,8 +34,10 @@ import type {
 import type {
   LastJudgedView,
   MyBuzzView,
+  RoomConnectionState,
   PendingTimerView,
   RoomPlayerView,
+  RoomSpectatorView,
   RoomRefusalView,
   RoomRoleView,
   RoomTeamView,
@@ -99,7 +104,11 @@ export class LocalSimRoomStore implements RoomStore {
 
   private readonly roomCode: string;
   private readonly role: RoomRoleView;
-  private readonly setup: GameSetup;
+  // NOT readonly since 2026-08-20: a host can retune the answering loop live
+  // (updateGameRules), and the mock applies the patch to its own setup so the sim demonstrates
+  // the real consequence rather than a moved readout. Everything the running STATE was built
+  // from is still frozen - that is enforced by the patch schema, not by this field.
+  private setup: GameSetup;
   private readonly content: ReturnType<typeof fixtureContentView>;
   private readonly onEvent: ((event: GameEvent) => void) | undefined;
   private readonly onBuzzWon: ((buzz: RoomBuzz) => void) | undefined;
@@ -121,7 +130,6 @@ export class LocalSimRoomStore implements RoomStore {
   private pausedState = $state(false);
   private roomSettings = $state.raw<RoomSettings>({
     ...defaultRoomSettings,
-    entry: "open",
     title: "",
     hostLabel: "",
   });
@@ -135,11 +143,41 @@ export class LocalSimRoomStore implements RoomStore {
   // counts the sockets this simulated room actually has, and the roster reports only what the
   // room has been told to claim.
   private simSpectators = $state<number | null>(null);
+  /**
+   * The mock audience BY NAME (owner, 2026-08-20). Derived from the count rather than stored
+   * separately, so the sim can never show four names beside "3 watching": a real room's list
+   * is shorter than its count when somebody watches anonymously, and the mock reproduces that
+   * by naming all but the last one.
+   */
+  private simSpectatorList = $derived.by<RoomSpectatorView[] | null>(() => {
+    const watching = this.simSpectators;
+    if (watching === null) return null;
+    return Array.from({ length: watching }, (_unused, index) => ({
+      spectatorId: `sim-spectator-${String(index + 1)}`,
+      // The last watcher is anonymous, so every surface that renders this list has to handle
+      // the null case rather than only meeting it in production.
+      name: index === watching - 1 ? null : `Watcher ${String(index + 1)}`,
+      deviceKind: index % 2 === 0 ? ("phone" as const) : ("computer" as const),
+      joinedAt: 1_760_000_000_000 + index,
+    }));
+  });
+  // A mock room has no socket, so "connected" is a claim rather than an observation - and it
+  // is the right claim until something closes the room. `closeRoom` moves it, so the console's
+  // close control demonstrates the state a real close leaves behind instead of being a dead
+  // button in the sim (room-view.ts, RoomConnectionState).
+  private simConnection = $state<RoomConnectionState>("connected");
+  // The mock room's rules, and a REAL projection of the setup it is running rather than the
+  // registry defaults: the sim resolves its own rule set (this.setup below), so a demo of a
+  // game whose rules say "no penalty for wrong" must show that on the console rather than the
+  // default deduct. `updateGameRules` moves it exactly as the room's broadcast moves the ws
+  // store's copy.
+  private simRules = $state.raw<LiveRules>(defaultLiveRules);
 
   constructor(options: LocalSimStoreOptions) {
     this.roomCode = options.roomCode;
     this.role = options.role;
     this.setup = fixtureGameSetup(options.seed ?? `mock-${options.roomCode}`);
+    this.simRules = liveRulesOfSettings(this.setup.settings);
     // Responses exist only in host-role stores - the redaction the M3 server performs is
     // reproduced here so mirror mode and phones are honest even in mock play.
     this.content = fixtureContentView(options.role === "host");
@@ -158,7 +196,8 @@ export class LocalSimRoomStore implements RoomStore {
     return {
       roomCode: this.roomCode,
       role: this.role,
-      connection: "connected",
+      connection: this.simConnection,
+      rules: this.simRules,
       phase: this.roomPhase,
       roster: {
         players: this.rosterPlayers,
@@ -170,6 +209,11 @@ export class LocalSimRoomStore implements RoomStore {
         // panel's "audience" control is the one thing that can tell it, and then the roster and
         // the census below report the SAME number rather than disagreeing on one screen.
         spectatorCount: this.simSpectators,
+        // The mock names its watchers too, so the console's audience list is exercised by the
+        // sim rather than only by a real room (simSetSpectators below is how a review drives
+        // it). Null when nothing has plugged an audience in - the same absent-is-not-zero rule
+        // the count follows.
+        spectators: this.simSpectatorList,
       },
       playerMode: this.setup.settings.teams.playerMode,
       myPlayerId: this.myPlayerId,
@@ -318,8 +362,8 @@ export class LocalSimRoomStore implements RoomStore {
    * The host's room-settings edit, mock-side. Applied with the DO's own two refusals
    * (packages/protocol/src/room/room-settings.ts): a public room needs a title, and a cap never
    * drops below the people already in the room - because nobody is ever ejected by a settings
-   * change. `entry` is DERIVED from the password rather than stored twice, exactly as the room
-   * derives it, so a mock room in streamer mode behaves like a real one on every surface.
+   * change. Every field is applied verbatim, which a mock can only do because none of them is
+   * a secret the room would have to keep (room-settings.ts).
    */
   updateRoomSettings(patch: RoomSettingsPatch): void {
     const next: RoomSettings = { ...this.roomSettings };
@@ -330,7 +374,6 @@ export class LocalSimRoomStore implements RoomStore {
     if (patch.maxSpectators !== undefined) next.maxSpectators = patch.maxSpectators;
     if (patch.spectatorsAllowed !== undefined) next.spectatorsAllowed = patch.spectatorsAllowed;
     if (patch.hideJoinCode !== undefined) next.hideJoinCode = patch.hideJoinCode;
-    if (patch.password !== undefined) next.entry = patch.password === null ? "open" : "password";
     if (next.listing === "public" && next.title.trim().length === 0) return;
     if (next.maxPlayers < this.rosterPlayers.length) return;
     this.roomSettings = next;
@@ -389,7 +432,7 @@ export class LocalSimRoomStore implements RoomStore {
   /**
    * Put this mock connection in a refused state on purpose - the sim panel's refusal probes and
    * the surface tests both need to SEE the screens a real room's refusals produce, and a mock
-   * room never produces them on its own (it has no password, no cap it enforces, no door).
+   * room never produces them on its own (one tab, no cap it enforces, nobody to turn away).
    */
   simRefuse(reason: RoomRefusalView["reason"]): void {
     this.refuse(reason);
@@ -444,6 +487,9 @@ export class LocalSimRoomStore implements RoomStore {
         teamId,
         connected: true,
         joinedAt: Date.now(),
+        // The sim is one tab, and this is the seat it belongs to, so it reports whatever this
+        // browser actually is - the same answer a real client sends on join.
+        deviceKind: detectDeviceKind() ?? null,
       },
     ];
     this.myPlayerId = playerId;
@@ -763,6 +809,39 @@ export class LocalSimRoomStore implements RoomStore {
     this.dispatch({ type: "end-round", at: Date.now() });
   }
 
+  endGame(): void {
+    this.dispatch({ type: "end-game", at: Date.now() });
+  }
+
+  /**
+   * The mock applies the patch to its OWN setup rather than pretending, so the sim panel
+   * demonstrates the real consequence: lengthen the answer clock here and the next mock clue
+   * genuinely runs the longer one. That is the whole value of the sim - a control that only
+   * moved a readout would be a picture of the feature rather than the feature.
+   */
+  updateGameRules(patch: LiveRulesPatch): void {
+    this.setup = {
+      ...this.setup,
+      settings: {
+        ...this.setup.settings,
+        buzzing: { ...this.setup.settings.buzzing, ...patch.buzzing },
+        scoring: { ...this.setup.settings.scoring, ...patch.scoring },
+      },
+    };
+    this.simRules = liveRulesOfSettings(this.setup.settings);
+  }
+
+  /**
+   * A mock room is one tab with nobody else in it, so there is nothing to close FOR anyone -
+   * but the console's control must still do something visible or the sim panel would be
+   * demonstrating a dead button. The honest mock is the state a real close leaves behind:
+   * this connection reads as closed, which is exactly what a `room-closed` frame produces on
+   * the ws store (ws-room-store.svelte.ts).
+   */
+  closeRoom(): void {
+    this.simConnection = "closed";
+  }
+
   tiebreakerNextClue(): void {
     this.dispatch({ type: "tiebreaker-next-clue", at: Date.now() });
   }
@@ -808,15 +887,6 @@ export class LocalSimRoomStore implements RoomStore {
     if (patch.spectators !== undefined) {
       this.simSpectators = Math.max(0, Math.trunc(patch.spectators));
     }
-  }
-
-  /**
-   * A mock room has no door to knock on: it is one tab, it holds no password, and it has never
-   * refused anybody for one. Accepting the password and doing nothing is the honest mock -
-   * clearing a refusal that cannot exist would be theatre.
-   */
-  submitRoomPassword(): void {
-    this.refusalState = null;
   }
 
   /** Phone-sleep / Wi-Fi-blip simulation: flips roster health, seats stay (A5 behavior). */

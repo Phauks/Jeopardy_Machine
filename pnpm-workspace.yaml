@@ -34,6 +34,11 @@ catalog:
   # three ships no .d.ts of its own; DefinitelyTyped tracks it minor-for-minor, so this pin
   # moves with the three pin above. Verified on npm 2026-08-14: 0.185.4 is the newest 0.185.x.
   "@types/three": 0.185.4
+  # Icons (owner, 2026-08-20: "use lucide icons ... replace all custom svg's"). Tree-shaken
+  # per-icon Svelte components, so the bundle carries the handful this app imports and not a
+  # set - which is why an icon FONT was refused for the same job (a whole download for one
+  # glyph). Peers svelte ^5; verified live on npm 2026-08-20.
+  "@lucide/svelte": 1.33.0
   "@sveltejs/adapter-cloudflare": 8.0.0-next.6
   "@sveltejs/kit": 3.0.0-next.23
   "@sveltejs/vite-plugin-svelte": 7.3.0

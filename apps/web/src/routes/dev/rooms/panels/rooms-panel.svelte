@@ -17,7 +17,6 @@
     source: "sample" | "compact";
     title: string;
     hostLabel: string;
-    password: string;
     maxPlayers: number;
     maxSpectators: number;
     spectatorsAllowed: boolean;
@@ -80,16 +79,7 @@
     host label
     <input class="w-48 border px-2 py-1" maxlength={limits.room.hostLabelMaxLength} bind:value={form.hostLabel} />
   </label>
-  <label class="flex items-center justify-between gap-2 text-sm">
-    password
-    <input
-      class="w-48 border px-2 py-1"
-      placeholder="(open room)"
-      maxlength={limits.room.roomPasswordMaxLength}
-      bind:value={form.password}
-    />
-  </label>
-  <label class="flex items-center justify-between gap-2 text-sm">
+    <label class="flex items-center justify-between gap-2 text-sm">
     max players
     <input
       class="w-24 border px-2 py-1"
@@ -137,7 +127,7 @@
           <strong class="text-base">{room.code}</strong>
           <span class="opacity-70">{room.settings.title}</span>
           <span class="opacity-70">
-            {room.settings.listing}{room.settings.entry === "password" ? " · locked" : " · open"}
+            {room.settings.listing}
             {room.settings.hideJoinCode ? " · code hidden" : ""}
           </span>
         </div>

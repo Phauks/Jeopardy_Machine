@@ -5,7 +5,8 @@
 import { env, SELF } from "cloudflare:test";
 import { expect } from "vitest";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
-import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
+import { limits } from "@jeopardy/protocol/limits";
+import { parseRoomServerMessage, roomCodeAlphabet } from "@jeopardy/protocol/room/server-messages";
 import { Bot } from "@jeopardy/bots/bot";
 import { withSimulatedLatency } from "@jeopardy/bots/latency";
 import type { BotOptions } from "@jeopardy/bots/bot";
@@ -18,10 +19,25 @@ import type { GameEvent } from "@jeopardy/engine/events";
 
 let codeCounter = 0;
 
-/** Unique per test: DO instances outlive isolated-storage rollbacks, codes must not. */
+/**
+ * Unique per test: DO instances outlive isolated-storage rollbacks, codes must not.
+ *
+ * Counted in BASE 32 over the room-code alphabet rather than in decimal, because since
+ * 2026-08-20 `roomCodeSchema` enforces that alphabet (server-messages.ts) and the old
+ * `T0001` shape is not a room code at all - 0 and 1 are two of the four characters
+ * deliberately left out so nothing is misread off a projector. Every code this yields is one
+ * the generator could really have produced, which is the point of a test fixture.
+ */
 export function uniqueCode(): string {
   codeCounter += 1;
-  return `T${String(codeCounter).padStart(4, "0")}`.slice(0, 5);
+  const digits = Array.from(
+    { length: limits.room.roomCodeLength },
+    (_unused, place) =>
+      roomCodeAlphabet[
+        Math.floor(codeCounter / roomCodeAlphabet.length ** place) % roomCodeAlphabet.length
+      ],
+  );
+  return digits.join("");
 }
 
 /** The board-only game spec, narrowed - so a test can spread it and keep the discriminant. */
@@ -48,7 +64,7 @@ export function roomStub(code: string) {
   return env.GAME_ROOM.get(env.GAME_ROOM.idFromName(code));
 }
 
-// `options` carries the room fields beyond the game itself - listing/title/hostLabel/password
+// `options` carries the room fields beyond the game itself - listing/title/hostLabel
 // (docs/decisions/2026-08-14-room-visibility-and-lobby.md) and the room controls
 // (docs/decisions/2026-08-14-room-controls-and-staging.md). Omitted = the default private,
 // open, spectators-welcome room every pre-existing test in this suite assumes.

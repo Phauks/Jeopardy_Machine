@@ -5,12 +5,12 @@
   // first lobby list did, by rendering the host as a grey continuation of the title line - is
   // what makes a server browser unreadable at a glance.
   //
-  // Picking a locked room reveals the password field INSIDE this card rather than opening a
-  // dialog: the password is a shared room secret, the room it belongs to is the thing you just
-  // tapped, and a modal that forgets which room it is about is a classic lobby bug.
+  // ONE TAP, ALWAYS. A locked room used to reveal a password field inside this card first;
+  // passwords are gone (@jeopardy/protocol room/visibility.ts), so a card in the lobby is a
+  // room you walk straight into - which is what "public" now means, and the whole reason a
+  // room that should not admit strangers is private instead.
   import { formatRoomAge, formatRoomPhase } from "#lib/lobby/room-age.ts";
   import { playerSeats, roomUnavailableReason, spectatorSeats } from "#lib/lobby/room-capacity.ts";
-  import { limits } from "@jeopardy/protocol/limits";
   import type { RoomSummary } from "@jeopardy/protocol/room/registry";
 
   type Props = {
@@ -19,23 +19,9 @@
     fetchedAt: number;
     /** The code box has a complete code: the list steps back rather than competing for a tap. */
     dimmed?: boolean;
-    /** True while this card is the one asking for a password. */
-    expanded?: boolean;
-    onSelect: (room: RoomSummary, password: string) => void;
-    onExpand: (room: RoomSummary) => void;
-    onCollapse: () => void;
+    onSelect: (room: RoomSummary) => void;
   };
-  let {
-    room,
-    fetchedAt,
-    dimmed = false,
-    expanded = false,
-    onSelect,
-    onExpand,
-    onCollapse,
-  }: Props = $props();
-
-  let password = $state("");
+  let { room, fetchedAt, dimmed = false, onSelect }: Props = $props();
 
   const players = $derived(playerSeats(room));
   const spectators = $derived(spectatorSeats(room));
@@ -44,32 +30,13 @@
 
   function pick(): void {
     if (disabled) return;
-    if (room.hasPassword && !expanded) {
-      onExpand(room);
-      return;
-    }
-    onSelect(room, password);
+    onSelect(room);
   }
 </script>
 
-<article class="room-card" class:dimmed class:playing={room.phase === "active"} class:expanded>
+<article class="room-card" class:dimmed class:playing={room.phase === "active"}>
   <button type="button" class="card-body" {disabled} onclick={pick}>
     <span class="title-row">
-      {#if room.hasPassword}
-        <!-- A drawn padlock, not an emoji (CLAUDE.md forbids emojis in the UI) and not an icon
-             font: at this size a two-path SVG that inherits currentColor is smaller than either
-             and themes for free. The hidden sentence carries the meaning to a screen reader. -->
-        <svg class="lock" viewBox="0 0 12 14" aria-hidden="true" focusable="false">
-          <path
-            d="M3.2 6V4.2a2.8 2.8 0 0 1 5.6 0V6"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.4"
-          />
-          <rect x="1.4" y="6" width="9.2" height="7" rx="1.2" fill="currentColor" />
-        </svg>
-        <span class="visually-hidden">Password required.</span>
-      {/if}
       <span class="title">{room.title}</span>
       <span class="phase-badge" data-phase={room.phase}>{formatRoomPhase(room.phase)}</span>
     </span>
@@ -109,29 +76,6 @@
       <span class="unavailable">{unavailable}</span>
     {/if}
   </button>
-
-  {#if expanded && room.hasPassword}
-    <form
-      class="password-row"
-      onsubmit={(event) => {
-        event.preventDefault();
-        onSelect(room, password);
-      }}
-    >
-      <label class="password-field">
-        <span>Password for {room.title}</span>
-        <input
-          type="password"
-          autocomplete="off"
-          maxlength={limits.room.roomPasswordMaxLength}
-          placeholder="Ask the host"
-          bind:value={password}
-        />
-      </label>
-      <button type="submit" class="password-go">Join</button>
-      <button type="button" class="password-cancel" onclick={onCollapse}>Cancel</button>
-    </form>
-  {/if}
 </article>
 
 <style>
@@ -158,9 +102,6 @@
       border-color 150ms ease;
   }
 
-  .room-card.expanded {
-    border-left-color: var(--accent);
-  }
 
   /* "Playing" is dimmed the way a server browser dims an in-progress match - a cue, not a
      verdict: whether it accepts an arrival is the room's answer, never the list's. */
@@ -197,13 +138,6 @@
     flex-wrap: wrap;
   }
 
-  .lock {
-    width: 0.8em;
-    height: 0.95em;
-    flex: none;
-    align-self: center;
-    color: var(--board-value-color);
-  }
 
   .room-card:hover {
     border-left-color: var(--board-value-color);
@@ -322,80 +256,7 @@
     color: var(--score-negative);
   }
 
-  .password-row {
-    display: flex;
-    align-items: end;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-    padding: 0 0.95rem 0.85rem;
-    border-top: 1px dashed var(--card-rule);
-    padding-top: 0.7rem;
-  }
-
-  .password-field {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-    min-width: 10rem;
-  }
-
-  .password-field span {
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    font-size: 0.68rem;
-    color: var(--card-muted);
-  }
-
-  .password-field input {
-    font: inherit;
-    font-size: 0.95rem;
-    padding: 0.5rem 0.6rem;
-    border: 1px solid var(--card-rule);
-    border-radius: 2px;
-    /* A well sunk INTO the cell rather than a chrome-colored box on top of it: darkening the
-       cell's own fill keeps the pairing with --clue-text-color that the board guarantees. */
-    background: var(--card-well);
-    color: var(--card-ink);
-  }
-
-  .password-go,
-  .password-cancel {
-    font-family: var(--font-chrome);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    font-size: 0.85rem;
-    padding: 0.55rem 0.9rem;
-    border-radius: 2px;
-    cursor: pointer;
-  }
-
-  .password-go {
-    border: none;
-    background: var(--board-value-color);
-    color: color-mix(in srgb, var(--board-cell-bg) 30%, #000000);
-  }
-
-  .password-cancel {
-    border: 1px solid var(--card-rule);
-    background: transparent;
-    color: var(--card-muted);
-  }
-
-  .visually-hidden {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-    white-space: nowrap;
-  }
-
-  .card-body:focus-visible,
-  .password-go:focus-visible,
-  .password-cancel:focus-visible,
-  .password-field input:focus-visible {
+  .card-body:focus-visible {
     outline: 3px solid var(--accent);
     outline-offset: -3px;
   }

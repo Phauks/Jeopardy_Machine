@@ -26,10 +26,9 @@ function formOf(overrides: Partial<CreateRoomForm> = {}): CreateRoomForm {
 const named = { title: "Pub quiz", hostLabel: "Board Game Club" };
 
 describe("create form validation", () => {
-  it("opens private and open, with the two required fields empty and the button off", () => {
+  it("opens private, with the two required fields empty and the button off", () => {
     const form = blankCreateForm();
     expect(form.listing).toBe("private");
-    expect(form.password).toBe("");
     expect(createFormProblems(form).map((problem) => problem.field)).toEqual([
       "title",
       "hostLabel",
@@ -67,14 +66,6 @@ describe("create form validation", () => {
         formOf({ ...named, hostLabel: "x".repeat(limits.room.hostLabelMaxLength + 1) }),
       ).length,
     ).toBe(1);
-  });
-
-  it("holds the password floor, and treats empty as 'no password' rather than as too short", () => {
-    expect(createFormProblems(formOf({ ...named, password: "" }))).toEqual([]);
-    const tooShort = createFormProblems(formOf({ ...named, password: "ab" }));
-    expect(tooShort[0]?.field).toBe("password");
-    expect(tooShort[0]?.message).toContain(String(limits.room.roomPasswordMinLength));
-    expect(createFormProblems(formOf({ ...named, password: "quizzy" }))).toEqual([]);
   });
 
   // Owner report 2026-08-17: "the player-cap field accepts values over 100". The ceiling the
@@ -131,22 +122,20 @@ describe("the request body", () => {
   const game = { kind: "compact", rounds: [{ columns: 3, rows: 3 }] };
 
   it("omits empty optionals rather than sending schema-invalid empty strings", () => {
-    const body = createRoomBody(formOf({ title: "  ", hostLabel: "", password: "" }), game);
+    const body = createRoomBody(formOf({ title: "  ", hostLabel: "" }), game);
     expect(body).not.toHaveProperty("title");
     expect(body).not.toHaveProperty("hostLabel");
-    expect(body).not.toHaveProperty("password");
     expect(body).toMatchObject({ game, listing: "private", spectatorsAllowed: true });
   });
 
   it("trims what it does send, so a stray space never becomes a room's name", () => {
     const body = createRoomBody(
-      formOf({ title: "  Pub quiz  ", hostLabel: " Board Game Club ", password: "quizzy" }),
+      formOf({ title: "  Pub quiz  ", hostLabel: " Board Game Club " }),
       game,
     );
     expect(body).toMatchObject({
       title: "Pub quiz",
       hostLabel: "Board Game Club",
-      password: "quizzy",
     });
   });
 
@@ -182,7 +171,6 @@ function responseOf(
     expiresAt: Date.now() + 7_200_000,
     settings: {
       listing,
-      entry: "open",
       maxPlayers: 100,
       maxSpectators: 50,
       spectatorsAllowed: true,

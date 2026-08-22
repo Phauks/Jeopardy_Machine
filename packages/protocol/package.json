@@ -20,6 +20,7 @@
     "./room/create": "./src/room/create.ts",
     "./room/visibility": "./src/room/visibility.ts",
     "./room/room-settings": "./src/room/room-settings.ts",
+    "./room/live-rules": "./src/room/live-rules.ts",
     "./room/registry": "./src/room/registry.ts",
     "./room/diagnostics": "./src/room/diagnostics.ts",
     "./settings/player-mode": "./src/settings/groups/teams.ts"

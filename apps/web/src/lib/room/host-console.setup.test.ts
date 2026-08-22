@@ -13,6 +13,7 @@ import GameScreenPanel from "#lib/room/game-screen-panel.svelte";
 import HostConsole from "#lib/room/host-console.svelte";
 import HostRosterPanel from "#lib/room/host-roster-panel.svelte";
 import JoinPanel from "#lib/room/join-panel.svelte";
+import { renderSVG } from "uqr";
 import { DevicePreferencesStore } from "#lib/host-settings/device-preferences.svelte.ts";
 import { GameScreenWindow } from "#lib/room/game-screen.svelte.ts";
 import { LocalSimRoomStore } from "#lib/room/local-sim-store.svelte.ts";
@@ -205,6 +206,29 @@ describe("the join panel (C2 doors open)", () => {
     expect(body).toContain("room-code");
   });
 
+  // Owner report 2026-08-20: "the qr code is inaccurate. It only shows the join code, not the
+  // source url." The panel fell back to the ambient `location.origin`, which does not exist
+  // during SSR - so the markup the server sent always encoded the bare path `/room/BQKX7`, a
+  // QR that scans perfectly and goes nowhere. The route passes `page.url.origin` now; this
+  // pair of assertions is what would have caught it, since an SSR render is exactly the case
+  // that was broken.
+  it("puts the ORIGIN in the QR, not a bare path - it is a camera target, not an href", () => {
+    const body = joinPanel();
+    // The URL is inside the QR's modules, not in the markup as text, so the only way to assert
+    // what a camera would read is to encode both candidates and see which one is on screen.
+    expect(body).toContain(renderSVG("https://play.test/room/BQKX7", { border: 2 }));
+    expect(body).not.toContain(renderSVG("/room/BQKX7", { border: 2 }));
+  });
+
+  it("draws NO QR when no origin reached it, and says so rather than showing a dead one", () => {
+    const body = joinPanel({ joinOrigin: null });
+    expect(body).not.toContain("<svg");
+    expect(body).toContain("read the code out instead");
+    // The code itself still gets everybody in, which is why this is a degraded panel and not
+    // an error screen.
+    expect(body).toContain(roomCode);
+  });
+
   it("offers the share sheet and the clipboard as separate buttons", () => {
     const body = joinPanel();
     expect(body).toContain("Share link");
@@ -272,5 +296,60 @@ describe("streamer mode: the console is the host's own screen", () => {
     const body = render(HostConsole, { props: { store, mirror: true } }).body;
     expect(body).not.toContain("How people join");
     expect(body).not.toContain("<svg");
+  });
+});
+
+// Owner report 2026-08-20: "there is no end game button for the host." There were two missing
+// controls behind that sentence, not one, and the risk in adding them is that a tired host
+// picks the wrong one - so the console shows them together, with their consequences written
+// out, and each takes a second press that names what it does.
+describe("the two endings", () => {
+  function endingMarkup(props: Record<string, unknown> = {}): string {
+    return consoleMarkup({ endOpen: true, ...props });
+  }
+
+  /** The console over a room whose game is actually under way - where ending one is possible. */
+  function runningMarkup(): string {
+    const store = hostStore();
+    store.startGame();
+    return render(HostConsole, { props: { store, endOpen: true } }).body;
+  }
+
+  it("keeps them closed until asked - an ending is never one stray tap away", () => {
+    expect(consoleMarkup({})).not.toContain("End the game");
+    expect(consoleMarkup({})).not.toContain("Close the room");
+  });
+
+  it("offers both, and says what closing costs", () => {
+    const body = endingMarkup();
+    expect(body).toContain("End the game");
+    expect(body).toContain("Close the room");
+    expect(body).toContain("the code stops working");
+    expect(body).toContain("Nothing is saved");
+  });
+
+  // The whole reason they share one bar: the difference between them is the thing a host has
+  // to understand, and it is a sentence, not a button label.
+  it("says, in a running game, that ending it KEEPS the room and the people in it", () => {
+    const body = runningMarkup();
+    expect(body).toContain("The room stays open and nobody is disconnected");
+    expect(body).toContain("Scores as they stand");
+    // ...beside the other one, which does the opposite.
+    expect(body).toContain("Everyone gets the polite screen");
+  });
+
+  it("does not offer to end a game that has not started, and says why", () => {
+    // hostStore() is a lobby room: nothing to end yet.
+    const body = endingMarkup();
+    expect(body).toContain("Nothing to end yet");
+    expect(body).toMatch(/End the game\s*<\/button>/);
+  });
+
+  it("asks a second time, and the second press names the one that was chosen", () => {
+    // The confirm line is state a click produces, so what an SSR render can hold is the
+    // absence: neither confirmation is on screen before anything is pressed.
+    const body = endingMarkup();
+    expect(body).not.toContain("Yes, end the game now");
+    expect(body).not.toContain("Yes, close the room for everyone");
   });
 });

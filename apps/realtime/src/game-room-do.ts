@@ -53,13 +53,13 @@ import {
   resolveFinalContent,
 } from "./room/content.ts";
 import { buildRoomDiagnostics } from "./room/diagnostics.ts";
+import { liveRulesOf } from "./room/live-rules.ts";
 import {
   identityEditsLocked,
   stampRelayedAction,
   timerExpiryAction,
   timerLiveInPhase,
 } from "./room/engine-glue.ts";
-import { hashRoomPassword, verifyRoomPassword } from "./room/password.ts";
 import { redactEventsFor, redactStateFor } from "./room/redact.ts";
 import {
   deleteRegistryRow,
@@ -82,8 +82,8 @@ import type { ConnectionCensus } from "@jeopardy/protocol/room/diagnostics";
 import type { RoomGameSpec } from "@jeopardy/protocol/room/create";
 import type { ActionTiming, RoomClientMessage } from "@jeopardy/protocol/room/client-messages";
 import type { RefusalReason, RoomErrorReason } from "@jeopardy/protocol/room/server-messages";
-import type { RoomRole } from "@jeopardy/protocol/room/identity";
-import type { RosterPayload, TeamDoc } from "@jeopardy/protocol/room/roster";
+import type { DeviceKind, RoomRole } from "@jeopardy/protocol/room/identity";
+import type { RosterPayload, SpectatorEntry, TeamDoc } from "@jeopardy/protocol/room/roster";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { ArmWindow } from "./room/arm-window.ts";
 import type { RegistryListing, RegistrySnapshot } from "./room/registry-writer.ts";
@@ -97,7 +97,25 @@ import type {
 } from "./room/storage.ts";
 
 // What a connection remembers about itself across hibernation (WebSocket attachment).
-type Attachment = { role: RoomRole; playerId: string | null };
+/**
+ * What the DO remembers about a live socket, beyond the room state it is attached to.
+ *
+ * `deviceKind` and `spectatorName` are CONNECTION facts rather than room state, and they are
+ * here rather than in storage on purpose: both describe the socket, both die with it, and
+ * neither survives a reconnect any more than the socket does. A spectator holds no seat, so
+ * there is nowhere in the persisted roster for their name to live - and a phone that comes
+ * back reports its own device again on the next join.
+ */
+type Attachment = {
+  role: RoomRole;
+  playerId: string | null;
+  /** Phone or computer, as this client reported it on join (@jeopardy/protocol identity.ts). */
+  deviceKind?: DeviceKind;
+  /** A watcher's chosen name; null when they gave none (owner, 2026-08-20). */
+  spectatorName?: string | null;
+  /** Unix ms this socket joined - the audience list is ordered by arrival like the roster. */
+  joinedAt?: number;
+};
 
 // Floor between throttled registry writes. A lobby refreshes every
 // limits.lobby.listingRefreshMs, so reporting faster than this could never be seen anyway -
@@ -153,10 +171,6 @@ export class GameRoomDO extends Server {
   // the meter, which only ever errs in the client's favor.
   private messageStamps = new Map<string, number[]>();
   private lastPersistedActivity = 0;
-  // Wrong-password attempts per connection, in memory for the same reason as messageStamps:
-  // the budget only ever resets in the client's favor, and resetting it costs an attacker a
-  // fresh WebSocket handshake anyway.
-  private passwordAttempts = new Map<string, number[]>();
   // Coalescing stamp for registry writes (see syncRegistry).
   private lastRegistrySyncAt = 0;
 
@@ -282,15 +296,66 @@ export class GameRoomDO extends Server {
 
   private wireRoster(): RosterPayload {
     const room = this.room;
-    if (room === null || room === undefined) return { players: [], teams: [], spectatorCount: 0 };
+    if (room === null || room === undefined) {
+      return { players: [], teams: [], spectatorCount: 0, spectators: [] };
+    }
+    // Devices are attached to the SOCKET, not the seat (see Attachment): a seat outlives a
+    // dropped phone, but "what device is this" is only true while a device is connected. A
+    // player who is away therefore reports no device, which is honest - nobody knows what they
+    // will come back on. Collected in ONE pass over the connections rather than per player,
+    // because the two loops are each the size of the room and nesting them makes a 100-phone
+    // roster broadcast quadratic.
+    const devices = this.deviceKindsBySeat();
     const players = Object.values(room.roster)
       .toSorted((a, b) => a.joinedAt - b.joinedAt)
-      .map(toWireRosterEntry);
-    // The audience travels as a COUNT, from live connections - spectators hold no roster seat
-    // and no identity, so this is the only fact about them that exists. Always sent by this
-    // server (the field is optional on the wire so "not reported" stays expressible for a
-    // producer that cannot count, never so that a real room can go quiet about its audience).
-    return { players, teams: Object.values(room.teams), spectatorCount: this.spectatorCount() };
+      .map((entry) => {
+        const wire = toWireRosterEntry(entry);
+        const deviceKind = devices.get(entry.playerId);
+        if (deviceKind !== undefined) wire.deviceKind = deviceKind;
+        return wire;
+      });
+    // The audience travels as a COUNT counted from live connections - and, since 2026-08-20,
+    // also BY NAME for the ones who gave one (owner: "spectators still should have a name").
+    // The count stays the authority on how many, because it includes the watchers who did
+    // not name themselves. Always sent by this server: the fields are optional on the wire so
+    // "not reported" stays expressible for a producer that cannot count, never so a real room
+    // can go quiet about its audience.
+    return {
+      players,
+      teams: Object.values(room.teams),
+      spectatorCount: this.spectatorCount(),
+      spectators: this.wireSpectators(),
+    };
+  }
+
+  /** Seat -> the device its live socket reported. Seats with nothing connected are absent. */
+  private deviceKindsBySeat(): Map<string, DeviceKind> {
+    const devices = new Map<string, DeviceKind>();
+    for (const connection of this.getConnections<Attachment>()) {
+      const attachment = connection.state;
+      if (attachment?.playerId == null || attachment.deviceKind === undefined) continue;
+      devices.set(attachment.playerId, attachment.deviceKind);
+    }
+    return devices;
+  }
+
+  /** The audience as people rather than as a number, in arrival order like the roster. */
+  private wireSpectators(): SpectatorEntry[] {
+    const watching: SpectatorEntry[] = [];
+    for (const connection of this.getConnections<Attachment>()) {
+      const attachment = connection.state;
+      if (attachment?.role !== "spectator") continue;
+      watching.push({
+        // The connection id IS the identity here: a spectator holds no seat and mints no
+        // session token, so there is no other stable handle - and none is needed, because
+        // nothing addresses a spectator individually.
+        spectatorId: connection.id,
+        name: attachment.spectatorName ?? null,
+        ...(attachment.deviceKind !== undefined && { deviceKind: attachment.deviceKind }),
+        joinedAt: attachment.joinedAt ?? 0,
+      });
+    }
+    return watching.toSorted((left, right) => left.joinedAt - right.joinedAt);
   }
 
   private broadcastRoster(): void {
@@ -686,10 +751,6 @@ export class GameRoomDO extends Server {
       const now = Date.now();
       const seed = body.data.seed ?? generateSecretToken();
       const setup = setupFromSpec(body.data.game, seed);
-      // The room password is hashed HERE, at creation, and the plaintext is never stored,
-      // logged, or echoed (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
-      const password =
-        body.data.password === undefined ? null : await hashRoomPassword(body.data.password);
       const meta: RoomMeta = {
         code: this.name,
         hostToken: generateSecretToken(),
@@ -704,7 +765,6 @@ export class GameRoomDO extends Server {
         },
         title: body.data.title ?? "",
         hostLabel: body.data.hostLabel ?? "",
-        password,
         createdAt: now,
         lastActivityAt: now,
         stateVersion: 0,
@@ -961,6 +1021,8 @@ export class GameRoomDO extends Server {
         return this.handleExpireTimer(connection, attachment);
       case "update-room-settings":
         return this.handleUpdateRoomSettings(connection, attachment, incoming);
+      case "update-game-rules":
+        return this.handleUpdateGameRules(connection, attachment, incoming);
       case "close-room":
         return this.handleCloseRoom(connection, attachment);
       default:
@@ -975,6 +1037,16 @@ export class GameRoomDO extends Server {
     // tab empties a room exactly as thoroughly as the last phone leaving.
     await this.noteDeparture(connection.id);
     const attachment = connection.state;
+    // A WATCHER LEAVING changes the roster too, and until 2026-08-20 nothing said so: the
+    // audience was a count derived at broadcast time, and a spectator holds no seat, so this
+    // method returned here and no broadcast ever went out. The count on the host's console
+    // therefore only corrected itself the next time a PLAYER did something. Now that the
+    // audience has names in it (@jeopardy/protocol room/roster.ts) a stale list is a list of
+    // people who have gone home, which is worse than a stale number.
+    if (attachment?.role === "spectator") {
+      this.broadcastRoster();
+      return;
+    }
     if (attachment === null || attachment.playerId === null) return;
     const entry = room.roster[attachment.playerId];
     if (entry === undefined) return;
@@ -1042,17 +1114,6 @@ export class GameRoomDO extends Server {
     const room = await this.load();
     if (room === null) return;
 
-    // The room password gates every role EXCEPT host: the creation token is the stronger
-    // claim, and a host locked out of their own room by a typo would be absurd. Checked
-    // BEFORE anything else a join could change, so a wrong password leaves no trace in the
-    // room (docs/decisions/2026-08-14-room-visibility-and-lobby.md).
-    if (
-      message.role !== "host" &&
-      !(await this.admitPassword(connection, room, message.password))
-    ) {
-      return;
-    }
-
     if (message.role === "host") {
       if (message.hostToken !== room.meta.hostToken) {
         this.refuse(connection, "bad-host-token", roomCloseCodes.badToken);
@@ -1068,6 +1129,7 @@ export class GameRoomDO extends Server {
       });
       this.sendSnapshot(connection, { role: "host", playerId: null });
       this.sendRoomSettings(connection);
+      this.sendGameRules(connection);
       return;
     }
 
@@ -1086,7 +1148,16 @@ export class GameRoomDO extends Server {
           return;
         }
       }
-      connection.setState({ role: message.role, playerId: null });
+      connection.setState({
+        role: message.role,
+        playerId: null,
+        ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+        // A watcher's name, when they gave one. Only spectators carry it: a display is the
+        // host's own projector rather than a member of the audience, and naming it would put
+        // a piece of furniture in the list of people.
+        ...(message.role === "spectator" && { spectatorName: message.nickname ?? null }),
+        joinedAt: Date.now(),
+      });
       this.send(connection, {
         type: "welcome",
         roomCode: room.meta.code,
@@ -1096,6 +1167,10 @@ export class GameRoomDO extends Server {
       });
       this.sendSnapshot(connection, { role: message.role, playerId: null });
       this.sendRoomSettings(connection);
+      this.sendGameRules(connection);
+      // A watcher arriving changes what the host's roster shows, which a snapshot to this one
+      // connection does not tell anybody else.
+      if (message.role === "spectator") this.broadcastRoster();
       return;
     }
 
@@ -1221,7 +1296,12 @@ export class GameRoomDO extends Server {
       room.roster[playerId] = entry;
       if (createdTeam !== null) room.teams[createdTeam.teamId] = createdTeam;
       await this.persist("state", "meta", "roster", "teams");
-      connection.setState({ role: "player", playerId });
+      connection.setState({
+        role: "player",
+        playerId,
+        ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+        joinedAt: Date.now(),
+      });
       this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
       this.broadcastEngineEvents(result.events);
       this.broadcastRoster();
@@ -1232,46 +1312,17 @@ export class GameRoomDO extends Server {
     room.roster[playerId] = entry;
     if (createdTeam !== null) room.teams[createdTeam.teamId] = createdTeam;
     await this.persist("meta", "roster", "teams");
-    connection.setState({ role: "player", playerId });
+    connection.setState({
+      role: "player",
+      playerId,
+      ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+      joinedAt: Date.now(),
+    });
     this.welcomePlayer(connection, room.meta.code, playerId, entry.sessionToken);
     this.broadcastRoster();
     // The lobby's "7/100" is the one number a browser judges a room by, so a roster change
     // reports itself (coalesced - see syncRegistry).
     await this.syncRegistry();
-  }
-
-  // Password verdict for one join attempt. Returns true when the connection may proceed.
-  // Refusals KEEP the socket so the phone can prompt and retry (server-messages close-code
-  // note) - until the per-connection budget runs out, which closes with joinRefused.
-  private async admitPassword(
-    connection: Connection<Attachment>,
-    room: LoadedRoom,
-    offered: string | undefined,
-  ): Promise<boolean> {
-    const stored = room.meta.password;
-    if (stored === null) return true;
-    if (offered === undefined) {
-      // Not counted against the budget: the FIRST join of a password room legitimately
-      // arrives without one (the client cannot know until it is told).
-      this.refuse(connection, "password-required");
-      return false;
-    }
-    if (await verifyRoomPassword(offered, stored)) {
-      this.passwordAttempts.delete(connection.id);
-      return true;
-    }
-    const now = Date.now();
-    const stamps = (this.passwordAttempts.get(connection.id) ?? []).filter(
-      (at) => now - at < limits.room.passwordAttemptWindowMs,
-    );
-    stamps.push(now);
-    this.passwordAttempts.set(connection.id, stamps);
-    if (stamps.length >= limits.room.passwordAttemptBurstMax) {
-      this.refuse(connection, "bad-password", roomCloseCodes.joinRefused);
-      return false;
-    }
-    this.refuse(connection, "bad-password");
-    return false;
   }
 
   private welcomePlayer(
@@ -1289,6 +1340,7 @@ export class GameRoomDO extends Server {
     });
     this.sendSnapshot(connection, { role: "player", playerId });
     this.sendRoomSettings(connection);
+    this.sendGameRules(connection);
   }
 
   // Every accepted join ends with the room's settings, so no surface has to ask: a phone knows
@@ -1325,7 +1377,15 @@ export class GameRoomDO extends Server {
       }
     }
     await this.persist("roster", "schedule");
-    connection.setState({ role: "player", playerId: entry.playerId });
+    connection.setState({
+      role: "player",
+      playerId: entry.playerId,
+      // A resume is a NEW socket, possibly on a new device: somebody whose phone died and who
+      // is now on a laptop resumes the same seat. Taking the device from this message rather
+      // than remembering the old one is what keeps the roster's answer true.
+      ...(message.deviceKind !== undefined && { deviceKind: message.deviceKind }),
+      joinedAt: Date.now(),
+    });
     this.welcomePlayer(connection, room.meta.code, entry.playerId, entry.sessionToken);
     this.broadcastRoster();
   }
@@ -1990,13 +2050,6 @@ export class GameRoomDO extends Server {
     if (patch.hideJoinCode !== undefined) meta.settings.hideJoinCode = patch.hideJoinCode;
     if (patch.title !== undefined) meta.title = patch.title;
     if (patch.hostLabel !== undefined) meta.hostLabel = patch.hostLabel;
-    if (patch.password !== undefined) {
-      // Changing the shared secret NEVER disconnects anyone already inside: the password is
-      // the door, not a session (docs/decisions/2026-08-14-room-controls-and-staging.md). It
-      // decides who may come in from now on, and the old one stops working the instant this
-      // lands.
-      meta.password = patch.password === null ? null : await hashRoomPassword(patch.password);
-    }
     await this.persist("meta");
     this.broadcastRoomSettings();
     // Going private must leave the lobby AT ONCE rather than at the next sweep - a browsable
@@ -2030,6 +2083,64 @@ export class GameRoomDO extends Server {
     }
   }
 
+  /**
+   * Retune the rules of a running game (owner, 2026-08-20: the answer timer "should be
+   * settable by the host").
+   *
+   * `setup` is the engine's static input and is written once at initialize - deliberately, and
+   * that stays true of everything the running state was BUILT from. What moves here is only
+   * the subset the engine reads fresh each time it needs it (@jeopardy/protocol
+   * room/live-rules.ts holds the list and the argument), so a change between clues, or during
+   * one, means the next read simply sees the new number. Nothing in flight becomes a
+   * description of a game that never happened.
+   *
+   * Persisted immediately: a room that is evicted a second after the host lengthens the answer
+   * clock must come back with the longer clock, or the setting silently reverts at the worst
+   * possible moment.
+   */
+  private async handleUpdateGameRules(
+    connection: Connection<Attachment>,
+    attachment: Attachment,
+    message: Extract<RoomClientMessage, { type: "update-game-rules" }>,
+  ): Promise<void> {
+    const room = await this.load();
+    if (room === null) return;
+    if (attachment.role !== "host") {
+      this.sendError(connection, "unauthorized", "game rules are host-only");
+      return;
+    }
+    const { buzzing, scoring } = message.rules;
+    room.setup = {
+      ...room.setup,
+      settings: {
+        ...room.setup.settings,
+        buzzing: { ...room.setup.settings.buzzing, ...buzzing },
+        scoring: { ...room.setup.settings.scoring, ...scoring },
+      },
+    };
+    await this.persist("setup");
+    this.broadcastGameRules();
+  }
+
+  /**
+   * The rules every surface is playing by. Broadcast to EVERY connection rather than answered
+   * to the host, for the same reason room settings are: a phone's answer clock and the
+   * console's copy of the rule have to change together, or one of them is lying to the room.
+   */
+  private broadcastGameRules(): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    const payload = { type: "game-rules", rules: liveRulesOf(room.setup), at: Date.now() };
+    for (const connection of this.getConnections<Attachment>()) this.send(connection, payload);
+  }
+
+  /** The same facts to one connection, on join - so a phone draws the right clock immediately. */
+  private sendGameRules(connection: Connection<Attachment>): void {
+    const room = this.room;
+    if (room === null || room === undefined) return;
+    this.send(connection, { type: "game-rules", rules: liveRulesOf(room.setup), at: Date.now() });
+  }
+
   // Every connection, joined or not: a socket still choosing a role has already been handed
   // the room code, and a display that has not finished joining must not paint a code that is
   // now hidden.
@@ -2053,7 +2164,6 @@ export class GameRoomDO extends Server {
       listing: room.meta.settings.listing,
       title: room.meta.title,
       hostLabel: room.meta.hostLabel,
-      hasPassword: room.meta.password !== null,
       playerCap: room.meta.settings.maxPlayers,
       spectatorCap: room.meta.settings.maxSpectators,
       spectatorsAllowed: room.meta.settings.spectatorsAllowed,

@@ -9,6 +9,9 @@ catalogs:
     '@cloudflare/vitest-pool-workers':
       specifier: 0.21.3
       version: 0.21.3
+    '@lucide/svelte':
+      specifier: 1.33.0
+      version: 1.33.0
     '@sveltejs/adapter-cloudflare':
       specifier: 8.0.0-next.6
       version: 8.0.0-next.6
@@ -114,6 +117,9 @@ importers:
       '@jeopardy/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@lucide/svelte':
+        specifier: 'catalog:'
+        version: 1.33.0(svelte@5.56.9)
       three:
         specifier: 'catalog:'
         version: 0.185.1
@@ -644,6 +650,11 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
+
+  '@lucide/svelte@1.33.0':
+    resolution: {integrity: sha512-b+osTYG2V4dge5Lr7tnaTaahhy/4vH7Xb8zcqVjmctjwgkpXS0NNOJPkGzHHZoxtw/OO+2YAU28omeMfYCaawg==}
+    peerDependencies:
+      svelte: ^5
 
   '@oxc-project/runtime@0.143.0':
     resolution: {integrity: sha512-zIuXUf+YGIgsPk0xlQmzTY8NCSc8jE/pSfDodlQ9H3EGZABmr+AtIjXRrnpQAXuXzhDSNqZz9cuhud8hDDLvpg==}
@@ -2451,6 +2462,10 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lucide/svelte@1.33.0(svelte@5.56.9)':
+    dependencies:
+      svelte: 5.56.9
 
   '@oxc-project/runtime@0.143.0': {}
 

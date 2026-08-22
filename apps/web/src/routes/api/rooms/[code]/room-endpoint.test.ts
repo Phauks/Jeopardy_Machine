@@ -31,7 +31,6 @@ const diagnostics = {
   code: "BQKX7",
   lifecycle: "lobby",
   settings,
-  hasPassword: false,
   createdAt: 1_760_000_000_000,
   lastActivityAt: 1_760_000_000_000,
   expiresAt: 1_760_007_200_000,
@@ -263,19 +262,24 @@ describe("PATCH /api/rooms/<CODE> - changing a live room's settings", () => {
     expect(durableObject.seen).toHaveLength(0);
   });
 
-  it("never echoes a password back, even when the patch set one", async () => {
-    const raw = await (
-      await PATCH(
-        event({
-          token: hostToken,
-          namespace: namespace(),
-          database: database(),
-          patch: { settings: { password: "sequoia-2026" } },
-        }),
-      )
-    ).text();
-    expect(raw).not.toContain("sequoia-2026");
-    expect(raw).not.toContain('password":"');
+  // Rooms carry no password since 2026-08-20 (@jeopardy/protocol room/visibility.ts). The
+  // patch schema is strict, so the field is not merely ignored - it is a malformed body, and
+  // this route fails fast on it BEFORE the DO is dialled. That last part is the assertion
+  // worth keeping: a stale console that still sends one must not be able to reach the room
+  // with it and have the DO decide what a password means.
+  it("refuses a password patch at the door, and never dials the room with it", async () => {
+    const durableObject = namespace();
+    const response = await PATCH(
+      event({
+        token: hostToken,
+        namespace: durableObject,
+        database: database(),
+        patch: { settings: { password: "sequoia-2026" } },
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.text()).not.toContain("sequoia-2026");
+    expect(durableObject.seen).toHaveLength(0);
   });
 });
 

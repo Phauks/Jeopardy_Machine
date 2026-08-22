@@ -3,15 +3,21 @@
 // the route pattern in apps/realtime/src/index.ts - this module and that regex are the two
 // ends of one contract.
 import { limits } from "@jeopardy/protocol/limits";
+import { roomCodeAlphabet } from "@jeopardy/protocol/room/server-messages";
 
-// Same alphabet the realtime router accepts. Codes are normalized to uppercase here so users
-// can type "bqkx7" on the join screen and still land in BQKX7.
-const roomCodePattern = new RegExp(`^[A-Z0-9]{${limits.room.roomCodeLength}}$`);
+// The protocol's alphabet verbatim - not a second pattern that happens to agree. It did not
+// agree until 2026-08-20: this accepted all 36 alphanumerics while the generator only ever
+// drew from 32, so a typed `O` passed here, dialled a socket and came back "no such room",
+// which is the same sentence a room that ENDED gets. Codes are uppercased on the way in, so
+// somebody reading "bqkx7" off a table tent still lands in BQKX7.
+const roomCodePattern = new RegExp(
+  `^[${roomCodeAlphabet}]{${String(limits.room.roomCodeLength)}}$`,
+);
 
 export class InvalidRoomCodeError extends Error {
   constructor(rawCode: string) {
     super(
-      `not a valid room code: "${rawCode}" (expected ${limits.room.roomCodeLength} letters/digits)`,
+      `not a valid room code: "${rawCode}" (expected ${String(limits.room.roomCodeLength)} characters from ${roomCodeAlphabet})`,
     );
     this.name = "InvalidRoomCodeError";
   }

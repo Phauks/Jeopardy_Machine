@@ -9,12 +9,14 @@
 // It deliberately contains no SQL: the row layout is infrastructure, the summary is a wire
 // contract, and only the latter belongs to every consumer.
 //
-// Three properties this shape is built to preserve:
+// Two properties this shape is built to preserve:
 // - Registry rows are a CACHE, never authority. The DO is the source of truth and refuses
 //   dead rooms on connect regardless of what a stale row claims.
-// - `hasPassword` is the ONLY password fact that is ever public - enough for a lock icon,
-//   useless as an oracle (verification happens in the DO, rate-limited, per join).
 // - Nothing here identifies a player. The lobby lists rooms, never people.
+//
+// It carried `hasPassword` until 2026-08-20 - the one password fact that was ever public,
+// enough for a lock icon and useless as an oracle. Passwords are gone entirely
+// (@jeopardy/protocol room/visibility.ts), so a listed room has nothing left to be locked by.
 import { z } from "zod";
 import { limits } from "../limits.ts";
 import { roomCodeSchema, roomPhaseSchema } from "./server-messages.ts";
@@ -26,7 +28,6 @@ export const roomSummarySchema = z.strictObject({
   // Empty string = the host did not name themselves; the lobby simply omits the byline.
   hostLabel: hostLabelSchema.or(z.literal("")),
   listing: roomListingSchema,
-  hasPassword: z.boolean(),
   // Only lobby/active rooms are ever listed; `ended` appears in the type because the row
   // outlives the transition by one write (the sweep and the phase filter drop it).
   phase: roomPhaseSchema,

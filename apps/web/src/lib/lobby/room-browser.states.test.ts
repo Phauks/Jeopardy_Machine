@@ -24,7 +24,6 @@ const lobbyRoom: RoomSummary = {
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
   listing: "public",
-  hasPassword: true,
   phase: "lobby",
   playerCount: 7,
   playerCap: 100,
@@ -37,7 +36,6 @@ const playingRoom: RoomSummary = {
   title: "Environment trivia",
   hostLabel: "",
   listing: "public",
-  hasPassword: false,
   phase: "active",
   playerCount: 24,
   playerCap: 100,
@@ -77,10 +75,6 @@ describe("room browser: rooms listed", () => {
     expect(body).toContain(`opened ${formatRoomAge(lobbyRoom.createdAt, fetchedAt)} ago`);
   });
 
-  it("marks exactly the password room with a lock", () => {
-    expect((body.match(/Password required\./g) ?? []).length).toBe(1);
-  });
-
   it("never renders a room code - a browsable list is not a code directory", () => {
     expect(body).not.toContain("PQZ21");
     expect(body).not.toContain("MJ4TW");
@@ -88,16 +82,6 @@ describe("room browser: rooms listed", () => {
 });
 
 describe("room browser: the head row", () => {
-  const { body } = render(RoomBrowser, {
-    props: { listing: listingOf([lobbyRoom, playingRoom]), ...noopHandlers },
-  });
-
-  it("carries the count, the one filter, and the real fetch timestamp on one line", () => {
-    expect(body).toContain("2 live");
-    expect(body).toContain("Open rooms only");
-    expect(body).toContain(`Updated ${formatClockTime(fetchedAt)}`);
-  });
-
   it("counts against the whole listing while a filter is narrowing it", () => {
     const filtered = render(RoomBrowser, {
       props: {
@@ -199,25 +183,7 @@ describe("room card", () => {
   const cardProps = {
     fetchedAt,
     onSelect: () => undefined,
-    onExpand: () => undefined,
-    onCollapse: () => undefined,
   };
-
-  it("asks for the password inside the card it belongs to, only when expanded", () => {
-    const collapsed = render(RoomCard, { props: { room: lobbyRoom, ...cardProps } });
-    expect(collapsed.body).not.toContain("Password for");
-
-    const expanded = render(RoomCard, { props: { room: lobbyRoom, expanded: true, ...cardProps } });
-    expect(expanded.body).toContain("Password for Pub quiz night");
-    expect(expanded.body).toContain('type="password"');
-  });
-
-  it("never offers a password field for a room that has no password", () => {
-    const { body } = render(RoomCard, {
-      props: { room: playingRoom, expanded: true, ...cardProps },
-    });
-    expect(body).not.toContain('type="password"');
-  });
 
   it("disables the card while a typed code wins", () => {
     const { body } = render(RoomCard, { props: { room: lobbyRoom, dimmed: true, ...cardProps } });

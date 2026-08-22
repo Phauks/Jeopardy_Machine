@@ -21,7 +21,6 @@ const room: RoomSummary = {
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
   listing: "public",
-  hasPassword: false,
   phase: "lobby",
   playerCount: 7,
   playerCap: 100,
@@ -34,7 +33,6 @@ const lockedRoom: RoomSummary = {
   code: "MJ4TW",
   title: "Environment trivia",
   hostLabel: "Environmental Law Society",
-  hasPassword: true,
 };
 
 function listingOf(rooms: RoomSummary[]): LobbyListing {
@@ -69,23 +67,44 @@ function renderFrontDoor(overrides: Overrides = {}): string {
   }).body;
 }
 
-describe("one counter, one list, one host button", () => {
+describe("two columns: joining on the left, hosting on the right", () => {
   const body = renderFrontDoor();
 
-  it("puts a single field on the page that names both of its jobs", () => {
+  // The field still does both jobs; it no longer SAYS so in a second label. "or search what is
+  // on" went with the standing hint on 2026-08-20 - the list sits directly under the field
+  // now, which shows the second job rather than describing it.
+  it("puts a single field on the page, with one action beside it", () => {
     expect(body).toContain("Room code");
-    expect(body).toContain("or search what is on");
     expect(body).toContain(">Join<");
+    expect(body).not.toContain("or search what is on");
   });
 
-  it("orders the page: masthead, then the counter, then the list", () => {
+  it("orders the page: masthead, then the counter, then the list it filters", () => {
     expect(body.indexOf("Jeopardy Machine")).toBeLessThan(body.indexOf("Room code"));
     expect(body.indexOf("Room code")).toBeLessThan(body.indexOf("Public rooms"));
   });
 
-  it("offers no second entry control - no standing password box beside the code", () => {
-    // The password is a STATE of having a code (decision 2026-08-18 §2), so an untouched page
-    // carries no password input anywhere.
+  it("gives joining and hosting a column each, in that order", () => {
+    expect(body).toContain('aria-label="Join a room"');
+    expect(body).toContain('aria-label="Host a game"');
+    expect(body.indexOf('aria-label="Join a room"')).toBeLessThan(
+      body.indexOf('aria-label="Host a game"'),
+    );
+  });
+
+  it("keeps the room list in the JOIN column, under the field that filters it", () => {
+    const joinColumn = body.slice(
+      body.indexOf('aria-label="Join a room"'),
+      body.indexOf('aria-label="Host a game"'),
+    );
+    expect(joinColumn).toContain("Room code");
+    expect(joinColumn).toContain("Public rooms");
+  });
+
+  it("offers ONE entry control: the code box, and nothing beside it", () => {
+    // The code is the whole credential (@jeopardy/protocol room/visibility.ts, 2026-08-20), so
+    // there is no second field for this page to grow back - not beside the box, not revealed
+    // by a valid code, not inside a room card.
     expect(body).not.toContain('type="password"');
   });
 
@@ -123,7 +142,12 @@ describe("the hero, the panels and the drawer are gone", () => {
     expect(body).not.toContain(">01<");
     expect(body).not.toContain(">02<");
     expect(body).not.toContain(">03<");
-    expect(body).not.toContain("Join a room");
+    // The deleted thing was the numbered HEADING "01 Join a room", not the words. Since
+    // 2026-08-20 the join side is a landmark carrying that name for a screen reader, which is
+    // the opposite of a decorative panel heading - so this asserts no visible heading rather
+    // than the absence of a string the page now legitimately uses.
+    expect(body).not.toContain("<h2>Join a room");
+    expect(body).not.toContain(">Join a room<");
   });
 
   it("keeps the developer index complete, but as one gear in the masthead", () => {
@@ -139,11 +163,9 @@ describe("the hero, the panels and the drawer are gone", () => {
 });
 
 describe("the code still wins, and now says what it will do", () => {
-  it("arms the join, holds the list back, and offers a password for a room it cannot see", () => {
+  it("arms the join and holds the list back for a room it cannot see", () => {
     const body = renderFrontDoor({ initialCode: "ZZZZZ" });
     expect(body).toContain("not on the public list");
-    expect(body).toContain('type="password"');
-    expect(body).toContain("only if the host set one");
     // The list steps back rather than competing for the tap.
     expect(body).toContain("dimmed");
   });
@@ -165,19 +187,10 @@ describe("the code still wins, and now says what it will do", () => {
     expect(body).not.toContain("Pub quiz night");
   });
 
-  it("names a listed open room and asks for no password", () => {
+  it("names a listed room and still asks for nothing but the code", () => {
     const body = renderFrontDoor({ initialCode: "BQKX7" });
     expect(body).toContain("BQKX7 is Pub quiz night");
     expect(body).not.toContain('type="password"');
-  });
-
-  it("says a listed locked room needs one, before anyone taps Join", () => {
-    const body = renderFrontDoor({
-      listing: listingOf([lockedRoom]),
-      initialCode: "MJ4TW",
-    });
-    expect(body).toContain("needs the room password");
-    expect(body).toContain("this room needs one");
   });
 
   it("leaves the list live while the field is incomplete", () => {
@@ -202,10 +215,6 @@ describe("the same field searches the list", () => {
     const body = renderFrontDoor({ initialCode: "nothing like this" });
     expect(body).toContain("Nothing here matches");
     expect(body).not.toContain("Nobody is hosting publicly");
-  });
-
-  it("carries the one filter the list's size justifies", () => {
-    expect(renderFrontDoor()).toContain("Open rooms only");
   });
 });
 
@@ -286,16 +295,23 @@ describe("rejoin memory", () => {
   });
 });
 
-describe("hosting is a button, and its form opens in place", () => {
-  it("offers hosting without laying a six-field form beside the code box", () => {
+// REWRITTEN 2026-08-20. Hosting was a BUTTON whose form opened in place, and the reason was
+// space: the form had nowhere to go without pushing the room list down a screen. Given a
+// column of its own it has somewhere, so the disclosure is gone - a tap to reveal a thing
+// that has room to simply be there is a tap charged for nothing. Same reasoning that took the
+// Roster and Settings toggles out of the console header on the same day.
+describe("hosting has a column, not a button", () => {
+  it("lays the form out beside the code box rather than behind a toggle", () => {
     const body = renderFrontDoor();
-    expect(body).toContain("Host a game");
-    expect(body).not.toContain("Room name");
-    expect(body).not.toContain("Player cap");
+    expect(body).toContain("Room name");
+    expect(body).toContain("Player cap");
     expect(body).not.toContain('href="/dev/rooms">Create');
+    // ...and there is no longer a control that opens it, because nothing is closed.
+    expect(body).not.toContain(">Host a game<");
+    expect(body).not.toContain("Close hosting");
   });
 
-  it("opens the real form - and keeps the counter on screen with it", () => {
+  it("keeps the counter on screen while a room is being created", () => {
     const body = renderFrontDoor({ createState: { status: "creating" } });
     expect(body).toContain("Room name");
     expect(body).toContain("Hosted by");

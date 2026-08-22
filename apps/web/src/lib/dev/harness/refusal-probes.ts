@@ -7,10 +7,9 @@
 //
 // Every expectation below is a contract stated somewhere else in the repo; this module is the
 // browser-side restatement, and the workerd suite (apps/realtime/test/guardrails.test.ts,
-// lifecycle.test.ts, passwords.test.ts) is the same set proven headlessly.
+// lifecycle.test.ts, room-settings.test.ts) is the same set proven headlessly.
 export type ProbeId =
   | "uncreated-room"
-  | "wrong-password"
   | "stale-version"
   | "malformed-json"
   | "oversized-payload"
@@ -34,13 +33,6 @@ export const refusalProbes: ProbeDefinition[] = [
     expected: "refused: no-such-room (or close 4404)",
     because: "creation is explicit - connecting to a code must never create a room",
     needsConnection: false,
-  },
-  {
-    id: "wrong-password",
-    label: "Join with the wrong password",
-    expected: "refused: bad-password, socket stays open",
-    because: "a phone must be able to retype without a new handshake",
-    needsConnection: true,
   },
   {
     id: "stale-version",
@@ -90,13 +82,6 @@ export function judgeProbe(id: ProbeId, observed: ProbeObservation): ProbeVerdic
       ? "pass"
       : "fail";
   }
-  if (id === "wrong-password") {
-    // password-required counts: a room that asks before judging has still refused entry.
-    return observed.type === "refused" &&
-      (observed.reason === "bad-password" || observed.reason === "password-required")
-      ? "pass"
-      : "fail";
-  }
   if (id === "stale-version") {
     return observed.type === "error" && observed.reason === "unsupported-version" ? "pass" : "fail";
   }
@@ -119,8 +104,6 @@ export type ProbeContext = {
   socketOpen: boolean;
   /** The role this tab joined as, or null when the socket is open but unjoined. */
   joinedRole: string | null;
-  /** A room THIS TAB created that carries a password (the wrong-password probe needs one). */
-  hasPasswordRoom: boolean;
 };
 
 /**
@@ -131,9 +114,6 @@ export function probeBlocker(id: ProbeId, context: ProbeContext): string | null 
   const definition = refusalProbes.find((probe) => probe.id === id);
   if (definition === undefined) return "unknown probe";
   if (definition.needsConnection && !context.socketOpen) return "needs an open socket";
-  if (id === "wrong-password" && !context.hasPasswordRoom) {
-    return "needs a password room this tab created";
-  }
   if (id === "rate-limit-burst") {
     if (context.joinedRole === null) return "needs a joined connection";
     // The host is exempt from the message-rate cap by design (it authenticated with the

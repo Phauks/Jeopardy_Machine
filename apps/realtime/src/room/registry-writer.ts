@@ -41,7 +41,6 @@ export type RegistryListing = {
   listing: "public" | "private";
   title: string;
   hostLabel: string;
-  hasPassword: boolean;
   playerCap: number;
   // The second budget travels with the first: turning spectators off, or retuning their
   // ceiling, changes the lobby row's audience line the same instant it changes the door.
@@ -63,7 +62,7 @@ const touchSql = `UPDATE rooms
 // leave a browsable door onto a room its host just closed to strangers - and a retuned
 // `maxPlayers` must move the "7/24" fraction with it or the lobby lies about capacity.
 const relistSql = `UPDATE rooms
-  SET listing = ?, title = ?, host_label = ?, has_password = ?, player_cap = ?,
+  SET listing = ?, title = ?, host_label = ?, player_cap = ?,
     spectator_cap = ?, spectators_allowed = ?, last_seen_at = ?
   WHERE code = ?`;
 
@@ -111,7 +110,6 @@ export async function relistRegistryRow(
         listing.listing,
         listing.title,
         listing.hostLabel,
-        listing.hasPassword ? 1 : 0,
         listing.playerCap,
         listing.spectatorCap,
         listing.spectatorsAllowed ? 1 : 0,

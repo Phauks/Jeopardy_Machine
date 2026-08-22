@@ -194,10 +194,15 @@ export function fixtureRosterView(): RoomRosterView {
     connected: player.connection === "connected",
     // Fixture order is join order; late joiners land after everyone else.
     joinedAt: (player.lateJoiner ? 100_000 : 0) + index,
+    // A believable MIX, because "everyone is on a phone" is the one arrangement a host never
+    // has to think about, and the roster's device column exists for the rooms where a couple
+    // of people are on a laptop (owner, 2026-08-20). Every third seat is a computer; the
+    // disconnected ones report nothing, because a device is a fact about a live socket.
+    deviceKind: player.connection === "connected" ? (index % 3 === 2 ? "computer" : "phone") : null,
   }));
   // No audience: the fixture describes a roster, and spectators are live connections nobody
   // can invent (room-view.ts - null is "not reported", which is the truth about dummy data).
-  return { players, teams, spectatorCount: null };
+  return { players, teams, spectatorCount: null, spectators: null };
 }
 
 export const fixtureRoomCode = fixtureRoster.roomCode;

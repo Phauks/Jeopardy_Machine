@@ -11,6 +11,7 @@
 // is one module (room-fold.ts), so they cannot drift into two answers about the same event.
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { TimerKind } from "@jeopardy/engine/events";
+import type { LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type { RoomView } from "#lib/room/room-view.ts";
 
@@ -72,18 +73,6 @@ export type RoomStore = {
   // Connection + membership.
   join(request: JoinRequest): void;
   leave(): void;
-
-  /**
-   * Hand this connection the room's password and try the door again.
-   *
-   * The front door normally does this for you - it stashes the password beside the code and
-   * the room route recalls it (src/lib/lobby/join-hand-off.ts). A phone that arrived by the URL
-   * ALONE has nothing stashed, which is the entire point of a password room, and until
-   * 2026-08-19 it was told "this room needs a password / the host has it" with nowhere to type
-   * one. The protocol always allowed for this: `password-required` and `bad-password` KEEP the
-   * socket precisely so the phone can prompt and retry on the same connection.
-   */
-  submitRoomPassword(password: string): void;
 
   // Personal tier (any player, self only) + team tier (leader or host).
   updateIdentity(patch: IdentityPatch): void;
@@ -153,16 +142,48 @@ export type RoomStore = {
   undo(): void;
   proceed(): void;
   endRound(): void;
+  /**
+   * Stop the GAME here and show the scores, from wherever the room is.
+   *
+   * The distinction that matters, and the reason there are two of these (owner, 2026-08-20:
+   * "there is no end game button for the host"): this one ENDS THE GAME and the room stays
+   * open - final standings on the display, everybody still connected, nobody's phone dropped.
+   * `closeRoom` below ends the ROOM. A host who has run out of time wants this one; the other
+   * is for when everyone has gone home.
+   */
+  endGame(): void;
+  /**
+   * Close the ROOM for everyone: the polite screen on every surface, the lobby row delisted,
+   * the code spent until the expiry alarm frees it (packages/protocol client-messages.ts
+   * `close-room`).
+   *
+   * IRREVERSIBLE, which is why the console asks first. Nothing about it is an ending in the
+   * game's sense - it does not compute standings and it does not care whether a game was ever
+   * started, so closing mid-game leaves the night with no scores on any screen. That is what
+   * `endGame` is for.
+   */
+  closeRoom(): void;
   tiebreakerNextClue(): void;
   /** Freeze/unfreeze all pending timers; the display shows "one moment" (C4 pause). */
   setPaused(paused: boolean): void;
   /**
-   * Change the ROOM's own settings - listing, entry/password, caps, spectators, streamer mode
+   * Change the ROOM's own settings - listing, caps, spectators, streamer mode, title
    * (packages/protocol/src/room/room-settings.ts). Host-only and sparse: send the fields you
    * mean to change. Server state, broadcast to every connection, and therefore the opposite of
    * a device preference in every way that matters (src/lib/host-settings/).
    */
   updateRoomSettings(patch: RoomSettingsPatch): void;
+  /**
+   * Retune the RULES of the running game - the answering loop only
+   * (@jeopardy/protocol room/live-rules.ts names the subset and argues for it).
+   *
+   * A different thing from `updateRoomSettings` above, and the difference is worth keeping
+   * straight at every call site: room settings are about the ROOM (who may come in, how many,
+   * what is on the projector); these are about the GAME (how long you have to answer, what a
+   * wrong answer costs). Host-only and sparse; the room answers with the complete rules, which
+   * is what `view.rules` then holds.
+   */
+  updateGameRules(patch: LiveRulesPatch): void;
   /**
    * Fire a pending timer's expiry action now (host force-expire; also how tests and the sim
    * panel advance time). Omitting `kind` fires whichever timer the current phase waits on.

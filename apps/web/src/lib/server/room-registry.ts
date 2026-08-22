@@ -39,7 +39,6 @@ export type RoomRegistration = {
   title: string;
   hostLabel: string;
   listing: RoomListing;
-  hasPassword: boolean;
   // The room's own settings.maxPlayers - what the lobby fraction must mean (registry.ts).
   playerCap: number;
   // The second budget, from the same settings object. The COUNT is not here: a room being
@@ -56,7 +55,6 @@ type RoomRow = {
   title: string;
   host_label: string;
   listing: string;
-  has_password: number;
   phase: string;
   player_count: number;
   player_cap: number;
@@ -71,15 +69,14 @@ type RoomRow = {
 // A code is reusable once its room expires (single-origin decision doc, lifecycle), so the
 // insert must be able to land on a stale row for the same code - upsert, not insert.
 const upsertSql = `INSERT INTO rooms
-  (code, title, host_label, listing, has_password, phase, player_count, player_cap,
+  (code, title, host_label, listing, phase, player_count, player_cap,
    spectator_count, spectator_cap, spectators_allowed,
    created_at, last_seen_at, expires_at, ended_at)
-  VALUES (?, ?, ?, ?, ?, 'lobby', 0, ?, 0, ?, ?, ?, ?, ?, NULL)
+  VALUES (?, ?, ?, ?, 'lobby', 0, ?, 0, ?, ?, ?, ?, ?, NULL)
   ON CONFLICT(code) DO UPDATE SET
     title = excluded.title,
     host_label = excluded.host_label,
     listing = excluded.listing,
-    has_password = excluded.has_password,
     phase = 'lobby',
     player_count = 0,
     player_cap = excluded.player_cap,
@@ -94,7 +91,7 @@ const upsertSql = `INSERT INTO rooms
 // Live public rooms, newest first. Liveness is asserted here rather than trusted: a room the
 // DO stopped reporting on delists itself when its expiry deadline passes, and `ended` rooms
 // never appear even if the sweep has not run yet.
-const listSql = `SELECT code, title, host_label, listing, has_password, phase,
+const listSql = `SELECT code, title, host_label, listing, phase,
     player_count, player_cap, spectator_count, spectator_cap, spectators_allowed,
     created_at, last_seen_at, expires_at
   FROM rooms
@@ -133,7 +130,6 @@ export function registerRoom(
       registration.title,
       registration.hostLabel,
       registration.listing,
-      registration.hasPassword ? 1 : 0,
       registration.playerCap,
       registration.spectatorCap,
       registration.spectatorsAllowed ? 1 : 0,
@@ -257,7 +253,6 @@ function toRoomSummary(row: RoomRow): RoomSummary {
     title: row.title,
     hostLabel: row.host_label,
     listing: row.listing === "public" ? "public" : "private",
-    hasPassword: row.has_password !== 0,
     phase: row.phase === "active" ? "active" : row.phase === "ended" ? "ended" : "lobby",
     playerCount: row.player_count,
     playerCap: row.player_cap,

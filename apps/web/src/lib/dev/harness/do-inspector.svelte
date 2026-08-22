@@ -47,7 +47,7 @@
       <dd><strong>{room.code}</strong> · {room.lifecycle}{room.paused ? " · PAUSED" : ""}</dd>
       <dt class="opacity-70">listing</dt>
       <dd>
-        {room.settings.listing} · {room.settings.entry}{room.settings.hideJoinCode
+        {room.settings.listing}{room.settings.hideJoinCode
           ? " · join code hidden"
           : ""}
       </dd>

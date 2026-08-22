@@ -7,10 +7,8 @@
 //
 // | Message         | Who may send                                                          |
 // | --------------- | --------------------------------------------------------------------- |
-// | join            | anyone; a password room additionally requires `password` from every    |
-// |                 | role EXCEPT host (the creation-time hostToken already proves the       |
-// |                 | stronger claim). Wrong/missing password = a `refused` that KEEPS the   |
-// |                 | socket for a retry, rate-limited per connection (limits.room)          |
+// | join            | anyone who reached the room, which means anyone holding its code -    |
+// |                 | rooms carry no second secret (visibility.ts, 2026-08-20)               |
 // | resume          | anyone holding a session token from a previous join                   |
 // | action          | per the engine-action authority matrix (authority.ts)                 |
 // | arm-ack         | anyone joined; the reply half of the round-trip measurement that      |
@@ -29,7 +27,8 @@
 // | leave           | anyone joined (explicit exit; a dropped socket is NOT a leave)        |
 // | set-pause       | host only (freezes the room and parks every running timer)            |
 // | expire-timer    | host only ("skip the wait": fires whichever timer the room is on)     |
-// | update-room-settings | host only (listing, caps, spectators, streamer mode, password)   |
+// | update-room-settings | host only (listing, caps, spectators, streamer mode, title)      |
+// | update-game-rules | host only; the tunable-while-running subset ONLY (live-rules.ts)    |
 // | close-room      | host only (ends the room for everyone - the polite screen everywhere) |
 import { z } from "zod";
 import { extensionBagSchema } from "../ext.ts";
@@ -40,12 +39,13 @@ import {
   hostTokenSchema,
   nicknameSchema,
   playerIdSchema,
+  deviceKindSchema,
   roomRoleSchema,
   sessionTokenSchema,
 } from "./identity.ts";
+import { liveRulesPatchSchema } from "./live-rules.ts";
 import { roomSettingsPatchSchema } from "./room-settings.ts";
 import { teamIdSchema } from "./roster.ts";
-import { roomPasswordSchema } from "./visibility.ts";
 
 // Every concrete message is strict (unknown fields only in ext) and carries the envelope
 // fields itself, so one parse validates envelope + payload in a single pass.
@@ -97,9 +97,33 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     ...envelopeFields,
     type: z.literal("join"),
     role: roomRoleSchema,
-    // Required for role=player, ignored for display/spectator (they are anonymous
-    // observers), optional label for host consoles.
+    /**
+     * Required for role=player; an optional label for host consoles; and since 2026-08-20 a
+     * SPECTATOR may give one too (owner: "spectators still should have a name").
+     *
+     * Spectators were anonymous by construction - a spectator was a live connection and
+     * nothing else - and the reasoning behind that was about the lobby, where a browsable
+     * list must never become a directory of people. Inside a room the calculus is different:
+     * the audience are colleagues who chose to watch, the host is the only person who sees
+     * the list, and "12 watching" tells a host nothing about whether the person they are
+     * waiting for has arrived. A name stays OPTIONAL, and a spectator who gives none is still
+     * counted rather than named (roster.ts).
+     */
     nickname: nicknameSchema.optional(),
+    /**
+     * What kind of thing this connection is running on, as the CLIENT reports it (owner,
+     * 2026-08-20: "show in roster whether users are on mobile or computers").
+     *
+     * Client-reported because nothing else can be honest about it: a server sees a user-agent
+     * string, which is a decades-long history of programs lying to each other about what they
+     * are. The browser's own coarse pointer/hover query answers the question a host is
+     * actually asking - can this person hold this in one hand - and it is unspoofable in the
+     * only direction that matters, since a phone has no reason to claim to be a laptop.
+     *
+     * Absent means "did not say", which the roster renders as nothing at all rather than
+     * guessing at a device (the same absent-is-not-zero rule the spectator count follows).
+     */
+    deviceKind: deviceKindSchema.optional(),
     avatarId: curatedAssetIdSchema.optional(),
     accentId: curatedAssetIdSchema.optional(),
     buzzSoundId: curatedAssetIdSchema.optional(),
@@ -108,16 +132,15 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     skinToneId: curatedAssetIdSchema.optional(),
     team: joinTeamIntentSchema.optional(),
     hostToken: hostTokenSchema.optional(),
-    // The shared room secret, when the room has one (docs/decisions/2026-08-14-room-
-    // visibility-and-lobby.md). It rides the join MESSAGE, never the URL or a query string:
-    // room links get pasted into group chats and printed on QR codes, and a secret in a URL
-    // ends up in browser history, referrers, and access logs.
-    password: roomPasswordSchema.optional(),
   }),
   z.strictObject({
     ...envelopeFields,
     type: z.literal("resume"),
     sessionToken: sessionTokenSchema,
+    // A resume is a NEW socket and possibly a new device - somebody whose phone died and who
+    // is now on a laptop resumes the same seat. Reported again rather than remembered, so the
+    // roster's answer stays true (identity.ts explains the field).
+    deviceKind: deviceKindSchema.optional(),
   }),
   z.strictObject({
     ...envelopeFields,
@@ -193,7 +216,7 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
   // time), so this is a host convenience over the same path rather than a new authority -
   // the host may already relay each *-timeout action by name (authority.ts).
   z.strictObject({ ...envelopeFields, type: z.literal("expire-timer") }),
-  // Change the ROOM (not the game): listing, caps, spectators, streamer mode, password, title.
+  // Change the ROOM (not the game): listing, caps, spectators, streamer mode, title.
   // Sparse - only the named fields move - and answered by a `room-settings` broadcast to
   // everyone, because the whole point is that a display reacts to the change immediately
   // (docs/decisions/2026-08-14-room-controls-and-staging.md). The same patch shape rides
@@ -202,6 +225,23 @@ export const roomClientMessageSchema = z.discriminatedUnion("type", [
     ...envelopeFields,
     type: z.literal("update-room-settings"),
     settings: roomSettingsPatchSchema,
+  }),
+  /**
+   * Retune the RULES of a running game (owner, 2026-08-20: the answer timer "should be
+   * settable by the host"). Host-only and sparse, like update-room-settings, and answered by
+   * a `game-rules` broadcast so every phone's answer clock and every screen's copy of the
+   * rule change together.
+   *
+   * Only the rules on `liveRulesPatchSchema` can move, and the reason is not caution but
+   * coherence: those are the rules the engine reads FRESH when it needs them. A rule the
+   * running STATE was built from - board shape, wager placement, seating, the final - has
+   * already been acted on, and changing one mid-game would make the state a description of a
+   * game that never happened (live-rules.ts argues this at length).
+   */
+  z.strictObject({
+    ...envelopeFields,
+    type: z.literal("update-game-rules"),
+    rules: liveRulesPatchSchema,
   }),
   // End the room for everyone: every connection gets room-closed(host-closed) and closes.
   z.strictObject({ ...envelopeFields, type: z.literal("close-room") }),

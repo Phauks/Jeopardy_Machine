@@ -13,7 +13,7 @@
 // | welcome       | myPlayerId + sessionToken (handed to onSessionToken -> sessionStorage);    |
 // |               | connection=connected                                                       |
 // | refused       | view.refusal (the REASON; room-refusal.ts owns the words). Room-level      |
-// |               | reasons arrive with a close; team/password ones keep the socket            |
+// |               | reasons arrive with a close; team-tier ones keep the socket                |
 // | snapshot      | replaces game + roster + phase + paused wholesale, and carries the room's  |
 // |               | static facts (playerMode, board material) so `sync` restores everything   |
 // | event         | folds the batch through room-fold.ts and takes the state it carries; a     |
@@ -54,9 +54,11 @@
 // Neither implies clock synchronization: both numbers are differences on one machine's own
 // clock. Skipping either is safe and un-punished - the room falls back to arrival order for
 // this connection, which is exactly what it did before compensation existed.
+import { defaultLiveRules } from "@jeopardy/protocol/room/live-rules";
 import { defaultRoomSettings } from "@jeopardy/protocol/room/room-settings";
 import { parseRoomServerMessage } from "@jeopardy/protocol/room/server-messages";
 import { protocolVersion } from "@jeopardy/protocol/envelope";
+import { detectDeviceKind } from "#lib/room/device-kind.ts";
 import { browserRoomSocket } from "#lib/room/room-socket.ts";
 import {
   emptyFold,
@@ -69,6 +71,7 @@ import type { PlayerMode } from "@jeopardy/protocol/settings/player-mode";
 import type { Verdict } from "@jeopardy/engine/actions";
 import type { GameEvent, TimerKind } from "@jeopardy/engine/events";
 import type { GameState } from "@jeopardy/engine/state";
+import type { LiveRules, LiveRulesPatch } from "@jeopardy/protocol/room/live-rules";
 import type { RoomSettings, RoomSettingsPatch } from "@jeopardy/protocol/room/room-settings";
 import type {
   BoardMaterial,
@@ -91,6 +94,7 @@ import type {
   RoomConnectionState,
   RoomContentView,
   RoomPlayerView,
+  RoomSpectatorView,
   RoomRefusalView,
   RoomRoleView,
   RoomTeamView,
@@ -102,8 +106,6 @@ export type WsRoomStoreOptions = {
   role: RoomRoleView;
   /** Creation-time credential; required for role=host (join-hand-off.ts stashes it). */
   hostToken?: string | null;
-  /** The shared room secret, when the room has one. Rides the join MESSAGE, never the URL. */
-  password?: string | null;
   /** The A5 resume credential from a previous join in this tab; null on a first visit. */
   sessionToken?: string | null;
   /** Where a newly minted (or invalidated) session token goes - sessionStorage, per tab. */
@@ -150,6 +152,9 @@ function toPlayerView(entry: RosterPayload["players"][number]): RoomPlayerView {
     teamId: entry.teamId,
     connected: entry.connected,
     joinedAt: entry.joinedAt,
+    // Absent stays null rather than becoming a default: "did not say" is a real answer and
+    // the roster renders it as nothing (room-view.ts).
+    deviceKind: entry.deviceKind ?? null,
   };
 }
 
@@ -181,12 +186,6 @@ export class WsRoomStore implements RoomStore {
   private socketOpen = false;
   /** The player's join intent, kept so a reconnect that lost its token can offer it again. */
   private pendingJoin: JoinRequest | null = null;
-  /**
-   * The room's password, as this connection currently believes it. Seeded from the front door's
-   * hand-off and replaceable at runtime (`submitRoomPassword`), because a phone that arrived by
-   * the URL alone starts with none and has to be able to type one.
-   */
-  private roomPassword: string | null;
   private sessionToken: string | null;
   private reconnectAttempt = 0;
   private reconnectHandle: ReturnType<typeof setTimeout> | null = null;
@@ -204,6 +203,8 @@ export class WsRoomStore implements RoomStore {
    * printed that as "0 watching" would be inventing a number (room-view.ts).
    */
   private spectatorCountState = $state<number | null>(null);
+  /** The audience by name, for the host console. Null until a roster carrying one lands. */
+  private spectatorsState = $state.raw<RoomSpectatorView[] | null>(null);
   private roomPhase = $state<"lobby" | "active" | "ended">("lobby");
   private playerModeState = $state<PlayerMode>("individuals");
   private myPlayerIdState = $state<string | null>(null);
@@ -224,11 +225,15 @@ export class WsRoomStore implements RoomStore {
    */
   private roomSettings = $state.raw<RoomSettings>({
     ...defaultRoomSettings,
-    entry: "open",
     title: "",
     hostLabel: "",
   });
   private settingsKnownState = $state(false);
+  // The rules THIS room is playing by, replaced whole whenever the host retunes one
+  // (@jeopardy/protocol room/live-rules.ts). Seeded with the registry's defaults so a surface
+  // rendering before the first `game-rules` frame draws a plausible clock rather than a
+  // zero-length one; the room's own answer overwrites it within the join round trip.
+  private gameRules = $state.raw<LiveRules>(defaultLiveRules);
   private refusalState = $state.raw<RoomRefusalView | null>(null);
   /** The room's last complaint about something this client sent (console-side notice). */
   private lastErrorState = $state.raw<{ reason: string; detail: string | null } | null>(null);
@@ -244,7 +249,6 @@ export class WsRoomStore implements RoomStore {
     // browser-walk found this store politely resuming with an empty string and being told the
     // frame was malformed, after which the phone's join never went out at all.
     this.sessionToken = options.sessionToken === "" ? null : (options.sessionToken ?? null);
-    this.roomPassword = options.password ?? null;
     if (options.autoConnect !== false) this.connect();
   }
 
@@ -258,6 +262,7 @@ export class WsRoomStore implements RoomStore {
         players: this.rosterPlayers,
         teams: this.rosterTeams,
         spectatorCount: this.spectatorCountState,
+        spectators: this.spectatorsState,
       },
       playerMode: this.playerModeState,
       // Null until the wire carries a census: the DO counts connections, and a store that
@@ -277,6 +282,7 @@ export class WsRoomStore implements RoomStore {
       finalWagerRanges: this.fold.finalWagerRanges,
       paused: this.pausedState,
       settings: this.roomSettings,
+      rules: this.gameRules,
       settingsKnown: this.settingsKnownState,
       refusal: this.refusalState,
     };
@@ -337,7 +343,14 @@ export class WsRoomStore implements RoomStore {
     // The room says nothing first: our opening move is resume (this tab already had a seat),
     // or join. A player with neither waits on the pre-game screen until they press Join.
     if (this.sessionToken !== null) {
-      this.sendMessage({ type: "resume", sessionToken: this.sessionToken });
+      // The device is reported again on a resume, not remembered: somebody whose phone died
+      // and who is now on a laptop resumes the same seat, and the roster's answer has to
+      // follow them (device-kind.ts).
+      this.sendMessage({
+        type: "resume",
+        sessionToken: this.sessionToken,
+        ...(detectDeviceKind() !== undefined && { deviceKind: detectDeviceKind() }),
+      });
       return;
     }
     if (this.role === "player") {
@@ -378,8 +391,8 @@ export class WsRoomStore implements RoomStore {
   }
 
   private sendJoin(request: JoinRequest | null): void {
-    const password = this.roomPassword;
     const hostToken = this.options.hostToken ?? null;
+    const deviceKind = detectDeviceKind();
     this.sendMessage({
       type: "join",
       role: this.role,
@@ -392,7 +405,10 @@ export class WsRoomStore implements RoomStore {
       ...(request?.skinToneId != null && { skinToneId: request.skinToneId }),
       ...(request?.team !== undefined && { team: request.team }),
       ...(hostToken !== null && hostToken !== "" && { hostToken }),
-      ...(password !== null && password !== "" && { password }),
+      // What this client is running on, so the host's roster can say phone or computer
+      // (#lib/room/device-kind.ts explains why the CLIENT answers this). Omitted when nothing
+      // can be known - "did not say" is a real answer and the roster renders it as nothing.
+      ...(deviceKind !== undefined && { deviceKind }),
     });
   }
 
@@ -500,6 +516,11 @@ export class WsRoomStore implements RoomStore {
         this.roomSettings = message.settings;
         this.settingsKnownState = true;
         return;
+      case "game-rules":
+        // Complete, never a patch (server-messages.ts): a surface merging a patch onto a rules
+        // document it does not hold would be guessing at what it is drawing.
+        this.gameRules = message.rules;
+        return;
       case "room-closed":
         // Every reason ends this connection; the surfaces read the refusal-free "closed" state
         // plus the room phase. A kick is the one that is only ever sent to one phone.
@@ -590,6 +611,15 @@ export class WsRoomStore implements RoomStore {
     // cannot count an audience is distinguishable from a room nobody is watching (roster.ts).
     // The DO always counts, so in practice this is null only before the first roster lands.
     this.spectatorCountState = roster.spectatorCount ?? null;
+    // Same rule for the named audience: absent means this producer does not report one, which
+    // is not the same as reporting that nobody is watching.
+    this.spectatorsState =
+      roster.spectators?.map((entry) => ({
+        spectatorId: entry.spectatorId,
+        name: entry.name,
+        deviceKind: entry.deviceKind ?? null,
+        joinedAt: entry.joinedAt,
+      })) ?? null;
     this.rosterPlayers = roster.players.map(toPlayerView);
     this.rosterTeams = roster.teams.map((team) => ({
       teamId: team.teamId,
@@ -619,20 +649,6 @@ export class WsRoomStore implements RoomStore {
     this.pendingJoin = request;
     this.refusalState = null;
     this.sendJoin(request);
-  }
-
-  submitRoomPassword(password: string): void {
-    this.roomPassword = password;
-    // Clearing the refusal FIRST is what makes the retry visible: the screen goes from "that
-    // password did not work" back to waiting, so a second wrong try reads as a new answer
-    // rather than as a screen that never changed.
-    this.refusalState = null;
-    // The same socket, deliberately - both password refusals keep it open (server-messages.ts),
-    // so retrying costs no round trip and no new connection. `pendingJoin` is null for a phone
-    // that was stopped at the door before it ever named itself, and `sendJoin(null)` is the
-    // right message then: it asks whether this connection may be here at all, and the phone
-    // goes on to pick a character once the room says yes.
-    this.sendJoin(this.pendingJoin);
   }
 
   leave(): void {
@@ -821,6 +837,17 @@ export class WsRoomStore implements RoomStore {
     this.sendAction({ type: "end-round" });
   }
 
+  endGame(): void {
+    this.sendAction({ type: "end-game" });
+  }
+
+  closeRoom(): void {
+    // A ROOM message rather than an engine action, for the same reason set-pause is one: the
+    // engine has no concept of the room existing, and closing is about the room and everybody
+    // connected to it, not about the game (client-messages.ts close-room).
+    this.sendMessage({ type: "close-room" });
+  }
+
   tiebreakerNextClue(): void {
     this.sendAction({ type: "tiebreaker-next-clue" });
   }
@@ -833,6 +860,10 @@ export class WsRoomStore implements RoomStore {
 
   updateRoomSettings(patch: RoomSettingsPatch): void {
     this.sendMessage({ type: "update-room-settings", settings: patch });
+  }
+
+  updateGameRules(patch: LiveRulesPatch): void {
+    this.sendMessage({ type: "update-game-rules", rules: patch });
   }
 
   expireTimer(kind?: TimerKind): void {

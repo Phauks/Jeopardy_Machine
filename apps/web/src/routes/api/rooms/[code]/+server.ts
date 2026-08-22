@@ -4,7 +4,7 @@
 // GET    /api/rooms/<CODE>  - diagnostics: what the DO believes about itself right now, beside
 //                             what the registry believes about it. Read-only, no secrets.
 // PATCH  /api/rooms/<CODE>  - change the room's settings (listing, caps, spectators, streamer
-//                             mode, password, title). The DO applies them, broadcasts
+//                             mode, title). The DO applies them, broadcasts
 //                             room-settings to everyone connected, and re-projects the lobby
 //                             row; this route answers with the settings AFTER the edit.
 // DELETE /api/rooms/<CODE>  - close the room: everyone gets the polite screen, the lobby row

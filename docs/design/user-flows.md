@@ -20,10 +20,10 @@ Big screen shows QR + short URL + room code (e.g. `play.<domain>/BQKX7`, code `B
 - **No app install, no account, no cookie banner** (no tracking, session-scoped storage only).
 - Room full / game over / bad code -> clear friendly error, not a spinner.
 
-**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md; split across two routes 2026-08-15). The site root `/` carries the room-code box and a link to `/lobby`, which lists live **public** rooms (title, host label, players/capacity, lock, phase badge, age, inline password prompt). Rooms are **private** by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
+**Alternative arrival: browsing the lobby** (added 2026-08-14, docs/decisions/2026-08-14-room-visibility-and-lobby.md; split across two routes 2026-08-15). The site root `/` carries the room-code box and a link to `/lobby`, which lists live **public** rooms (title, host label, players/capacity, phase badge, age). Rooms are **private** by default, so this path exists only for hosts who opted in; the QR/code flow above is untouched and remains the primary one.
 
 - **The code box always wins**: a complete typed code bypasses the list entirely (someone holding a code came to use it, not to browse). The list dims while a code is typed.
-- **Password rooms** show a lock. The password is a shared room secret shouted across the hall or printed on a table tent - never an account (boundary 2.2 stands). It travels in the join message, never in the URL, and a wrong one is refused _on the same socket_ so the phone can just try again; too many wrong tries close the connection.
+- **There is no second door.** A room carries no password (docs/decisions/2026-08-20-no-room-passwords.md, 2026-08-20): the code is what admits people, and a room that should not admit strangers is private rather than locked. A phone that reaches a room is in it.
 - **A room in progress** shows "Playing" and is dimmed - whether it actually accepts an arrival is the late-join setting's business, answered by the room itself, not by the list.
 - The list is a **browse surface, not a live room**: it polls, it is briefly cached, and it is capped (pagination deliberately deferred). A stale row can never open a dead room - the room refuses.
 
@@ -152,13 +152,13 @@ One settings panel on the console, opened **in place** - a rail beside the conso
 It has two halves and says which is which, because the difference is not cosmetic:
 
 - **This device** - local, instant, stored on this laptop, invisible to everyone else: **display text size** and **console text size** as independent controls (a projector is read across a room, a console at arm's length - the same slider for both is the wrong control), room audio here plus master volume, **how the room sees this game** (second screen / mirror - C1's one question, also asked on the console's game-screen panel where the action lives), manual mode, timer visibility, roster density, and stage motion (moving / still / no 3D).
-- **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, password, the two caps, spectators allowed.
+- **This room** - server state, broadcast to every connection: streamer mode (with the code reveal, which lives here and nowhere else), listing + title, the two caps, spectators allowed.
 
 The display type scale reaches the projector window of the same browser live, because both windows read one device-preferences document (C1's laptop-plus-projector setup is two tabs of one origin). A projector driven by a different machine has its own, which the panel says.
 
 **The panel is not themed, and that is a rule** (owner-specified 2026-08-17: "settings show the theme assets, which makes them difficult to read"). A control panel is never painted by the thing it controls - the cog steers the type scale a theme renders at, so rendering the cog IN that theme put its labels in the board's poster faces at whatever contrast the theme chose. The panel's chrome is a fixed palette under every theme, present or future; only the type-scale PREVIEW is themed, because it is a picture of the display and is supposed to look like one.
 
-**Room settings that are TYPED wait for an Apply, and say so.** Switches (streamer mode, listing, spectators allowed) reach the room the moment they move; a title, a password or a cap being typed must not travel letter by letter, so those groups state the edit they are holding ("player cap 30 -> 24") beside a button that names its effect and is dead until there is one. "Save caps" - a button named after itself - was the version the owner could not read.
+**Room settings that are TYPED wait for an Apply, and say so.** Switches (streamer mode, listing, spectators allowed) reach the room the moment they move; a title or a cap being typed must not travel letter by letter, so those groups state the edit they are holding ("player cap 30 -> 24") beside a button that names its effect and is dead until there is one. "Save caps" - a button named after itself - was the version the owner could not read.
 
 ### C2. Doors open
 
@@ -170,11 +170,11 @@ Game screen shows the themed title screen + giant QR + code. The console has its
 
 **Streamer mode's boundary is the opposite here, deliberately.** `hideJoinCode` means "stop broadcasting the code on SHARED surfaces": the game screen drops the code, the QR and the join URL from its markup entirely. The console is the host's own private screen - it already shows every answer - so it KEEPS all three and says out loud that they are not on the big screen. Hiding them there would protect nothing and would leave a streaming host unable to admit a latecomer.
 
-**The roster panel** (owner-specified 2026-08-17: "show all player data, so host can force renaming of teams, names, kicking, etc. Also show spectators") is a rail beside the console, open by default in the lobby and one click away in the header for the rest of the night - never a screen the host leaves the game for (the persistent-layout law). It carries:
+**The roster panel** (owner-specified 2026-08-17: "show all player data, so host can force renaming of teams, names, kicking, etc. Also show spectators") is a section of the left host dock, open by default in the lobby and collapsed once a game is running with its count still on the header - never a screen the host leaves the game for (the persistent-layout law). It carries:
 
-- **Every player**: avatar, name, team, connection state as a WORD (never a dot alone), and the score they are playing for once the game is running.
+- **Every player**: avatar, name, team, the score they are playing for once the game is running, and two facts added 2026-08-20 - a connection SYMBOL (a dot that is hollow when away and filled when here; colour and shape together, with the sentence in the title and for screen readers, because a colour alone is never the whole answer) and **phone or computer**, reported by that client from its own coarse-pointer query rather than sniffed from a user-agent string. A device nobody reported renders as nothing; a disconnected seat reports none, because nobody knows what they will come back on.
 - **Every team**: members with the leader marked, colour, lock state, and the team's room-audible buzz sound.
-- **The audience as a count.** Spectators join anonymously and hold no seat, so there is no list of them to show and never will be - what exists is how many are watching, counted by the room. A console that has not been told says so rather than printing zero.
+- **The audience, counted AND named** (owner, 2026-08-20: "spectators still should have a name"). Watching used to be strictly anonymous, and the reasoning behind that was about the LOBBY, where a browsable list must never become a directory of people - a rule that has not changed. Inside a room the calculus is different: these are colleagues who chose to watch, the host is the only person who sees the list, and "12 watching" cannot answer whether the person the host is waiting for has arrived. A name stays optional, so the COUNT remains the authority on how many and the list can legitimately be shorter than it. A console that has not been told the count says so rather than printing zero.
 - **Host powers, behind each row's "..."** (the same overflow rule the team cards follow): rename a player, move them between teams or off one, hand a team's leadership over, rename or lock a team, and remove somebody from the room - which asks a second time, because it ends their evening. Host supremacy holds throughout: a locked team still admits the host's seating, and a host rename is neither rate-limited nor blocked by the armed-window lock.
 
 The console's lobby is then two panels, each owning its own facts: **Game screen** (the setup choice, the window state, the room's display census) and **Roster** (who is here by name, connection health, teams, spectators - detailed below). The old "Pre-flight" checklist was deleted 2026-08-19 (owner: "pre-flight and roster look the exact same, what was the benefit?") - it restated counts the roster already showed and printed the display URL as a hint. One place per fact; **Start game** moved into the console's chrome as an action with its readiness attached. Team drag-to-rebalance and rename/kick from the console remain to do.
@@ -211,6 +211,13 @@ Console is keyboard-first (spacebar = arm, ←/→ = wrong/correct, U = undo) wi
 ### C7. After
 
 Winner screen (podium + per-team totals). Console: export results (JSON/CSV: final scores, per-clue log). Room expires via DO alarm (default 2h idle); code becomes reusable.
+
+**Two endings, and they are not the same one** (owner, 2026-08-20: "there is no end game button for the host"). The console's **End** control shows both together, with what each leaves behind written beside it, because the mistake to prevent is picking the wrong one:
+
+- **End the game** stops the GAME where it stands and puts the scores up. The room stays open, nobody is disconnected, and the display shows final standings. It is the ending a quiz night that has run long actually needs, and until 2026-08-20 it did not exist - the only route to `game-over` was playing the board out, since `end-round` finishes a round and leaves whatever comes after it still ahead. It does not run the tie rules: a host who is stopping is not asking for one more clue, so a tie for first stays a shared first (engine `handleEndGame`).
+- **Close the room** stops the ROOM: the polite screen everywhere, the lobby row delisted, the code spent until the expiry alarm frees it. It computes nothing and saves nothing, so taking it mid-game leaves the night with no scores on any screen. It existed as `DELETE /api/rooms/<CODE>` and a button on the developer harness; now it is where a host can reach it.
+
+Each takes a second press, and the second press names the ending it commits to rather than saying "Confirm".
 
 ---
 

@@ -1,7 +1,9 @@
 // The room-control contracts (docs/decisions/2026-08-14-room-controls-and-staging.md). What
 // matters here is what the shapes REFUSE: a cap above the operational limit, a patch that
-// changes nothing, and - the one that would be a real leak - a settings payload carrying the
-// room password to every connected phone and projector.
+// changes nothing, and - the one that would be a real leak - a settings payload carrying a
+// secret to every connected phone and projector. Room passwords were removed on 2026-08-20
+// (visibility.ts explains the trade); the leak assertions stay, because the host token is
+// still a secret and the schema is still what stops it travelling.
 import { describe, expect, it } from "vitest";
 import { limits } from "../limits.ts";
 import {
@@ -13,18 +15,19 @@ import {
 
 const settings = {
   ...defaultRoomSettings,
-  entry: "password",
   title: "Pub quiz night",
   hostLabel: "Board Game Club",
 };
 
 describe("the settings every client is told", () => {
-  it("parses a full payload and keeps entry a derived, secret-free fact", () => {
+  it("parses a full payload and refuses the retired entry axis", () => {
     expect(roomSettingsSchema.parse(settings)).toEqual(settings);
-    expect(roomSettingsSchema.safeParse({ ...settings, entry: "locked" }).success).toBe(false);
+    // `entry` (open / password) went with the passwords. No alias, no ignored field: a client
+    // still sending it is one that has not been updated.
+    expect(roomSettingsSchema.safeParse({ ...settings, entry: "open" }).success).toBe(false);
   });
 
-  it("never carries the password, its hash, or the host token", () => {
+  it("never carries a secret of any kind to the phones and the projector", () => {
     for (const leak of [
       { password: "hunter2!" },
       { passwordHash: "a".repeat(64) },
@@ -72,18 +75,9 @@ describe("the host's settings patch", () => {
     expect(roomSettingsPatchSchema.safeParse({}).success).toBe(false);
   });
 
-  it("carries the password as the entry axis: a string sets it, null clears it", () => {
-    expect(roomSettingsPatchSchema.safeParse({ password: "sequoia-2026" }).success).toBe(true);
-    expect(roomSettingsPatchSchema.safeParse({ password: null }).success).toBe(true);
-    // The same length floor as creation - a one-character shared secret is not one.
-    expect(
-      roomSettingsPatchSchema.safeParse({
-        password: "x".repeat(limits.room.roomPasswordMinLength - 1),
-      }).success,
-    ).toBe(false);
-  });
-
-  it("refuses `entry` itself: it is derived from the password, never set directly", () => {
+  it("refuses a password patch - there is no password to set or clear", () => {
+    expect(roomSettingsPatchSchema.safeParse({ password: "sequoia-2026" }).success).toBe(false);
+    expect(roomSettingsPatchSchema.safeParse({ password: null }).success).toBe(false);
     expect(roomSettingsPatchSchema.safeParse({ entry: "open" }).success).toBe(false);
   });
 

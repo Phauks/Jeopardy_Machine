@@ -14,7 +14,6 @@ const diagnostics = {
   lifecycle: "lobby",
   settings: {
     listing: "public",
-    entry: "password",
     maxPlayers: 24,
     maxSpectators: 50,
     spectatorsAllowed: true,
@@ -22,7 +21,6 @@ const diagnostics = {
     title: "Pub quiz night",
     hostLabel: "Board Game Club",
   },
-  hasPassword: true,
   createdAt: 1_760_000_000_000,
   lastActivityAt: 1_760_000_060_000,
   expiresAt: 1_760_007_200_000,

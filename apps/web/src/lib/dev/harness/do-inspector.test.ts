@@ -17,7 +17,6 @@ const inspection: RoomInspection = {
     lifecycle: "active",
     settings: {
       listing: "public",
-      entry: "password",
       maxPlayers: 24,
       maxSpectators: 50,
       spectatorsAllowed: true,
@@ -25,7 +24,6 @@ const inspection: RoomInspection = {
       title: "Pub quiz night",
       hostLabel: "Board Game Club",
     },
-    hasPassword: true,
     createdAt: 1_760_000_000_000,
     lastActivityAt: 1_760_000_060_000,
     expiresAt: now + 90 * 60_000,

@@ -85,6 +85,14 @@ export type GameEvent =
       score: number;
     }
   | { type: "rebound-armed"; remainingEntities: string[] }
+  /**
+   * The answer window ran out and the room decided that is NOT a verdict
+   * (settings.scoring.answerTimeoutOutcome = host-decides). Purely informational: no score
+   * moved, nobody was locked out, and the clue is still open on the same buzz winner. Every
+   * surface renders it as "over time" so the room can see the clock has passed without the
+   * game having taken the decision away from the host.
+   */
+  | { type: "answer-time-expired"; entityId: string }
   | {
       type: "clue-finished";
       resolution: "correct" | "dead" | "cancelled";
@@ -125,6 +133,18 @@ export type GameEvent =
       type: "game-over";
       standings: StandingsEntry[];
       winners: string[]; // empty = no winner (#38 no-winner)
-      note: "clean" | "co-champions" | "shared-placement" | "sudden-death" | "no-winner";
+      /**
+       * How the game came to an end. "ended-early" is the host's own `end-game` and is the
+       * only note that does NOT mean the board was played out: scores are whatever they were
+       * at that moment, and a tie for first stays a tie rather than opening sudden death,
+       * because a host who is stopping the game is not asking for one more clue.
+       */
+      note:
+        | "clean"
+        | "co-champions"
+        | "shared-placement"
+        | "sudden-death"
+        | "no-winner"
+        | "ended-early";
     }
   | { type: "undo-applied"; undoneAction: GameActionType };
