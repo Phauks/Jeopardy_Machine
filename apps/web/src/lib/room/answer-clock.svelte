@@ -13,11 +13,12 @@
   // room would watch two different clocks disagree about whether time was up. Both read the
   // same `PendingTimerView` the room broadcast, and both stop at the same instant.
   //
-  // WHAT IT NEVER DOES is decide anything. Under the room's `host-decides` rule an expired
-  // clock is information and nothing else (@jeopardy/protocol settings/groups/scoring.ts) -
-  // so this keeps rendering after zero, saying the time is over, rather than vanishing as
-  // though the clue had ended. A timer that disappears exactly when a person looks up is how
-  // a room concludes the game moved on without them.
+  // WHAT IT NEVER DOES is decide anything, and there is no longer a setting that would let it
+  // (owner, 2026-08-20: "all scoring is manual"). An expired clock is information - so this
+  // keeps rendering after zero, saying the time is over, rather than vanishing as though the
+  // clue had ended. A timer that disappears exactly when a person looks up is how a room
+  // concludes the game moved on without them. It renders NOTHING when there is no timer at
+  // all, which is the room whose answer clock is turned off entirely.
   import type { PendingTimerView } from "#lib/room/room-view.ts";
 
   type Props = {
@@ -30,22 +31,11 @@
      * inline = beside a control, at the size of the text around it.
      */
     variant?: "stage" | "inline";
-    /**
-     * Does running out END the attempt? Straight from `view.rules.answerTimeoutOutcome`. It
-     * changes the WORDS at zero and nothing else: "time" when the clock is the adjudicator,
-     * "over time" when the host still holds the verdict and the room is still talking.
-     */
-    endsTheAttempt?: boolean;
+
     /** Screen-reader label; the visual is a number, which is not a sentence. */
     label?: string;
   };
-  let {
-    timer,
-    now,
-    variant = "stage",
-    endsTheAttempt = true,
-    label = "Time to answer",
-  }: Props = $props();
+  let { timer, now, variant = "stage", label = "Time to answer" }: Props = $props();
 
   const remainingMs = $derived(timer === null ? null : Math.max(0, timer.firesAt - now));
   // Ceil, so the last whole second is shown as "1" for its whole duration rather than
@@ -79,7 +69,7 @@
     </div>
     <p class="readout">
       {#if expired}
-        {endsTheAttempt ? "Time" : "Over time"}
+        Over time
       {:else}
         {seconds}
       {/if}

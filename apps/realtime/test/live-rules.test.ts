@@ -56,24 +56,40 @@ describe("retuning a live room's rules", () => {
     ).toBe(12_000);
   });
 
-  it("carries the owner's other two: no penalty for wrong, and a timeout the host judges", async () => {
+  it("carries the owner's other ask: a wrong answer that costs nothing", async () => {
     const code = uniqueCode();
     const { hostToken } = await initializeRoom(code);
     const host = await connectHost(code, hostToken);
     await host.waitFor("game-rules");
 
-    host.send({
-      type: "update-game-rules",
-      rules: {
-        scoring: { wrongAnswerPenalty: "none", answerTimeoutOutcome: "host-decides" },
-      },
-    });
+    host.send({ type: "update-game-rules", rules: { scoring: { wrongAnswerPenalty: "none" } } });
     const rules = (
       await host.waitFor("game-rules", (message) => message.rules.wrongAnswerPenalty === "none")
     ).rules;
-    expect(rules.answerTimeoutOutcome).toBe("host-decides");
     // Untouched fields are not reset to their defaults by a sparse patch.
     expect(rules.answerWindowMs).toBe(5000);
+  });
+
+  // NO CLOCK AT ALL (owner, 2026-08-20: "time to answer should allow for no time limit"), and
+  // the assertion that matters is that it survives the round trip as null rather than being
+  // coerced into a number somewhere between the console and the engine.
+  it("turns the answer clock off entirely, and back on again", async () => {
+    const code = uniqueCode();
+    const { hostToken } = await initializeRoom(code);
+    const host = await connectHost(code, hostToken);
+    await host.waitFor("game-rules");
+
+    host.send({ type: "update-game-rules", rules: { buzzing: { answerWindowMs: null } } });
+    expect(
+      (await host.waitFor("game-rules", (message) => message.rules.answerWindowMs === null)).rules
+        .answerWindowMs,
+    ).toBeNull();
+
+    host.send({ type: "update-game-rules", rules: { buzzing: { answerWindowMs: 9000 } } });
+    expect(
+      (await host.waitFor("game-rules", (message) => message.rules.answerWindowMs === 9000)).rules
+        .answerWindowMs,
+    ).toBe(9000);
   });
 
   // The assertion that makes the rest matter: the number does not merely travel to the

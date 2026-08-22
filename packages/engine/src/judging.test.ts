@@ -65,21 +65,26 @@ describe("verdicts and scoring", () => {
   });
 });
 
-describe("matrix #14/#18: answer window timeout", () => {
-  it("deductOnAnswerTimeout on (default): timeout scores like a wrong answer", () => {
+// MATRIX ROW 18 IS GONE (owner, 2026-08-20: "all scoring is manual, remove it counts as wrong
+// option"). It asked what a timeout COSTS, which took for granted that a timeout was a verdict
+// - true on television, and false in a room where a host with a microphone judges every answer.
+// The full behaviour now lives in answer-timeout.test.ts; what these two keep is the shape of
+// what a clock may NOT do.
+describe("matrix #14: the answer window is a clock, never a verdict", () => {
+  it("scores nothing when it expires, and leaves the floor where it was", () => {
     let game = answering({});
     game = runOn(game, [{ type: "answer-timeout", at: 7400 }]);
-    expect(game.state.scores.p1).toBe(-200);
-    expect(eventsOfType(game.events, "judged")[0]?.verdict).toBe("timeout");
+    expect(game.state.scores.p1).toBe(0);
+    expect(eventsOfType(game.events, "judged")).toHaveLength(0);
+    expect(game.state.phase).toBe("answering");
   });
 
-  it("deductOnAnswerTimeout off: free, but the lockout still applies", () => {
-    let game = answering({ overrides: { scoring: { deductOnAnswerTimeout: false } } });
+  it("locks nobody out either, so the same person may still be judged right", () => {
+    let game = answering({});
     game = runOn(game, [{ type: "answer-timeout", at: 7400 }]);
-    expect(game.state.scores.p1).toBe(0);
-    expect(applyExpectingRejection(game, { type: "buzz", at: 7500, playerId: "p1" })).toBe(
-      "locked-out",
-    );
+    expect(game.state.clue?.lockedOutEntities ?? []).not.toContain("p1");
+    game = runOn(game, [{ type: "judge", at: 7500, verdict: "correct" }]);
+    expect(game.state.scores.p1).toBe(200);
   });
 });
 

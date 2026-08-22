@@ -48,8 +48,26 @@ describe("describeSettingsRegistry", () => {
     const flat = groups.flatMap((group) => group.settings);
     const armMode = flat.find((setting) => setting.key === "armMode");
     expect(armMode?.schema["enum"]).toEqual(["manual", "auto-after-tts", "auto-after-delay"]);
-    const answerWindow = flat.find((setting) => setting.key === "answerWindowMs");
-    expect(answerWindow?.schema["minimum"]).toBe(3000);
-    expect(answerWindow?.schema["maximum"]).toBe(15_000);
+    // A plain int carries its bounds at the top level...
+    const autoArm = flat.find((setting) => setting.key === "autoArmDelayMs");
+    expect(autoArm?.schema["minimum"]).toBe(500);
+    expect(autoArm?.schema["maximum"]).toBe(30_000);
+  });
+
+  // The two "off is null" durations, and the shape a UI has to read to render them. Their
+  // bounds sit under `anyOf` rather than at the top level, which is what a nullable integer
+  // serializes to - a customizer that reached for `schema.minimum` on one of these would find
+  // undefined and draw an unbounded slider.
+  it("keeps the nullable durations' bounds reachable, beside their null branch", () => {
+    const flat = groups.flatMap((group) => group.settings);
+    for (const key of ["answerWindowMs", "buzzWindowMs"]) {
+      const setting = flat.find((entry) => entry.key === key);
+      const branches = setting?.schema["anyOf"] as { type?: string; minimum?: number }[];
+      expect(
+        branches.map((branch) => branch.type),
+        key,
+      ).toEqual(["integer", "null"]);
+      expect(branches[0]?.minimum, key).toBe(3000);
+    }
   });
 });

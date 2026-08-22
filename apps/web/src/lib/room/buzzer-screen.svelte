@@ -178,7 +178,6 @@
             timer={answerTimer}
             {now}
             variant="inline"
-            endsTheAttempt={view.rules.answerTimeoutOutcome === "counts-as-wrong"}
             label="Your time to answer"
           />
         {/if}

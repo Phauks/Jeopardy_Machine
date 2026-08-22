@@ -13,13 +13,39 @@
   // wrote to itself (#lib/lobby/room-memory.ts), and the only fact asked of the server is
   // whether the code still names a room (#lib/lobby/room-liveness.ts). The liveness verdict
   // changes the chip IN PLACE - a checking room and a confirmed one are the same chip.
+  import { formatExpiryCountdown } from "#lib/lobby/room-liveness.ts";
   import type { RejoinCandidate } from "#lib/lobby/room-liveness.ts";
 
   type Props = {
     rooms: readonly RejoinCandidate[];
     onRejoin: (room: RejoinCandidate) => void;
+    /** Injected by tests so the countdown is assertable without a clock. */
+    now?: number | null;
   };
-  let { rooms, onRejoin }: Props = $props();
+  let { rooms, onRejoin, now: injectedNow = null }: Props = $props();
+
+  // A COUNTDOWN, not a claim (owner, 2026-08-20: "instead of rejoining as a host saying still
+  // live, we should show the countdown until the room will expire").
+  //
+  // "still live" answered a question nobody was asking. Of course it is live - it is being
+  // offered, and the offer is deleted the moment the probe says otherwise. What a host
+  // actually wants to know when they see their own room sitting there is how long they have,
+  // because a room expires on an idle timer and the answer decides whether they finish their
+  // coffee first.
+  //
+  // Ticked once a minute, which is all the precision the format has (room-liveness.ts rounds
+  // to minutes): a per-second interval would re-render the front page sixty times for a number
+  // that changes once.
+  let tick = $state(Date.now());
+  $effect(() => {
+    const interval = setInterval(() => {
+      tick = Date.now();
+    }, 30_000);
+    return () => {
+      clearInterval(interval);
+    };
+  });
+  const now = $derived(injectedNow ?? tick);
 </script>
 
 {#if rooms.length > 0}
@@ -27,14 +53,22 @@
     <span class="strip-label">Back in</span>
     <ul class="chips">
       {#each rooms as room (room.code)}
+        {@const countdown = formatExpiryCountdown(room.expiresAt, now)}
         <li>
           <button type="button" class="chip" onclick={() => onRejoin(room)}>
             <span class="chip-lead">Rejoin</span>
             <span class="chip-title">{room.title === "" ? `room ${room.code}` : room.title}</span>
             <span class="chip-role">{room.role === "host" ? "as host" : "as player"}</span>
-            <!-- The verdict box always exists, so a resolved probe never resizes the chip. -->
+            <!-- The verdict box always exists, so a resolved probe never resizes the chip.
+                 Three states, and the middle one is the point: a room whose deadline nothing
+                 could report still says nothing rather than inventing a countdown - the same
+                 absent-is-not-zero rule the lobby's capacity lines follow. -->
             <span class="chip-verdict" data-verdict={room.verdict}>
-              {room.verdict === "unknown" ? "checking" : "still live"}
+              {#if room.verdict === "unknown"}
+                checking
+              {:else if countdown !== null}
+                {countdown} left
+              {/if}
             </span>
           </button>
         </li>

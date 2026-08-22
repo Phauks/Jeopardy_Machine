@@ -59,6 +59,11 @@
     onCreate: () => void;
     onContinueCreate: (code: string) => void;
     onRefreshListing?: (() => void) | null;
+    /**
+     * Injected by tests so the rejoin countdown is assertable without a clock; the strip ticks
+     * its own otherwise (#lib/landing/rejoin-strip.svelte).
+     */
+    now?: number | null;
   };
   let {
     listing,
@@ -75,6 +80,7 @@
     onCreate,
     onContinueCreate,
     onRefreshListing = null,
+    now = null,
   }: Props = $props();
 
   // A seed, deliberately read once: after the first render the field belongs to whoever is
@@ -121,7 +127,7 @@
        by the room list, the right by a form. -->
   <div class="front-columns">
     <section class="join-column" aria-label="Join a room">
-      <RejoinStrip rooms={rejoins} {onRejoin} />
+      <RejoinStrip rooms={rejoins} {onRejoin} {now} />
       <EntryCounter
         value={typed}
         onInput={(raw) => {
@@ -202,33 +208,47 @@
     display: grid;
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     gap: var(--rule);
-    align-items: start;
+    /* STRETCH, not start (owner, 2026-08-20: "let's have them the same height"). Two boxes of
+       different heights beside each other read as one box and one leftover, and which one is
+       taller changes with the number of rooms in the list - so the page's shape depended on
+       how busy the night was. Equal height makes them a pair. */
+    align-items: stretch;
     max-width: var(--measure);
     width: 100%;
     margin: 0 auto;
     padding: var(--space-4) var(--page-inset);
   }
 
-  /* Board hierarchy, reused: the side you act on gets the CELL fill, the other sits on the
-     board's own darker ground. That is the same rule the bands followed - cells are what you
-     act on - applied across rather than down. */
-  .join-column {
+  /* TWO BOXES, matched (owner, 2026-08-20: "let's match the host and join areas so they are
+     two boxes next to each other"). Same padding, same rule, same corner - the only thing that
+     differs is the fill, and that difference is the board's own hierarchy reused: the side you
+     act on gets the CELL colour, the other sits on the board's darker ground. */
+  .join-column,
+  .host-column {
     display: flex;
     flex-direction: column;
-    gap: var(--space-3);
     min-width: 0;
     padding: var(--space-4);
+    border: 1px solid color-mix(in srgb, var(--clue-text-color) 18%, transparent);
+    border-radius: 2px;
+  }
+
+  .join-column {
+    gap: var(--space-3);
     background: var(--board-cell-bg);
     background-image: var(--effect-cell-overlay);
     box-shadow: var(--effect-cell-shadow);
   }
 
   .host-column {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-    padding: var(--space-4);
     background: color-mix(in srgb, var(--board-cell-bg) 34%, #000000);
+  }
+
+  /* The room list takes whatever height the join box has left, so "same height" means the two
+     boxes end level rather than one of them ending early with a gap under it. `:global`
+     because the browser is a child component and Svelte's scoping does not reach into one. */
+  .join-column > :global(.room-browser) {
+    flex: 1;
   }
 
   /* ONE COLUMN on anything narrower than a laptop, and the join side goes FIRST - hosting is

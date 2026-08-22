@@ -44,6 +44,8 @@ type Overrides = {
   listingError?: string | null;
   listingLoaded?: boolean;
   rejoins?: RejoinCandidate[];
+  /** Pins the rejoin countdown, which otherwise reads the wall clock. */
+  now?: number | null;
   /** Seeds the counter's field - a `?code=` arrival, or (in tests) a search term. */
   initialCode?: string;
   createForm?: CreateRoomForm;
@@ -268,17 +270,32 @@ describe("rejoin memory", () => {
   it("leads with the room this tab was in, by name, above the counter", () => {
     const body = renderFrontDoor({
       rejoins: [
-        { code: "BQKX7", title: "Pub quiz night", role: "player", at: fetchedAt, verdict: "live" },
+        {
+          code: "BQKX7",
+          title: "Pub quiz night",
+          role: "player",
+          at: fetchedAt,
+          verdict: "live",
+          expiresAt: null,
+        },
       ],
     });
     expect(body).toContain("Rejoin");
-    expect(body).toContain("still live");
     expect(body.indexOf("Rejoin")).toBeLessThan(body.indexOf("Room code"));
   });
 
   it("names the room by its code when this tab never learned a title", () => {
     const body = renderFrontDoor({
-      rejoins: [{ code: "BQKX7", title: "", role: "host", at: fetchedAt, verdict: "live" }],
+      rejoins: [
+        {
+          code: "BQKX7",
+          title: "",
+          role: "host",
+          at: fetchedAt,
+          verdict: "live",
+          expiresAt: null,
+        },
+      ],
     });
     expect(body).toContain("room BQKX7");
     expect(body).toContain("as host");
@@ -287,11 +304,60 @@ describe("rejoin memory", () => {
   it("shows an unresolved probe as checking rather than as a claim", () => {
     const body = renderFrontDoor({
       rejoins: [
-        { code: "BQKX7", title: "Pub quiz", role: "player", at: fetchedAt, verdict: "unknown" },
+        {
+          code: "BQKX7",
+          title: "Pub quiz",
+          role: "player",
+          at: fetchedAt,
+          verdict: "unknown",
+          expiresAt: null,
+        },
       ],
     });
     expect(body).toContain(">checking<");
-    expect(body).not.toContain(">still live<");
+  });
+
+  // A COUNTDOWN, not a claim (owner, 2026-08-20: "instead of rejoining as a host saying still
+  // live, we should show the countdown until the room will expire"). "still live" answered a
+  // question nobody was asking - of course it is live, it is being offered - where the real
+  // one is how long the host has before the room expires out from under them.
+  it("counts down to the room's expiry instead of asserting it is alive", () => {
+    const body = renderFrontDoor({
+      rejoins: [
+        {
+          code: "BQKX7",
+          title: "Pub quiz",
+          role: "host",
+          at: fetchedAt,
+          verdict: "live",
+          expiresAt: fetchedAt + 74 * 60_000,
+        },
+      ],
+      now: fetchedAt,
+    });
+    expect(body).toContain("1h 14m left");
+    expect(body).not.toContain("still live");
+  });
+
+  // The deadline is a fact the room may not have - no D1 binding, an unapplied migration. A
+  // chip that invented "0m left" would be worse than one that simply says nothing.
+  it("says nothing about time when nothing reported a deadline", () => {
+    const body = renderFrontDoor({
+      rejoins: [
+        {
+          code: "BQKX7",
+          title: "Pub quiz",
+          role: "host",
+          at: fetchedAt,
+          verdict: "live",
+          expiresAt: null,
+        },
+      ],
+      now: fetchedAt,
+    });
+    expect(body).toContain("Rejoin");
+    expect(body).not.toContain("left");
+    expect(body).not.toContain("still live");
   });
 });
 

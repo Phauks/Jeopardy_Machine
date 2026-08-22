@@ -7,7 +7,12 @@ import { settingsSchema } from "./derive.ts";
 import { settingsGroups } from "./registry.ts";
 
 describe("settings registry gate", () => {
-  it("covers matrix rows 1-19 and 21-43 exactly (20 is always-on host override, not a setting)", () => {
+  // ROW 18 LEFT ON 2026-08-20 ("deduct on answer timeout"). It asked what a timeout costs,
+  // which presupposed a timeout was a verdict; all scoring is manual, so a clock never scores
+  // anything and there is no cost to configure (settings/groups/scoring.ts). Row 20 was always
+  // absent for the neighbouring reason - the host's override is always on, and a setting that
+  // cannot be turned off is not a setting.
+  it("covers matrix rows 1-17, 19 and 21-43 exactly (20 and 18 are not settings)", () => {
     const covered = new Set<number>();
     for (const group of settingsGroups) {
       for (const definition of Object.values(group.settings)) {
@@ -16,7 +21,7 @@ describe("settings registry gate", () => {
     }
     const expected = new Set<number>();
     for (let row = 1; row <= 43; row += 1) {
-      if (row !== 20) expected.add(row);
+      if (row !== 20 && row !== 18) expected.add(row);
     }
     expect([...covered].toSorted((a, b) => a - b)).toEqual([...expected].toSorted((a, b) => a - b));
   });

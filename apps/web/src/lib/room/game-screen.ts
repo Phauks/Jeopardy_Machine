@@ -166,11 +166,19 @@ export function startReadiness(params: {
   gameScreen: GameScreenState;
   connectedDisplays: number | null;
 }): StartReadiness {
+  // AN EMPTY ROOM IS NO LONGER BLOCKED (owner, 2026-08-20: "allow for starting a room with 0
+  // players") - it is WARNED, which is the same shape the missing-game-screen case has always
+  // used: say the thing that is probably a mistake, once, and let the host proceed.
+  //
+  // Starting empty is a legitimate thing to do - rehearsing before the doors open, running the
+  // board on a projector while people arrive, driving the night by hand because the wi-fi
+  // died - and people can still join a running game (late join, matrix #43). It is also
+  // usually an accident, which is why it still says so.
   if (params.seatedPlayers === 0) {
     return {
-      kind: "blocked",
+      kind: "warn",
       headline: "Nobody has joined yet",
-      detail: "The game needs at least one player - share the code or the link.",
+      detail: "You can start anyway and let people join as they arrive.",
     };
   }
   // Mirror mode IS the game screen: this laptop is what the room is looking at, so there is

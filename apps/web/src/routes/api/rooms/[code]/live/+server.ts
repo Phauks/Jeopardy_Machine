@@ -11,7 +11,10 @@
 //    answers a question anyone holding the code can already answer by opening the socket and
 //    being refused with `no-such-room` - so it adds no oracle, and it is one D1 read instead of
 //    a WebSocket handshake. It says NOTHING else: no title, no phase, no counts, no listing.
-//    A private room's facts stay private; only its existence is visible, exactly as before.
+//    A private room's facts stay private. Since 2026-08-20 it also carries `expiresAt` so the
+//    rejoin offer can count DOWN instead of asserting "still live" (owner) - which stays
+//    inside the same rule: a deadline is answerable by anyone already holding the code, names
+//    nobody, and is strictly less than the existence it qualifies.
 // 2. It reads the REGISTRY, which is a cache and never authority
 //    (docs/decisions/2026-08-14-room-visibility-and-lobby.md). Drift is survivable in both
 //    directions: a row that outlived its room costs one wasted tap and a refusal from the DO;
@@ -47,16 +50,22 @@ export const GET: RequestHandler = async ({ params, platform, setHeaders }) => {
       code,
       live: false,
       registry: { status: "unavailable", reason: "no-binding" },
+      expiresAt: null,
     } satisfies RoomLiveness);
   }
 
   const now = Date.now();
   try {
     const row = await readRegistryRow(database, code, now);
+    const live = row !== null && registryRowIsLive(row, now);
     return Response.json({
       code,
-      live: row !== null && registryRowIsLive(row, now),
+      live,
       registry: { status: "ok" },
+      // Only for a room that is actually there: a deadline for a dead room is a number about
+      // nothing, and the caller treats a null as "no countdown" rather than as a countdown of
+      // zero (src/lib/lobby/room-liveness.ts).
+      expiresAt: live ? (row?.expiresAt ?? null) : null,
     } satisfies RoomLiveness);
   } catch (error) {
     console.warn("room liveness probe failed - answering unavailable", error);
@@ -64,6 +73,7 @@ export const GET: RequestHandler = async ({ params, platform, setHeaders }) => {
       code,
       live: false,
       registry: registryStatusFromError(error),
+      expiresAt: null,
     } satisfies RoomLiveness);
   }
 };

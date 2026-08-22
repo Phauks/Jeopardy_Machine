@@ -45,8 +45,11 @@ export const buzzingGroup = defineSettingsGroup({
     answerWindowMs: defineSetting({
       matrixRow: 14,
       label: "Answer window",
-      description: "Time the buzz winner has to answer before it counts as wrong.",
-      schema: z.int().min(3000).max(15_000).default(5000),
+      description:
+        "How long the buzz winner has, shown as a countdown on the big screen and on their phone. null is NO LIMIT: no clock, no countdown, and the host closes the answer whenever the room is done with it.",
+      constraints:
+        "null = unlimited, per the group's own convention. It never scored anything either way - a clock is information here, never a verdict (@jeopardy/protocol settings/groups/scoring.ts).",
+      schema: z.int().min(3000).max(15_000).nullable().default(5000),
     }),
     rebound: defineSetting({
       matrixRow: 15,

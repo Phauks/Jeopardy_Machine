@@ -52,10 +52,6 @@ export const liveRulesPatchSchema = z
     scoring: z
       .strictObject({
         wrongAnswerPenalty: scoringGroup.settings.wrongAnswerPenalty.schema.unwrap().optional(),
-        answerTimeoutOutcome: scoringGroup.settings.answerTimeoutOutcome.schema.unwrap().optional(),
-        deductOnAnswerTimeout: scoringGroup.settings.deductOnAnswerTimeout.schema
-          .unwrap()
-          .optional(),
       })
       .optional(),
   })
@@ -75,13 +71,12 @@ export type LiveRulesPatch = z.infer<typeof liveRulesPatchSchema>;
  * a patch onto a document it does not hold would be guessing.
  */
 export const liveRulesSchema = z.strictObject({
-  answerWindowMs: z.int().positive(),
+  /** null = no limit: no clock on any screen, and the host closes the answer (buzzing.ts). */
+  answerWindowMs: z.int().positive().nullable(),
   buzzWindowMs: z.int().positive().nullable(),
   rebound: z.boolean(),
   wrongAnswererLockedOut: z.boolean(),
   wrongAnswerPenalty: z.enum(["deduct", "floor-at-zero", "none"]),
-  answerTimeoutOutcome: z.enum(["counts-as-wrong", "host-decides"]),
-  deductOnAnswerTimeout: z.boolean(),
 });
 export type LiveRules = z.infer<typeof liveRulesSchema>;
 
@@ -100,16 +95,12 @@ export const defaultLiveRules: LiveRules = liveRulesOfSettings(settingsSchema.pa
 /** The projection, shared by the default above and by the room that serves the real thing. */
 export function liveRulesOfSettings(settings: {
   buzzing: {
-    answerWindowMs: number;
+    answerWindowMs: number | null;
     buzzWindowMs: number | null;
     rebound: boolean;
     wrongAnswererLockedOut: boolean;
   };
-  scoring: {
-    wrongAnswerPenalty: "deduct" | "floor-at-zero" | "none";
-    answerTimeoutOutcome: "counts-as-wrong" | "host-decides";
-    deductOnAnswerTimeout: boolean;
-  };
+  scoring: { wrongAnswerPenalty: "deduct" | "floor-at-zero" | "none" };
 }): LiveRules {
   return {
     answerWindowMs: settings.buzzing.answerWindowMs,
@@ -117,8 +108,6 @@ export function liveRulesOfSettings(settings: {
     rebound: settings.buzzing.rebound,
     wrongAnswererLockedOut: settings.buzzing.wrongAnswererLockedOut,
     wrongAnswerPenalty: settings.scoring.wrongAnswerPenalty,
-    answerTimeoutOutcome: settings.scoring.answerTimeoutOutcome,
-    deductOnAnswerTimeout: settings.scoring.deductOnAnswerTimeout,
   };
 }
 
@@ -144,6 +133,4 @@ export const liveRuleKeys = [
   "buzzing.rebound",
   "buzzing.wrongAnswererLockedOut",
   "scoring.wrongAnswerPenalty",
-  "scoring.answerTimeoutOutcome",
-  "scoring.deductOnAnswerTimeout",
 ] as const;

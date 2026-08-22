@@ -1,11 +1,16 @@
-// OWNER, 2026-08-20: "Just because it times out, doesn't mean it was wrong. People will be
-// discussing the question."
+// OWNER, 2026-08-20, in two steps that land in the same place:
+//   "Just because it times out, doesn't mean it was wrong. People will be discussing the
+//    question."
+//   "all scoring is manual, remove it counts as wrong option."
 //
-// The rules matrix only ever asked what a timeout COSTS (row 18). It took for granted that a
-// timeout was a verdict at all - true on television, where the contestant had their five
-// seconds and the show moves, and false in a room where six people are still arguing. The
-// engine ending the clue over a clock takes the decision away from the person holding the
-// microphone, which is the one thing guiding principle 4 says it may never do.
+// The first was answered with a CHOICE - the television rule, or defer to the host. The second
+// deleted the choice, and it is the truer description of this product: a host with a microphone
+// judges every answer in this room, and the only verdicts the engine ever applied on its own
+// were the ones a clock produced. So an expired answer window is information and nothing else,
+// unconditionally, with no setting that makes it a verdict again.
+//
+// The clue-level consequence is what these tests hold: the floor does not move, no score
+// changes, nobody is locked out, and the host judges when the room has finished arguing.
 import { describe, expect, it } from "vitest";
 import { eventsOfType, runOn, startedGame, testSetup } from "./testing.ts";
 import type { Run } from "./testing.ts";
@@ -21,22 +26,9 @@ function buzzedClue(options: TestSetupOptions = {}): Run {
   ]);
 }
 
-const hostDecides: TestSetupOptions = {
-  overrides: { scoring: { answerTimeoutOutcome: "host-decides" } },
-};
-
 describe("when the answer clock runs out", () => {
-  it("counts as wrong by default - the TV rule, unchanged", () => {
-    const game = runOn(buzzedClue(), [{ type: "answer-timeout", at: 9000 }]);
-    const judged = eventsOfType(game.events, "judged").at(-1);
-    expect(judged?.verdict).toBe("timeout");
-    expect(judged?.delta).toBeLessThan(0);
-    // The attempt is closed: p1 is locked out and the rest get their rebound.
-    expect(game.state.clue?.lockedOutEntities).toContain("p1");
-  });
-
-  it("under host-decides, judges NOTHING and leaves the clue exactly where it was", () => {
-    const before = buzzedClue(hostDecides);
+  it("judges NOTHING and leaves the clue exactly where it was", () => {
+    const before = buzzedClue();
     const scoreBefore = before.state.scores["p1"] ?? 0;
     const game = runOn(before, [{ type: "answer-timeout", at: 9000 }]);
 
@@ -49,19 +41,19 @@ describe("when the answer clock runs out", () => {
   });
 
   it("says so out loud, so every screen can show 'over time' without the game acting on it", () => {
-    const game = runOn(buzzedClue(hostDecides), [{ type: "answer-timeout", at: 9000 }]);
+    const game = runOn(buzzedClue(), [{ type: "answer-timeout", at: 9000 }]);
     expect(eventsOfType(game.events, "answer-time-expired")[0]?.entityId).toBe("p1");
   });
 
   it("still lets the host judge afterwards - the verdict was only ever deferred", () => {
-    let game = runOn(buzzedClue(hostDecides), [{ type: "answer-timeout", at: 9000 }]);
+    let game = runOn(buzzedClue(), [{ type: "answer-timeout", at: 9000 }]);
     game = runOn(game, [{ type: "judge", at: 12_000, verdict: "correct" }]);
     expect(eventsOfType(game.events, "judged").at(-1)?.verdict).toBe("correct");
     expect(game.state.scores["p1"]).toBeGreaterThan(0);
   });
 
   it("does not fire twice into a decision - a second expiry is still just information", () => {
-    let game = runOn(buzzedClue(hostDecides), [{ type: "answer-timeout", at: 9000 }]);
+    let game = runOn(buzzedClue(), [{ type: "answer-timeout", at: 9000 }]);
     game = runOn(game, [{ type: "answer-timeout", at: 15_000 }]);
     expect(game.state.phase).toBe("answering");
     expect(eventsOfType(game.events, "answer-time-expired")).toHaveLength(2);
@@ -75,7 +67,6 @@ describe("when the answer clock runs out", () => {
       startedGame(
         testSetup({
           rounds: [{ columns: 3, rows: 3, wagerPlacement: "manual", authoredWagers: [[1, 1]] }],
-          overrides: { scoring: { answerTimeoutOutcome: "host-decides" } },
         }),
       ),
       [
@@ -92,14 +83,11 @@ describe("when the answer clock runs out", () => {
   });
 
   it("leaves every OTHER timeout alone - this rule is about the answer window only", () => {
-    // The everyone-answers window still closes submissions under host-decides: that window is
-    // a collection deadline, not a verdict, and nothing about it takes a decision from anyone.
+    // The everyone-answers window still closes submissions: that window is a collection
+    // DEADLINE, not a verdict, and closing it takes no decision away from anybody.
     const game = startedGame(
       testSetup({
-        overrides: {
-          scoring: { answerTimeoutOutcome: "host-decides" },
-          answerMode: { everyoneAnswers: "on", answerCapture: "typed" },
-        },
+        overrides: { answerMode: { everyoneAnswers: "on", answerCapture: "typed" } },
       }),
     );
     const opened = runOn(game, [
@@ -114,5 +102,17 @@ describe("when the answer clock runs out", () => {
     // nothing to judge, so the clue is simply over.
     expect(closed.state.phase).not.toBe("all-answering");
     expect(eventsOfType(closed.events, "answer-time-expired")).toHaveLength(0);
+  });
+
+  // NO CLOCK AT ALL is a legitimate room (owner, 2026-08-20: "time to answer should allow for
+  // no time limit"). The engine's side of that is simply that nothing schedules the timer;
+  // there is no second code path, which is the point of spelling "off" as null.
+  it("sets no answer timer when the room has no answer clock", () => {
+    const game = buzzedClue({ overrides: { buzzing: { answerWindowMs: null } } });
+    const timers = eventsOfType(game.events, "timer-set").filter(
+      (event) => event.kind === "answer-window",
+    );
+    expect(timers).toHaveLength(0);
+    expect(game.state.phase).toBe("answering");
   });
 });

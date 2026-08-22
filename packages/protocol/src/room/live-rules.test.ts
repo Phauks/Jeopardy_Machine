@@ -27,13 +27,35 @@ describe("what a host may retune while people are playing", () => {
     ).toBe(true);
   });
 
-  it("takes the rest of the answering loop: rebound, lockout, the timeout rule", () => {
+  it("takes the rest of the answering loop: rebound and the lockout", () => {
     expect(
       liveRulesPatchSchema.safeParse({
         buzzing: { rebound: true, wrongAnswererLockedOut: false },
-        scoring: { answerTimeoutOutcome: "host-decides" },
       }).success,
     ).toBe(true);
+  });
+
+  // NO LIMIT is a real answer for the answer clock (owner, 2026-08-20: "time to answer should
+  // allow for no time limit"), and null is how this settings layer has always spelled "off" on
+  // a duration - the same way buzzWindowMs does.
+  it("takes null as the answer clock, which is no clock at all", () => {
+    expect(liveRulesPatchSchema.safeParse({ buzzing: { answerWindowMs: null } }).success).toBe(
+      true,
+    );
+    expect(liveRulesPatchSchema.safeParse({ buzzing: { buzzWindowMs: null } }).success).toBe(true);
+  });
+
+  // The timeout rule is GONE rather than defaulted (2026-08-20: "all scoring is manual, remove
+  // it counts as wrong option"). A stale console that still sends it must be refused, not
+  // humoured - the alternative is a host believing they turned auto-scoring back on.
+  it("refuses the timeout settings that were deleted with manual scoring", () => {
+    expect(
+      liveRulesPatchSchema.safeParse({ scoring: { answerTimeoutOutcome: "counts-as-wrong" } })
+        .success,
+    ).toBe(false);
+    expect(
+      liveRulesPatchSchema.safeParse({ scoring: { deductOnAnswerTimeout: true } }).success,
+    ).toBe(false);
   });
 
   // The refusals are the point of a strict schema. Each of these is a rule the RUNNING STATE
@@ -111,8 +133,6 @@ describe("the live rules a surface is told", () => {
       rebound: settings.buzzing.rebound,
       wrongAnswererLockedOut: settings.buzzing.wrongAnswererLockedOut,
       wrongAnswerPenalty: settings.scoring.wrongAnswerPenalty,
-      answerTimeoutOutcome: settings.scoring.answerTimeoutOutcome,
-      deductOnAnswerTimeout: settings.scoring.deductOnAnswerTimeout,
     };
     expect(liveRulesSchema.parse(live)).toEqual(live);
   });

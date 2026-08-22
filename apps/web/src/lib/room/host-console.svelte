@@ -1127,19 +1127,24 @@
      team name fit on one line. */
   .console-dock {
     flex: none;
-    width: 17rem;
+    /* WIDER, and NOT A BOX (owner, 2026-08-20: "everything is in on box on the left side
+       scrunched to the left side. we need to make it bigger, and don't put it into a box").
+       At 17rem in a bordered, filled panel the sections were a column of squeezed rows inside
+       a frame - the boxes-in-boxes problem moved up a level rather than solved, since the dock
+       had become the outer box its own contents were crammed into.
+
+       So the frame is gone entirely. What separates the dock from the board is the RULE down
+       its inner edge and the space beside it - the same way the board's own gutter separates
+       cells - and the width is a range rather than a number, so a wide window gives the roster
+       room to breathe instead of banking the surplus into empty board. */
+    width: clamp(20rem, 26vw, 30rem);
     align-self: stretch;
     display: flex;
     flex-direction: column;
-    padding: 0.2rem 0.6rem 0.6rem;
-    border: 1px solid var(--control-border);
-    border-radius: var(--control-radius);
-    background: var(--control-page);
+    padding-inline-end: 1rem;
+    border-inline-end: 1px solid var(--control-border);
     color: var(--control-text);
     font-family: var(--control-font);
-    /* ONE box, and this is it. Everything inside is a band separated by a hairline, never a
-       card inside a card inside a card (owner: "settings are boxes in boxes... looks AI
-       made"). The panels drop their own chrome through their `embedded` prop. */
   }
 
   /* Start lives in the console's own chrome with its state beside it. The note slot is reserved

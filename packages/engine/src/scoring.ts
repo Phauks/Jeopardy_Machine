@@ -17,19 +17,11 @@ export function wrongAnswerDelta(
   return -stake;
 }
 
-/**
- * Delta when the answer window expires after a buzz (#18): treated as a wrong answer when
- * deductOnAnswerTimeout is on, free otherwise. The lockout consequence (#16) is separate -
- * a timeout locks the answerer out either way.
- */
-export function answerTimeoutDelta(
-  currentScore: number,
-  stake: number,
-  settings: Settings,
-): number {
-  if (!settings.scoring.deductOnAnswerTimeout) return 0;
-  return wrongAnswerDelta(currentScore, stake, settings.scoring.wrongAnswerPenalty);
-}
+// DELETED 2026-08-20: `answerTimeoutDelta`, the delta a timeout applied under matrix row 18.
+// A clock never scores anything now - all scoring is manual, and an expired answer window is
+// information rather than a verdict (transitions/judging.ts, and the reasoning in
+// @jeopardy/protocol settings/groups/scoring.ts). There is no timeout delta because there is
+// no timeout scoring.
 
 /**
  * Points for a correct everyone-answers submission (#22). speed-weighted decays linearly

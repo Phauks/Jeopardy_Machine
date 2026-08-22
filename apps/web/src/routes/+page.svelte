@@ -77,11 +77,15 @@
     // appearing under someone's thumb a moment later; the liveness verdict then changes the
     // card IN PLACE (the standing layout law). sessionStorage only - no account, no server.
     const remembered = readRememberedRooms();
-    rejoins = remembered.map((room) => ({ ...room, verdict: "unknown" as const }));
+    rejoins = remembered.map((room) => ({
+      ...room,
+      verdict: "unknown" as const,
+      expiresAt: null,
+    }));
     void Promise.all(
       remembered.map(async (room) => {
-        const verdict = await probeRoomLiveness(room.code);
-        if (verdict === "gone") {
+        const probe = await probeRoomLiveness(room.code);
+        if (probe.verdict === "gone") {
           // A room that has genuinely ended cleans itself up without a word - an offer to
           // rejoin a finished game is worse than no offer at all.
           forgetRoom(room.code);
@@ -91,7 +95,11 @@
         // Updated IN PLACE (the layout law, applied to the data too): the card keeps its
         // identity and its position, and only its own state changes.
         const candidate = rejoins.find((entry) => entry.code === room.code);
-        if (candidate !== undefined) candidate.verdict = verdict;
+        if (candidate === undefined) return;
+        candidate.verdict = probe.verdict;
+        // The deadline arrives with the verdict, so the chip's countdown appears in the same
+        // frame the chip stops saying "checking" - one state change, not two.
+        candidate.expiresAt = probe.expiresAt;
       }),
     );
   });

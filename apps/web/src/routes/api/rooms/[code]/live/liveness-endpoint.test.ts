@@ -59,12 +59,29 @@ function liveRow(overrides: Record<string, unknown> = {}) {
 
 describe("room liveness probe", () => {
   it("answers live for a private room - being unlisted is not being dead", async () => {
-    const response = await probe("bqkx7", databaseWith([liveRow()]));
+    const row = liveRow();
+    const response = await probe("bqkx7", databaseWith([row]));
     const body = (await response.json()) as RoomLiveness;
     expect(response.status).toBe(200);
     // Normalized on the way in: a code out of sessionStorage may be any case.
-    expect(body).toEqual({ code: "BQKX7", live: true, registry: { status: "ok" } });
+    expect(body).toEqual({
+      code: "BQKX7",
+      live: true,
+      registry: { status: "ok" },
+      // The deadline the rejoin chip counts down to (owner, 2026-08-20). It is one more fact
+      // than this endpoint used to give and it stays inside the endpoint's own rule: a
+      // deadline names nobody, describes nothing about the room, and is strictly less than the
+      // existence it qualifies.
+      expiresAt: row.expires_at,
+    });
     expect(verdictFor(body)).toBe("live");
+  });
+
+  it("withholds the deadline for a room that is NOT live - a number about nothing", async () => {
+    const ended = liveRow({ phase: "ended", ended_at: Date.now() });
+    const body = (await (await probe("BQKX7", databaseWith([ended]))).json()) as RoomLiveness;
+    expect(body.live).toBe(false);
+    expect(body.expiresAt).toBeNull();
   });
 
   it("answers live for a game already in progress - late arrivals are the room's call", async () => {

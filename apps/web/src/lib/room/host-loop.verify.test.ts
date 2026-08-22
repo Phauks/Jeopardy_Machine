@@ -61,17 +61,35 @@ describe("C4 step 1-2: the board, control, and the clue", () => {
     expect(body).toContain("ARM");
   });
 
-  it("refuses to start a room nobody has joined, and says so", () => {
-    // Found by the walk: this used to move the ROOM to active while the engine stayed in its
-    // lobby, which took the projector off the staged lobby onto a board that could not be
-    // played - the worst kind of failure, because both screens looked fine.
+  // An empty room may start since 2026-08-20 (owner: "allow for starting a room with 0
+  // players"), so what this test guards has moved rather than gone. The bug the walk found was
+  // never really "an empty room started" - it was the ROOM moving to active while the ENGINE
+  // stayed in its lobby, which took the projector off the staged lobby onto a board that could
+  // not be played. Both screens looked fine, which is what made it the worst kind of failure.
+  //
+  // So the invariant is the same one, now asserted in the direction the rule points: the two
+  // move TOGETHER. And the console still says the room is empty, because starting empty is
+  // legitimate but usually an accident.
+  it("starts an empty room, moving the engine and the room together", () => {
     const empty = new LocalSimRoomStore({ roomCode: "TESTA", role: "host", seedRoster: "empty" });
     empty.startGame();
-    expect(empty.view.game?.phase).toBe("lobby");
-    expect(empty.view.phase).toBe("lobby");
+    expect(empty.view.game?.phase).toBe("awaiting-selection");
+    expect(empty.view.phase).toBe("active");
+  });
+
+  it("leaves Start live in an empty room rather than disabling it", () => {
+    const empty = new LocalSimRoomStore({ roomCode: "TESTA", role: "host", seedRoster: "empty" });
     const body = render(HostConsole, { props: { store: empty } }).body;
+    // The button is enabled. Asserted on the start ROW rather than the whole document, because
+    // other controls on this console are legitimately disabled (the rules panel's slider when
+    // the clock is off, for one). The empty-room WARNING follows the same warn-once shape as
+    // the missing-game-screen one - it appears on the first press, which an SSR render cannot
+    // perform, so game-screen.test.ts holds the readiness function's answer directly.
+    const startRow = body.slice(body.indexOf('class="start-row'), body.indexOf("console-body"));
+    expect(startRow).toContain("Start game");
+    expect(startRow).not.toContain("disabled");
+    // ...and the roster says the room is empty regardless, which is where a host looks.
     expect(body).toContain("Nobody has joined yet");
-    expect(body).toContain("disabled");
   });
 });
 

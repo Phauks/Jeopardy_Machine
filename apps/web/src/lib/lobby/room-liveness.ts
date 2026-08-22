@@ -25,6 +25,18 @@ export type RoomLiveness = {
   live: boolean;
   /** Whether the registry could answer at all - `unavailable` makes `live: false` meaningless. */
   registry: RegistryStatus;
+  /**
+   * When the room's code stops working, Unix ms - or null when nothing can say (no binding, an
+   * unapplied migration, a room with no row).
+   *
+   * Added 2026-08-20 so the rejoin chip can count DOWN rather than assert "still live" (owner).
+   * It is one more fact than this endpoint used to give, and it stays inside the rule the
+   * endpoint was built on: it is answerable by anyone already holding the code, tells nothing
+   * about who is in the room or what it is called, and expires along with the room itself. A
+   * deadline is also strictly less than the existence it qualifies - knowing a room dies at
+   * 21:40 is useless without knowing it is there, which this already said.
+   */
+  expiresAt: number | null;
 };
 
 /**
@@ -35,14 +47,44 @@ export type RoomLiveness = {
  */
 export type RejoinVerdict = "live" | "gone" | "unknown";
 
+/** A verdict plus, for a live room, when its code stops working. */
+export type RejoinProbe = { verdict: RejoinVerdict; expiresAt: number | null };
+
 /** A remembered room plus the verdict the probe returned for it - what the front door's rejoin
  * strip renders. It lives here rather than in the component so the route, the strip and the
  * tests all name the same type without importing a Svelte file for it. */
-export type RejoinCandidate = RememberedRoom & { verdict: RejoinVerdict };
+export type RejoinCandidate = RememberedRoom & {
+  verdict: RejoinVerdict;
+  /** When this room's code stops working, or null when nothing has said. */
+  expiresAt: number | null;
+};
 
 export function verdictFor(liveness: RoomLiveness): RejoinVerdict {
   if (liveness.registry.status !== "ok") return "unknown";
   return liveness.live ? "live" : "gone";
+}
+
+/**
+ * How long a remembered room has left, as a countdown a chip can render: "1h 12m", "8m",
+ * "under a minute". Null when the deadline is unknown, and null once it has passed - an
+ * expired room is `gone`, and a countdown reading "0m" beside an offer to walk back in would
+ * be the offer arguing with itself.
+ *
+ * Coarse on purpose, and coarser the further out it is. A room expires hours from now and the
+ * question a host is asking is "do I have time for a coffee", not "how many seconds". Seconds
+ * would also demand a per-second re-render of the front page for a number nobody reads that
+ * closely.
+ */
+export function formatExpiryCountdown(expiresAt: number | null, now: number): string | null {
+  if (expiresAt === null) return null;
+  const remainingMs = expiresAt - now;
+  if (remainingMs <= 0) return null;
+  const minutes = Math.floor(remainingMs / 60_000);
+  if (minutes < 1) return "under a minute";
+  if (minutes < 60) return `${String(minutes)}m`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `${String(hours)}h` : `${String(hours)}h ${String(rest)}m`;
 }
 
 /**
@@ -58,13 +100,14 @@ export function verdictForStatus(httpStatus: number): RejoinVerdict {
 export async function probeRoomLiveness(
   code: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<RejoinVerdict> {
+): Promise<RejoinProbe> {
   try {
     const response = await fetchImpl(`/api/rooms/${encodeURIComponent(code)}/live`);
-    if (!response.ok) return verdictForStatus(response.status);
-    return verdictFor((await response.json()) as RoomLiveness);
+    if (!response.ok) return { verdict: verdictForStatus(response.status), expiresAt: null };
+    const liveness = (await response.json()) as RoomLiveness;
+    return { verdict: verdictFor(liveness), expiresAt: liveness.expiresAt ?? null };
   } catch {
     // Offline, DNS, a Worker cold start that timed out: unknown, never a deletion.
-    return "unknown";
+    return { verdict: "unknown", expiresAt: null };
   }
 }

@@ -46,7 +46,7 @@ Arming, lockouts, and the windows around a buzz.
 | #11 | `autoArmDelayMs` (Auto-arm delay) | integer 500 to 30000 | `4000` | Reading time before buzzers arm themselves. _Only read when arm mode is auto-after-delay._ |
 | #12 | `earlyBuzzLockoutMs` (Early-buzz lockout) | integer 0 to 1000 | `250` | Buzzing before arming locks that buzzer out this long, re-triggered per press (TV: 250ms - the core skill element). 0 turns the penalty off. |
 | #13 | `buzzWindowMs` (Buzz-in window) | integer 3000 to 15000, or null | `5000` | How long after arming anyone may ring in; null keeps buzzers live until the host closes the clue. |
-| #14 | `answerWindowMs` (Answer window) | integer 3000 to 15000 | `5000` | Time the buzz winner has to answer before it counts as wrong. |
+| #14 | `answerWindowMs` (Answer window) | integer 3000 to 15000, or null | `5000` | How long the buzz winner has, shown as a countdown on the big screen and on their phone. null is NO LIMIT: no clock, no countdown, and the host closes the answer whenever the room is done with it. _null = unlimited, per the group's own convention. It never scored anything either way - a clock is information here, never a verdict (@jeopardy/protocol settings/groups/scoring.ts)._ |
 | #15 | `rebound` (Rebound after wrong answer) | on / off | `true` | Re-arm the remaining buzzers after a wrong answer (TV rule); off means one attempt per clue. |
 | #16 | `wrongAnswererLockedOut` (Wrong answerer locked out) | on / off | `true` | A player who answered wrong stays locked out for the rest of the clue (TV rule). |
 | - | `latencyCompensation` (Buzz latency compensation) | on / off | `true` | Rank buzzes by reaction time (measured against each phone's own arm signal, clamped by its measured round trip) instead of raw server arrival, so a slow connection stops being a handicap. Off ranks by arrival, which quietly rewards the best Wi-Fi in the room. |
@@ -59,8 +59,6 @@ What wrong answers and timeouts cost.
 | Matrix | Setting | Values | Default | Description |
 | --- | --- | --- | --- | --- |
 | #17 | `wrongAnswerPenalty` (Wrong answer penalty) | `deduct` / `floor-at-zero` / `none` | `"deduct"` | deduct is the TV rule (negative scores are normal); floor-at-zero deducts but never below zero; none is the kids/casual mode. |
-| - | `answerTimeoutOutcome` (When the answer clock runs out) | `counts-as-wrong` / `host-decides` | `"counts-as-wrong"` | counts-as-wrong is the TV rule: the window closes the attempt and the game moves on. host-decides leaves the clue open and the verdict with the host - the timer informs the room instead of judging it. |
-| #18 | `deductOnAnswerTimeout` (Deduct on answer timeout) | on / off | `true` | Buzzing in and then running out the answer window is treated as a wrong answer (TV rule). _Only read when the answer clock counts as wrong._ |
 | #19 | `questionFormatRequired` (Question format required) | `off` / `host-reminder` / `strict-later-rounds` | `"off"` | Whether responses must be phrased as a question. strict-later-rounds is the TV rule (gentle reminder in round one, strictly enforced from round two); off is the natural default for typed answers. |
 
 ## Answer mode (`answerMode`)

@@ -449,7 +449,6 @@
                 timer={answerTimer}
                 {now}
                 variant="stage"
-                endsTheAttempt={view.rules.answerTimeoutOutcome === "counts-as-wrong"}
               />
             {/if}
           </div>

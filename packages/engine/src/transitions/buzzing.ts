@@ -31,12 +31,18 @@ export function handleArmBuzzers(
     draft.phase = "all-answering";
     clue.answersOpenedAt = action.at;
     events.push({ type: "answers-open", at: action.at });
-    events.push({
-      type: "timer-set",
-      kind: "everyone-answers-window",
-      durationMs: setup.settings.buzzing.answerWindowMs,
-      at: action.at,
-    });
+    // Everyone-answers borrows the same duration, and the same null. Here it means the typed
+    // window has no deadline of its own and the host closes it (`close-answers`) - which the
+    // mode already supported as the host's early-close.
+    const typingWindow = setup.settings.buzzing.answerWindowMs;
+    if (typingWindow !== null) {
+      events.push({
+        type: "timer-set",
+        kind: "everyone-answers-window",
+        durationMs: typingWindow,
+        at: action.at,
+      });
+    }
     return null;
   }
 
@@ -197,12 +203,20 @@ export function handleBuzz(
   clue.buzzWinner = { playerId: action.playerId, entityId };
   draft.phase = "answering";
   events.push({ type: "buzz-won", playerId: action.playerId, entityId, at: action.at });
-  events.push({
-    type: "timer-set",
-    kind: "answer-window",
-    durationMs: setup.settings.buzzing.answerWindowMs,
-    at: action.at,
-  });
+  // NO CLOCK is a real room (owner, 2026-08-20: "time to answer should allow for no time
+  // limit"), spelled null the way every other "off" duration in this settings group is. There
+  // is no second code path for it - nothing is scheduled, so nothing expires, and the host
+  // closes the answer when the room is done with it. Surfaces draw no countdown because there
+  // is no timer to draw (#lib/room/answer-clock.svelte renders nothing without one).
+  const answerWindow = setup.settings.buzzing.answerWindowMs;
+  if (answerWindow !== null) {
+    events.push({
+      type: "timer-set",
+      kind: "answer-window",
+      durationMs: answerWindow,
+      at: action.at,
+    });
+  }
   return null;
 }
 

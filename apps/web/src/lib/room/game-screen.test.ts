@@ -131,10 +131,14 @@ describe("what the console says about it", () => {
 describe("starting without a game screen", () => {
   const base = { seatedPlayers: 4, mirrored: false, connectedDisplays: null };
 
-  it("refuses an empty room, and says why", () => {
+  // WARNS rather than blocks since 2026-08-20 (owner: "allow for starting a room with 0
+  // players"). Starting empty is legitimate - a rehearsal, a board on a projector while people
+  // arrive - and people can join a running game afterwards. It is also usually an accident,
+  // which is why it still says so once.
+  it("warns about an empty room rather than refusing it", () => {
     const readiness = startReadiness({ ...base, seatedPlayers: 0, gameScreen: "open" });
-    expect(readiness.kind).toBe("blocked");
-    expect(readiness.kind === "blocked" && readiness.headline).toBe("Nobody has joined yet");
+    expect(readiness.kind).toBe("warn");
+    expect(readiness.kind === "warn" && readiness.headline).toBe("Nobody has joined yet");
   });
 
   it("warns - never blocks - when nothing is on the projector", () => {
@@ -157,9 +161,17 @@ describe("starting without a game screen", () => {
     );
   });
 
-  it("still refuses an empty room in mirror mode: the two failures are independent", () => {
-    expect(
-      startReadiness({ ...base, seatedPlayers: 0, mirrored: true, gameScreen: "open" }).kind,
-    ).toBe("blocked");
+  // The empty-room warning outranks mirror mode's "nothing to attach": a host who is mirroring
+  // has settled the screen question, so the only thing left worth saying is that the room is
+  // empty. Neither one blocks any more, so this is about which sentence is shown.
+  it("still mentions an empty room in mirror mode, where the screen question is settled", () => {
+    const readiness = startReadiness({
+      ...base,
+      seatedPlayers: 0,
+      mirrored: true,
+      gameScreen: "open",
+    });
+    expect(readiness.kind).toBe("warn");
+    expect(readiness.kind === "warn" && readiness.headline).toBe("Nobody has joined yet");
   });
 });

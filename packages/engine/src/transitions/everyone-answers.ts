@@ -36,11 +36,16 @@ export function handleJudgeSubmission(
   clue.entityVerdicts[action.entityId] = action.verdict;
   let delta = 0;
   if (action.verdict === "correct") {
+    // With NO window there is no fraction of one to decay against, so a speed-weighted room
+    // with the clock turned off awards flat value rather than dividing by nothing. Passing the
+    // elapsed time as the window makes the ratio 1, which is exactly "full value".
+    const typingWindow = setup.settings.buzzing.answerWindowMs;
+    const elapsed = submission.at - (clue.answersOpenedAt ?? submission.at);
     delta = everyoneAnswersAward(
       clue.value,
       setup.settings.answerMode.everyoneAnswers,
-      submission.at - (clue.answersOpenedAt ?? submission.at),
-      setup.settings.buzzing.answerWindowMs,
+      elapsed,
+      typingWindow ?? Math.max(elapsed, 1),
     );
   }
   const score = (draft.scores[action.entityId] ?? 0) + delta;

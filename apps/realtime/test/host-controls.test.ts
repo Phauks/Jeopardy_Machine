@@ -150,10 +150,20 @@ describe("forcing the pending timer", () => {
     const { host } = await roomWithOpenClue();
     host.sendAction({ type: "arm-buzzers" });
     await host.takeEvent("buzzers-armed");
+    // The bot buzzes the instant it is armed, so the wait the room is on by now is the ANSWER
+    // window rather than the buzz window. Waited on by its TIMER rather than by `buzz-won`:
+    // that one is a per-connection message to the presser, not an engine event, so a host
+    // waiting for it waits forever.
+    await host.takeEvent("timer-set"); // buzz-window
+    await host.takeEvent("timer-set"); // answer-window - the wait we are about to skip
     host.send({ type: "expire-timer" });
-    // The buzz window closing is exactly what the alarm would have done, just sooner.
-    const finished = await host.takeEvent("clue-finished");
-    expect(finished).toBeDefined();
+
+    // Exactly what the alarm would have done, just sooner - which since 2026-08-20 is to SAY
+    // the time is up and nothing else. All scoring is manual, so a clock the host fired early
+    // still cannot judge anybody (@jeopardy/protocol settings/groups/scoring.ts).
+    const expired = await host.takeEvent("answer-time-expired");
+    expect(expired).toBeDefined();
+    expect(host.engineEvents.filter((event) => event.type === "judged")).toEqual([]);
   });
 
   it("says so when the room is not waiting on anything, and refuses non-hosts", async () => {

@@ -42,7 +42,18 @@
   // Seconds on screen, milliseconds on the wire. A host thinks "give them ten seconds", and
   // the bounds are the settings registry's own (buzzing.answerWindowMs) so a host tuning live
   // cannot escape a limit an authored rule set is held to.
-  const answerSeconds = $derived(Math.round(rules.answerWindowMs / 1000));
+  //
+  // null is NO LIMIT (owner, 2026-08-20: "time to answer should allow for no time limit"), and
+  // the slider keeps its last position while the switch is off so turning the clock back on
+  // returns the number the host had chosen rather than a default they have to find again.
+  const limited = $derived(rules.answerWindowMs !== null);
+  let rememberedSeconds = $state(5);
+  $effect(() => {
+    if (rules.answerWindowMs !== null) rememberedSeconds = Math.round(rules.answerWindowMs / 1000);
+  });
+  const answerSeconds = $derived(
+    rules.answerWindowMs === null ? rememberedSeconds : Math.round(rules.answerWindowMs / 1000),
+  );
 
   function setAnswerSeconds(seconds: number): void {
     const clamped = Math.min(
@@ -69,7 +80,7 @@
   <div class="control">
     <label for="answer-window">
       Time to answer
-      <span class="value">{answerSeconds}s</span>
+      <span class="value">{limited ? `${String(answerSeconds)}s` : "no limit"}</span>
     </label>
     <input
       id="answer-window"
@@ -78,50 +89,37 @@
       max={answerWindowSecondBounds.max}
       step="1"
       value={answerSeconds}
+      disabled={!limited}
       oninput={(event) => {
         setAnswerSeconds(event.currentTarget.valueAsNumber);
       }}
     />
-    <p class="note">Counted down on the big screen and in the answerer's hand.</p>
-  </div>
-
-  <!-- ...AND WHAT RUNNING OUT MEANS, immediately below it, because the two are one decision.
-       A host lengthening the clock is usually trying to solve the problem this setting solves
-       properly. -->
-  <fieldset class="control">
-    <legend>When that time runs out</legend>
-    <label class="choice">
+    <label class="switch">
       <input
-        type="radio"
-        name="answer-timeout-outcome"
-        checked={rules.answerTimeoutOutcome === "counts-as-wrong"}
-        onchange={() => {
-          store.updateGameRules({ scoring: { answerTimeoutOutcome: "counts-as-wrong" } });
+        type="checkbox"
+        checked={!limited}
+        onchange={(event) => {
+          store.updateGameRules({
+            buzzing: {
+              answerWindowMs: event.currentTarget.checked ? null : rememberedSeconds * 1000,
+            },
+          });
         }}
       />
       <span>
-        <strong>It counts as wrong</strong>
-        <span class="note">The television rule. The attempt is over and the game moves on.</span>
-      </span>
-    </label>
-    <label class="choice">
-      <input
-        type="radio"
-        name="answer-timeout-outcome"
-        checked={rules.answerTimeoutOutcome === "host-decides"}
-        onchange={() => {
-          store.updateGameRules({ scoring: { answerTimeoutOutcome: "host-decides" } });
-        }}
-      />
-      <span>
-        <strong>You decide</strong>
+        <strong>No time limit</strong>
         <span class="note">
-          Nothing happens on its own - no points move and nobody is locked out. The clock just
-          says the time is up, and you judge when the room has finished talking.
+          No countdown anywhere, and nothing runs out. Take as long as the room needs and judge
+          when you are ready.
         </span>
       </span>
     </label>
-  </fieldset>
+    <p class="note">
+      {limited
+        ? "Counted down on the big screen and in the answerer's hand. Running out changes nothing on its own - you still judge every answer."
+        : "Nothing is being counted."}
+    </p>
+  </div>
 
   <!-- WHAT A WRONG ANSWER COSTS. "Just because you got it wrong does not mean you lose money." -->
   <fieldset class="control">
@@ -150,7 +148,9 @@
 
   <!-- THE REBOUND. "when someone gets a question wrong, other people answer until they someone
        gets it right." Two settings, deliberately adjacent: passing the clue on is only "until
-       someone gets it right" if the person who missed steps aside. -->
+       someone gets it right" if the person who missed steps aside. The copy was rewritten on
+       the owner's call the same day - the first version described the MECHANISM ("buzzers
+       re-arm") to a host who is asking what happens at their quiz night. -->
   <div class="control">
     <label class="switch">
       <input
@@ -161,10 +161,10 @@
         }}
       />
       <span>
-        <strong>Pass a missed clue to everyone else</strong>
+        <strong>Keep going after a wrong answer</strong>
         <span class="note">
-          Buzzers re-arm after a wrong answer and keep going until somebody is right or nobody
-          is left to try. Off means one attempt per clue.
+          Everyone else gets a shot at the same clue, until somebody is right or nobody is left
+          to try. Off ends the clue on the first wrong answer.
         </span>
       </span>
     </label>
@@ -183,19 +183,20 @@
         <strong>...and whoever missed sits that clue out</strong>
         <span class="note">
           {rules.rebound
-            ? "Off lets the same person buzz again on the rebound."
-            : "Nothing to sit out while a missed clue ends the attempt."}
+            ? "Turn this off and they can buzz again on the same clue."
+            : "Nothing to sit out - a wrong answer already ends the clue."}
         </span>
       </span>
     </label>
   </div>
 
+  <!-- The old version of this footnote explained the ARCHITECTURE - which rules the running
+       state was built from, and a phone count that read "the state on 0 phones was built from"
+       in an empty room. A host does not need the reason; they need to know where to look for
+       the settings that are not here (owner, 2026-08-20). -->
   <p class="foot">
-    Everything else about this game - the board, the rounds, the wager cells, whether people
-    play in teams - was settled when the room opened and cannot move mid-game. Those are what
-    the state on {view.roster.players.length}
-    {view.roster.players.length === 1 ? "phone" : "phones"} was built from.
-    <span class="cap">Caps and limits stay where they are: hosts tune down, never up.</span>
+    The board, the rounds, the wager cells and whether people play in teams were set when this
+    room opened. Changing those means a new room.
   </p>
 </section>
 
@@ -319,10 +320,5 @@
     padding-block-start: 0.7rem;
     border-block-start: 1px solid var(--control-border);
     font-size: 0.85em;
-  }
-
-  .cap {
-    display: block;
-    margin-block-start: 0.3rem;
   }
 </style>

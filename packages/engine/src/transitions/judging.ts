@@ -2,7 +2,7 @@
 // manual-mode awards, and clue cancellation. Scoring math lives in scoring.ts; this module
 // owns the consequences (lockouts, re-arms, control passing, clue closure).
 import { closeClue } from "../flow.ts";
-import { answerTimeoutDelta, wrongAnswerDelta } from "../scoring.ts";
+import { wrongAnswerDelta } from "../scoring.ts";
 import { finishTiebreaker } from "../standings.ts";
 import { entityForPlayer } from "../state.ts";
 import type { GameAction, Verdict } from "../actions.ts";
@@ -179,22 +179,13 @@ export function handleAnswerTimeout(
     const clue = draft.clue;
     if (clue === null || clue.buzzWinner === null) return "no-buzz-winner";
     const winner = clue.buzzWinner;
-    // HOST-DECIDES: the clock is information, not a verdict (owner, 2026-08-20 - the setting's
-    // own note in @jeopardy/protocol settings/groups/scoring.ts). Nothing moves: the same buzz
-    // winner still holds the floor, no score changes, nobody is locked out, and the host
-    // judges when the room has finished arguing. The event is still emitted so every surface
-    // can say "over time" - that is the whole point of leaving the timer on screen.
-    if (setup.settings.scoring.answerTimeoutOutcome === "host-decides") {
-      events.push({ type: "answer-time-expired", entityId: winner.entityId });
-      return null;
-    }
-    const delta = answerTimeoutDelta(
-      draft.scores[winner.entityId] ?? 0,
-      clue.value,
-      setup.settings,
-    );
-    applyDelta(draft, winner.entityId, delta, "timeout", events);
-    afterMiss(draft, setup, events, action.at, clue, winner.entityId, true);
+    // THE CLOCK IS INFORMATION, NOT A VERDICT, and there is no setting that makes it one
+    // (owner, 2026-08-20: "all scoring is manual, remove it counts as wrong option" -
+    // @jeopardy/protocol settings/groups/scoring.ts records the full reasoning). Nothing
+    // moves: the same buzz winner still holds the floor, no score changes, nobody is locked
+    // out. The event is emitted so every surface can say "over time", which is the whole point
+    // of putting the timer on the projector.
+    events.push({ type: "answer-time-expired", entityId: winner.entityId });
     return null;
   }
 
@@ -202,16 +193,10 @@ export function handleAnswerTimeout(
     const clue = draft.clue;
     if (clue === null || clue.selectedBy === null || clue.wager === null) return "no-wager";
     const entityId = clue.selectedBy;
-    const wager = clue.wager;
     // Same rule on a wager clue, and for a stronger reason: the stake is the player's own
-    // number, so a clock ending it is the harshest possible way to lose a bet nobody judged.
-    if (setup.settings.scoring.answerTimeoutOutcome === "host-decides") {
-      events.push({ type: "answer-time-expired", entityId });
-      return null;
-    }
-    const delta = answerTimeoutDelta(draft.scores[entityId] ?? 0, wager, setup.settings);
-    applyDelta(draft, entityId, delta, "timeout", events);
-    closeClue(draft, setup, events, action.at, "dead");
+    // number, so a clock ending it would be the harshest possible way to lose a bet nobody
+    // judged.
+    events.push({ type: "answer-time-expired", entityId });
     return null;
   }
 

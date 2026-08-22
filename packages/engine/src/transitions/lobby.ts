@@ -127,7 +127,16 @@ export function handleStartGame(
   events: GameEvent[],
 ): string | null {
   if (draft.phase !== "lobby") return "already-started";
-  if (draft.entityOrder.length === 0) return "nobody-joined";
+  // AN EMPTY ROOM MAY START (owner, 2026-08-20: "allow for starting a room with 0 players").
+  // The refusal here was "nobody-joined", and it was guarding a shape the engine turns out not
+  // to need: entityOrder drives scoring and selection order, and both already handle being
+  // empty - nobody has control, nobody can buzz, and the board simply sits there.
+  //
+  // What it cost was real: a host rehearsing before the doors open, running the board on a
+  // projector while the room fills up, or driving the whole night manually because the wi-fi
+  // died, all met a refusal for doing something perfectly sensible. Late join (#43) then lets
+  // people arrive INTO the running game, which is the same path a room that started with two
+  // people uses when a third walks in.
 
   // Materialize per-round board state; wager cells place NOW so the whole game's hidden
   // layout is fixed by the seed (settings rows #23/#24; authored cells win on manual rounds).

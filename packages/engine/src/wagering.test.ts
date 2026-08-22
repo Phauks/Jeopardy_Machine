@@ -125,14 +125,19 @@ describe("wager cells (matrix #23-#28)", () => {
     expect(game.state.scores[controller]).toBe(0);
   });
 
-  it("matrix #18: the answer timeout treats the wager like a wrong answer", () => {
+  // Row 18 left on 2026-08-20 with the rest of automatic scoring. A wager is the case where
+  // it mattered most: the stake is the player's OWN number, so a clock ending it would be the
+  // harshest possible way to lose a bet nobody judged.
+  it("the answer clock takes nothing from a wager - the host still judges it", () => {
     let game = atWagerPrompt(wagerSetupOptions(), 800);
     const controller = game.state.controlEntity ?? "p1";
+    const before = game.state.scores[controller] ?? 0;
     game = runOn(game, [
       { type: "commit-wager", at: 2200, amount: 500 },
       { type: "answer-timeout", at: 9000 },
     ]);
-    expect(game.state.scores[controller]).toBe(300);
+    expect(game.state.scores[controller]).toBe(before);
+    expect(game.state.phase).toBe("wager-answering");
   });
 
   it("matrix #27: the entry timer expiry force-commits the minimum", () => {

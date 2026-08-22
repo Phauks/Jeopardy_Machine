@@ -22,10 +22,30 @@ describe("lobby and joining", () => {
     expect(eventsOfType(game.events, "round-started")[0]?.roundIndex).toBe(0);
   });
 
-  it("start-game with nobody joined is rejected", () => {
+  // ALLOWED since 2026-08-20 (owner: "allow for starting a room with 0 players"). The refusal
+  // was guarding a shape the engine turns out not to need - entityOrder drives scoring and
+  // selection order, and both already handle being empty. What it cost was a host rehearsing
+  // before the doors open, or running the board while the room fills up, meeting a refusal for
+  // doing something sensible; people can still arrive into a running game (late join, #43).
+  it("start-game with nobody joined is allowed, and starts a real round", () => {
     const setup = testSetup();
     const empty = { state: createInitialState(setup), events: [], setup };
-    expect(applyExpectingRejection(empty, { type: "start-game", at: 1 })).toBe("nobody-joined");
+    const game = runOn(empty, [{ type: "start-game", at: 1 }]);
+    expect(game.state.phase).toBe("awaiting-selection");
+    expect(game.state.entityOrder).toEqual([]);
+    expect(game.state.controlEntity).toBeNull();
+    expect(eventsOfType(game.events, "round-started")[0]?.roundIndex).toBe(0);
+  });
+
+  it("and the empty game it starts is playable: a cell opens with nobody to buzz", () => {
+    const setup = testSetup();
+    const empty = { state: createInitialState(setup), events: [], setup };
+    const game = runOn(empty, [
+      { type: "start-game", at: 1 },
+      { type: "select-cell", at: 2000, category: 0, row: 0 },
+    ]);
+    expect(game.state.phase).toBe("reading");
+    expect(game.state.clue).not.toBeNull();
   });
 
   it("a second start-game is rejected", () => {

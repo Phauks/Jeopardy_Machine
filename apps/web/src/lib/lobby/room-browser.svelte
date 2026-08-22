@@ -141,8 +141,63 @@
 </section>
 
 <style>
+  /* Board materials, not chrome materials: this region sits on the gutter color and its rooms
+     are cells (room-card.svelte). Deriving from --board-* keeps it legible under every preset,
+     including the light paper one, where the chrome tokens collapse toward each other. */
+  .room-browser {
+    --browser-ink: var(--clue-text-color);
+    --browser-muted: color-mix(in srgb, var(--clue-text-color) 66%, transparent);
+    --browser-rule: color-mix(in srgb, var(--clue-text-color) 22%, transparent);
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+    color: var(--browser-ink);
+    transition: opacity 150ms ease;
+  }
 
+  /* Stepped back rather than switched off: a complete code is what happens next, but the list
+     it was typed over stays readable (decision 2026-08-18 §1). */
+  .room-browser.dimmed {
+    opacity: 0.55;
+  }
 
+  .browser-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--browser-rule);
+  }
+
+  .browser-title {
+    margin: 0;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-size: 0.9rem;
+  }
+
+  .browser-count {
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.7rem;
+    color: var(--board-value-color);
+  }
+
+  .browser-tools {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.9rem;
+    margin-left: auto;
+    font-family: var(--font-chrome);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.66rem;
+    color: var(--browser-muted);
+  }
 
   .refresh {
     font: inherit;
